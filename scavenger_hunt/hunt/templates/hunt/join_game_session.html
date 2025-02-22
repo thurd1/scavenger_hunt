@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 style="color: #90C83C">Welcome to The Amazing Race</h1>
+    
+    <div class="join-options">
+        <div class="option-box">
+            <h2 style="color: #90C83C">Join Game</h2>
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="lobby_code">Enter Game Code:</label>
+                    <input type="text" name="lobby_code" id="lobby_code" required class="input-field" 
+                           maxlength="4" style="text-transform: uppercase;" placeholder="ABCD">
+                </div>
+                <button type="submit" class="btn">Join Game</button>
+            </form>
+            <div class="admin-link">
+                <a href="{% url 'login' %}">Are you an Admin? Log in here</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+    <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<style>
+.container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1rem;
+}
+
+.join-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.option-box {
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
+    padding: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    color: #90C83C;
+    margin-bottom: 0.5rem;
+}
+
+.input-field {
+    width: 100%;
+    padding: 0.8rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    font-size: 16px;
+}
+
+.btn {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    text-align: center;
+    background: linear-gradient(135deg, #FFA500, #FF7F00);
+    color: white;
+    text-decoration: none;
+    border-radius: 25px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    margin-bottom: 1rem;
+}
+
+.btn:hover {
+    background: linear-gradient(135deg, #FF7F00, #FF4500);
+    transform: scale(1.05);
+    text-decoration: none;
+    color: white;
+}
+
+.admin-link {
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}
+
+.admin-link a {
+    color: #90C83C;
+    text-decoration: none;
+    opacity: 0.8;
+    transition: all 0.3s ease;
+}
+
+.admin-link a:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+h2 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.alert {
+    margin: 1rem auto;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    max-width: 600px;
+}
+
+.alert-error {
+    background-color: rgba(255, 99, 71, 0.2);
+    color: #ff6347;
+}
+
+.alert-success {
+    background-color: rgba(144, 200, 60, 0.2);
+    color: #90C83C;
+}
+</style>
+{% endblock %} 
