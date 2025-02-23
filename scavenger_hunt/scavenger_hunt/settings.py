@@ -57,7 +57,7 @@ DATABASES = {
         'NAME': 'scavenger_hunt',
         'USER': 'admin',
         'PASSWORD': 'your_db_password',
-        'HOST': 'your-db-instance-name.region.rds.amazonaws.com',
+        'HOST': 'ec2-35-84-106-252.us-west-2.compute.amazonaws.com',
         'PORT': '5432',
     }
 }
