@@ -54,8 +54,8 @@ WSGI_APPLICATION = 'scavenger_hunt.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'your_db_name',
-        'USER': 'your_db_user',
+        'NAME': 'scavenger_hunt',
+        'USER': 'admin',
         'PASSWORD': 'your_db_password',
         'HOST': 'your-db-instance-name.region.rds.amazonaws.com',
         'PORT': '5432',
