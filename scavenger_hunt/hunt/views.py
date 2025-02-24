@@ -299,5 +299,3 @@ def view_team(request, team_id):
         'team': team,
         'members': team.team_members.all()
     })
-
-    })
