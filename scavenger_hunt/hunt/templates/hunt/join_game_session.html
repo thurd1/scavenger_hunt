@@ -7,13 +7,13 @@
     <div class="join-options">
         <div class="option-box">
             <h2 style="color: #90C83C">Join Game</h2>
-            <form method="post">
+            <form method="post" action="{% url 'home' %}">
                 {% csrf_token %}
                 <div class="form-group">
-                    <label for="lobby_code">Enter Game Code:</label>
+                    <label for="invite_code" style="color: #90C83C">Enter Game Code:</label>
                     <input type="text" 
-                           name="lobby_code" 
-                           id="lobby_code" 
+                           name="code"
+                           id="invite_code" 
                            required 
                            class="input-field" 
                            maxlength="6"
