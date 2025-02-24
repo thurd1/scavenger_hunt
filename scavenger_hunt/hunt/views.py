@@ -131,21 +131,25 @@ def save_player_name(request):
         return render(request, 'team_options.html', {'lobby': lobby})
     return redirect('join_game_session')
 
-
 def join_existing_team(request, lobby_id):
     if request.method == 'POST':
         team_code = request.POST.get('team_code')
+        print(f"Attempting to join team with code: {team_code}")
         try:
             team = Team.objects.get(code=team_code, lobbies=lobby_id)
             player_name = request.session.get('player_name')
+            print(f"Player name from session: {player_name}")
             if player_name:
+                # Create team member with player_name as both role and user
                 team_member = TeamMember.objects.create(
                     team=team,
-                    role=player_name,
+                    role=player_name,  # Store the player name as role
                 )
+                print(f"Created team member: {team_member.role} for team: {team.name}")
                 messages.success(request, f'Successfully joined team {team.name}!')
             return redirect('team_dashboard', team_id=team.id)
         except Team.DoesNotExist:
+            print(f"No team found with code {team_code} in lobby {lobby_id}")
             messages.error(request, 'Invalid team code. Please try again.')
     
     lobby = get_object_or_404(Lobby, id=lobby_id)
@@ -226,8 +230,22 @@ def create_team(request, lobby_id):
     })
 
 def team_dashboard(request, team_id):
-    team = get_object_or_404(Team, id=team_id)
-    return render(request, 'team_dashboard.html', {'team': team})
+    # Get team with related team members
+    team = get_object_or_404(Team.objects.prefetch_related('team_members'), id=team_id)
+    team_members = TeamMember.objects.filter(team=team)  # Direct query
+    print(f"Team ID: {team_id}")
+    print(f"Team name: {team.name}")
+    print(f"Number of team members: {team_members.count()}")
+    print(f"Team members found: {[m.role for m in team_members]}")
+    
+    # Verify the data in the template context
+    context = {
+        'team': team,
+        'team_members': team_members
+    }
+    print(f"Context team members: {[m.role for m in context['team_members']]}")
+    
+    return render(request, 'team_dashboard.html', context)
 
 @login_required
 def leader_dashboard(request):
@@ -280,4 +298,6 @@ def view_team(request, team_id):
     return render(request, 'view_team.html', {
         'team': team,
         'members': team.team_members.all()
+    })
+
     })
