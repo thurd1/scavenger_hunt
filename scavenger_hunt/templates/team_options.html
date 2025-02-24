@@ -14,7 +14,9 @@
                        required 
                        class="input-field" 
                        placeholder="Your name"
+                       value="{{ request.session.player_name }}"
                        autofocus>
+                <button type="submit" class="btn">Save Name</button>
             </form>
         </div>
 
