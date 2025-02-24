@@ -10,7 +10,7 @@ def generate_lobby_code():
 
 class Lobby(models.Model):
     name = models.CharField(max_length=100)
-    code = models.CharField(max_length=4, unique=True, blank=True)
+    code = models.CharField(max_length=6, unique=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     teams = models.ManyToManyField('Team', related_name='lobbies', blank=True)
     is_active = models.BooleanField(default=True)
@@ -18,7 +18,7 @@ class Lobby(models.Model):
     def save(self, *args, **kwargs):
         if not self.code:
             while True:
-                code = ''.join(random.choices(string.ascii_uppercase, k=4))
+                code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
                 if not Lobby.objects.filter(code=code).exists():
                     self.code = code
                     break
@@ -112,3 +112,4 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return self.user.username
+
