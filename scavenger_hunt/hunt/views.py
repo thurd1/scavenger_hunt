@@ -131,6 +131,7 @@ def save_player_name(request):
         return render(request, 'team_options.html', {'lobby': lobby})
     return redirect('join_game_session')
 
+
 def join_existing_team(request, lobby_id):
     if request.method == 'POST':
         team_code = request.POST.get('team_code')
@@ -138,9 +139,9 @@ def join_existing_team(request, lobby_id):
             team = Team.objects.get(code=team_code, lobbies=lobby_id)
             player_name = request.session.get('player_name')
             if player_name:
-                TeamMember.objects.create(
+                team_member = TeamMember.objects.create(
                     team=team,
-                    role=player_name
+                    role=player_name,
                 )
                 messages.success(request, f'Successfully joined team {team.name}!')
             return redirect('team_dashboard', team_id=team.id)
