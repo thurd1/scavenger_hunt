@@ -26,7 +26,7 @@ def create_lobby(request):
 @login_required
 def lobby_details(request, lobby_id):
     lobby = get_object_or_404(Lobby, id=lobby_id)
-    teams = lobby.teams.all()  # Get all teams in the lobby using the reverse relationship
+    teams = lobby.teams.all()
     
     context = {
         'lobby': lobby,
@@ -64,6 +64,26 @@ def generate_code():
 
 def home(request):
     print("Home view accessed")
+    if request.method == 'POST':
+        code = request.POST.get('code')
+        print(f"Received code: {code}")
+        try:
+            lobby = Lobby.objects.filter(code=code).first()
+            if lobby is None:
+                print(f"No lobby found with code: {code}")
+                return render(request, 'hunt/join_game_session.html', {'error': 'Invalid lobby code. Please try again.'})
+            
+            if not lobby.is_active:
+                print(f"Lobby found but inactive: {lobby.name}")
+                return render(request, 'hunt/join_game_session.html', {'error': 'This lobby is no longer active.'})
+            
+            print(f"Found active lobby: {lobby.name}")
+            request.session['lobby_code'] = code
+            return render(request, 'team_options.html', {'lobby': lobby})
+            
+        except Exception as e:
+            print(f"Error looking up lobby: {str(e)}")
+            return render(request, 'hunt/join_game_session.html', {'error': 'An error occurred. Please try again.'})
     return render(request, 'hunt/join_game_session.html')
 
 def user_login(request):
@@ -113,10 +133,9 @@ def join_existing_team(request, lobby_id):
             team = Team.objects.get(code=team_code, lobbies=lobby_id)
             player_name = request.session.get('player_name')
             if player_name:
-                # Create a new TeamMember
                 TeamMember.objects.create(
                     team=team,
-                    role=player_name  # Using player_name as role since we don't have a user account
+                    role=player_name
                 )
                 messages.success(request, f'Successfully joined team {team.name}!')
             return redirect('team_dashboard', team_id=team.id)
@@ -256,3 +275,4 @@ def view_team(request, team_id):
         'team': team,
         'members': team.team_members.all()
     })
+
