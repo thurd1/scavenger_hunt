@@ -12,19 +12,17 @@
         <div class="player-section">
             <h3>Team Members</h3>
             <div class="members-list">
-                {% if team.team_members.all %}
-                    {% for member in team.team_members.all %}
-                        <div class="member-item">
-                            {% if member.user %}
-                                {{ member.user.username }}
-                            {% else %}
-                                {{ member.role }}
-                            {% endif %}
-                        </div>
-                    {% endfor %}
-                {% else %}
+                {% for member in team_members %}
+                    <div class="member-item">
+                        {% if member.user %}
+                            {{ member.user.username }}
+                        {% else %}
+                            {{ member.role }}
+                        {% endif %}
+                    </div>
+                {% empty %}
                     <p>No team members yet</p>
-                {% endif %}
+                {% endfor %}
             </div>
         </div>
 
