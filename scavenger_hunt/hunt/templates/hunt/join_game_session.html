@@ -11,8 +11,16 @@
                 {% csrf_token %}
                 <div class="form-group">
                     <label for="lobby_code">Enter Game Code:</label>
-                    <input type="text" name="lobby_code" id="lobby_code" required class="input-field" 
-                           maxlength="4" style="text-transform: uppercase;" placeholder="ABCD">
+                    <input type="text" 
+                           name="lobby_code" 
+                           id="lobby_code" 
+                           required 
+                           class="input-field" 
+                           maxlength="6"
+                           minlength="6"
+                           pattern="[A-Za-z0-9]{6}"
+                           style="text-transform: uppercase;" 
+                           placeholder="XXXXXX">
                 </div>
                 <button type="submit" class="btn">Join Game</button>
             </form>
