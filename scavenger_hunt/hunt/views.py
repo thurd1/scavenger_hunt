@@ -65,8 +65,13 @@ def generate_code():
 def home(request):
     print("Home view accessed")
     if request.method == 'POST':
-        code = request.POST.get('code')
+        code = request.POST.get('code') or request.POST.get('lobby_code')
         print(f"Received code: {code}")
+        
+        if not code:
+            print("No code received in POST request")
+            return render(request, 'hunt/join_game_session.html', {'error': 'Please enter a game code.'})
+            
         try:
             lobby = Lobby.objects.filter(code=code).first()
             if lobby is None:
@@ -275,4 +280,3 @@ def view_team(request, team_id):
         'team': team,
         'members': team.team_members.all()
     })
-
