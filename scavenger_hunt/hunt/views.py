@@ -125,8 +125,14 @@ def join_game_session(request):
 def save_player_name(request):
     if request.method == 'POST':
         player_name = request.POST.get('player_name')
+        print(f"Saving player name to session: {player_name}")  # Debug print
         request.session['player_name'] = player_name
+        request.session.modified = True  # Force session save
+        print(f"Player name in session after save: {request.session.get('player_name')}")  # Verify save
+        
         lobby_code = request.session.get('lobby_code')
+        print(f"Lobby code in session: {lobby_code}")  # Debug print
+        
         lobby = get_object_or_404(Lobby, code=lobby_code)
         return render(request, 'team_options.html', {'lobby': lobby})
     return redirect('join_game_session')
@@ -221,13 +227,15 @@ def create_team(request, lobby_id):
             
             # Create a team member for the creator
             player_name = request.session.get('player_name')
-            print(f"Creating team member for: {player_name}")
+            print(f"Creating team with player name from session: {player_name}")  # Debug print
             if player_name:
                 team_member = TeamMember.objects.create(
                     team=team,
                     role=player_name
                 )
-                print(f"Created team member: {team_member.role}")
+                print(f"Created team member: {team_member.id} - {team_member.role}")  # Debug print
+            else:
+                print("No player name found in session!")  # Debug print
             
             request.session['team_id'] = team.id
             messages.success(request, f'Team created! Your team code is: {team.code}')
