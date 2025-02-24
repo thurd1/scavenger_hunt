@@ -13,12 +13,32 @@
                    name="code" 
                    id="invite_code" 
                    required 
+                   minlength="6"
+                   maxlength="6"
+                   size="6"
+                   pattern="[A-Za-z0-9]{6}"
+                   oninput="this.value = this.value.toUpperCase()"
                    style="width: 200px; font-size: 24px;"
-                   value="">
+                   value=""
+                   autocomplete="off">
             {% if error %}
                 <p>{{ error }}</p>
             {% endif %}
             <button type="submit">Join</button>
         </form>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const input = document.getElementById('invite_code');
+            
+            const newInput = input.cloneNode(true);
+            input.parentNode.replaceChild(newInput, input);
+            
+            newInput.addEventListener('input', function(e) {
+                console.log('Input value:', e.target.value);
+                console.log('Input length:', e.target.value.length);
+            });
+        });
+    </script>
 {% endblock %}
