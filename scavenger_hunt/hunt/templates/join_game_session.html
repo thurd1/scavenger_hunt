@@ -4,28 +4,21 @@
 {% block title %}Join Game Session{% endblock %}
 
 {% block content %}
-    <div class="form-container">
-        <h2><p style="color: #FFA500; font-weight: bold;"> Join Game Session</h2>
+    <div>
+        <h2>Join Game Session</h2>
         <form method="POST">
             {% csrf_token %}
-            <label for="invite_code" style="color: #90C83C">Enter Invite Code:</label>
+            <label for="invite_code">Enter Invite Code:</label>
             <input type="text" 
                    name="code" 
                    id="invite_code" 
                    required 
-                   minlength="6" 
-                   maxlength="6" 
-                   pattern="[A-Z0-9]{6}" 
-                   placeholder="XXXXXX"
-                   style="text-transform: uppercase;">
+                   style="width: 200px; font-size: 24px;"
+                   value="">
             {% if error %}
-                <p style="color: red; font-weight: bold;">{{ error }}</p>
+                <p>{{ error }}</p>
             {% endif %}
-            <button type="submit" class="btn">Join</button>
+            <button type="submit">Join</button>
         </form>
-        
-        <p class="login-link">
-            <p style="color: #90C83C">Are you an Admin? <a href="{% url 'login' %}" style="color: #FFA500; font-weight: bold;">Login here</a>.
-        </p>
     </div>
 {% endblock %}
