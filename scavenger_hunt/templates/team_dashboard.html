@@ -12,8 +12,14 @@
         <div class="player-section">
             <h3>Team Members</h3>
             <div class="members-list">
+                <!-- Debug info -->
+                <p style="color: gray;">Debug: Number of members: {{ team_members|length }}</p>
+                
                 {% for member in team_members %}
                     <div class="member-item">
+                        <!-- Debug info -->
+                        <p style="color: gray;">Member role: {{ member.role }}</p>
+                        
                         {% if member.user %}
                             {{ member.user.username }}
                         {% else %}
@@ -151,4 +157,4 @@ h3 {
 </style>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-{% endblock %} 
+{% endblock %}  
