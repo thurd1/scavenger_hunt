@@ -15,13 +15,11 @@
                 {% if team.team_members.all %}
                     {% for member in team.team_members.all %}
                         <div class="member-item">
-                            {{ member.player_name }}
-                        </div>
-                    {% endfor %}
-                {% elif team.members.all %}
-                    {% for member in team.members.all %}
-                        <div class="member-item">
-                            {{ member.player_name }}
+                            {% if member.user %}
+                                {{ member.user.username }}
+                            {% else %}
+                                {{ member.role }}
+                            {% endif %}
                         </div>
                     {% endfor %}
                 {% else %}
