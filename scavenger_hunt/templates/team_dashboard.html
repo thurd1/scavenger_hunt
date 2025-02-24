@@ -12,17 +12,21 @@
         <div class="player-section">
             <h3>Team Members</h3>
             <div class="members-list">
-                {% for member in team.members.all %}
-                    <div class="member-item">
-                        {% if member.user %}
-                            {{ member.user.username }}
-                        {% else %}
-                            {{ member.role }}
-                        {% endif %}
-                    </div>
-                {% empty %}
+                {% if team.team_members.all %}
+                    {% for member in team.team_members.all %}
+                        <div class="member-item">
+                            {{ member.player_name }}
+                        </div>
+                    {% endfor %}
+                {% elif team.members.all %}
+                    {% for member in team.members.all %}
+                        <div class="member-item">
+                            {{ member.player_name }}
+                        </div>
+                    {% endfor %}
+                {% else %}
                     <p>No team members yet</p>
-                {% endfor %}
+                {% endif %}
             </div>
         </div>
 
@@ -144,7 +148,7 @@ h3 {
     text-decoration: none;
     color: white;
 }
-    
+
 .btn i {
     margin-right: 0.5rem;
 }
