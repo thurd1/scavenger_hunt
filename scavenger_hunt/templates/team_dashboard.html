@@ -13,13 +13,14 @@
             <h3>Team Members</h3>
             <div class="members-list">
                 <!-- Debug info -->
+                <p style="color: gray;">Debug: Team ID: {{ team.id }}</p>
+                <p style="color: gray;">Debug: Team Name: {{ team.name }}</p>
                 <p style="color: gray;">Debug: Number of members: {{ team_members|length }}</p>
                 
                 {% for member in team_members %}
                     <div class="member-item">
-                        <!-- Debug info -->
-                        <p style="color: gray;">Member role: {{ member.role }}</p>
-                        
+                        <p style="color: gray;">Debug: Member ID: {{ member.id }}</p>
+                        <p style="color: gray;">Debug: Member Role: {{ member.role }}</p>
                         {% if member.user %}
                             {{ member.user.username }}
                         {% else %}
@@ -28,6 +29,8 @@
                     </div>
                 {% empty %}
                     <p>No team members yet</p>
+                    <!-- More debug info -->
+                    <p style="color: gray;">Debug: Session player name: {{ request.session.player_name }}</p>
                 {% endfor %}
             </div>
         </div>
@@ -157,4 +160,4 @@ h3 {
 </style>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-{% endblock %}  
+{% endblock %} 
