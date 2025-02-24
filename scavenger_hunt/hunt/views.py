@@ -218,6 +218,17 @@ def create_team(request, lobby_id):
         if form.is_valid():
             team = form.save()
             lobby.teams.add(team)
+            
+            # Create a team member for the creator
+            player_name = request.session.get('player_name')
+            print(f"Creating team member for: {player_name}")
+            if player_name:
+                team_member = TeamMember.objects.create(
+                    team=team,
+                    role=player_name
+                )
+                print(f"Created team member: {team_member.role}")
+            
             request.session['team_id'] = team.id
             messages.success(request, f'Team created! Your team code is: {team.code}')
             return redirect('team_dashboard', team_id=team.id)
@@ -230,20 +241,23 @@ def create_team(request, lobby_id):
     })
 
 def team_dashboard(request, team_id):
-    # Get team with related team members
-    team = get_object_or_404(Team.objects.prefetch_related('team_members'), id=team_id)
-    team_members = TeamMember.objects.filter(team=team)  # Direct query
+    team = get_object_or_404(Team, id=team_id)
+    team_members = TeamMember.objects.filter(team=team)
+    
     print(f"Team ID: {team_id}")
     print(f"Team name: {team.name}")
+    print(f"Raw SQL query: {str(team_members.query)}")  # Print the SQL query
     print(f"Number of team members: {team_members.count()}")
     print(f"Team members found: {[m.role for m in team_members]}")
     
-    # Verify the data in the template context
+    # Try to get all TeamMember objects for debugging
+    all_members = TeamMember.objects.all()
+    print(f"All TeamMembers in database: {[m.role for m in all_members]}")
+    
     context = {
         'team': team,
         'team_members': team_members
     }
-    print(f"Context team members: {[m.role for m in context['team_members']]}")
     
     return render(request, 'team_dashboard.html', context)
 
@@ -298,4 +312,6 @@ def view_team(request, team_id):
     return render(request, 'view_team.html', {
         'team': team,
         'members': team.team_members.all()
+    })
+
     })
