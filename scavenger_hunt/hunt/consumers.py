@@ -19,7 +19,6 @@ class TeamConsumer(AsyncWebsocketConsumer):
         )
         await self.accept()
 
-        # Send initial team members list
         team_members = await self.get_team_members()
         await self.send(text_data=json.dumps({
             'type': 'team_members',
@@ -30,13 +29,9 @@ class TeamConsumer(AsyncWebsocketConsumer):
         logger.info(f"WebSocket disconnected for team {self.team_id} with player {self.player_name}")
         
         if self.player_name:
-            # Remove the team member
             await self.remove_team_member()
-            
-            # Get updated list of team members
             team_members = await self.get_team_members()
             
-            # Broadcast the update to all connected clients
             await self.channel_layer.group_send(
                 self.team_group_name,
                 {
