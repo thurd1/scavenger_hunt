@@ -11,24 +11,10 @@
 
         <div class="player-section">
             <h3>Team Members</h3>
-            <div class="members-list">
-                <!-- Debug info -->
-                <p style="color: gray;">Debug: Team ID: {{ team.id }}</p>
-                <p style="color: gray;">Debug: Team Name: {{ team.name }}</p>
-                <p style="color: gray;">Debug: Number of members: {{ team_members|length }}</p>
-                <p style="color: gray;">Debug: Session player name: {{ request.session.player_name }}</p>
-                <p style="color: gray;">Debug: Session team ID: {{ request.session.team_id }}</p>
-                <p style="color: gray;">Debug: Session lobby code: {{ request.session.lobby_code }}</p>
-                
+            <div class="members-list" id="members-list">
                 {% for member in team_members %}
                     <div class="member-item">
-                        <p style="color: gray;">Debug: Member ID: {{ member.id }}</p>
-                        <p style="color: gray;">Debug: Member Role: {{ member.role }}</p>
-                        {% if member.user %}
-                            {{ member.user.username }}
-                        {% else %}
-                            {{ member.role }}
-                        {% endif %}
+                        {{ member.role }}
                     </div>
                 {% empty %}
                     <p>No team members yet</p>
