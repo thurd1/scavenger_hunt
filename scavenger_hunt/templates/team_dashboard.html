@@ -28,7 +28,7 @@
         </div>
 
         <div class="navigation-buttons">
-            <a href="{% url 'join_existing_team' lobby_id=team.lobbies.first.id %}" class="btn home-btn">
+            <a href="{% url 'join_team' lobby_id=team.lobbies.first.id %}" class="btn home-btn">
                 <i class="fas fa-users"></i> Join Team
             </a>
             <a href="{% url 'join_game_session' %}" class="btn change-team-btn">
@@ -37,6 +37,32 @@
         </div>
     </div>
 </div>
+
+<script>
+    const teamSocket = new WebSocket(
+        'ws://' + window.location.host + 
+        '/ws/team/{{ team.id }}/'
+    );
+
+    teamSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'team_members') {
+            const membersList = document.getElementById('members-list');
+            membersList.innerHTML = '';
+            
+            data.members.forEach(member => {
+                const memberDiv = document.createElement('div');
+                memberDiv.className = 'member-item';
+                memberDiv.textContent = member;
+                membersList.appendChild(memberDiv);
+            });
+        }
+    };
+
+    teamSocket.onclose = function(e) {
+        console.error('Team socket closed unexpectedly');
+    };
+</script>
 
 <style>
 .container {
