@@ -140,22 +140,27 @@ def save_player_name(request):
 def join_existing_team(request, lobby_id):
     if request.method == 'POST':
         team_code = request.POST.get('team_code')
-        print(f"Attempting to join team with code: {team_code}")
         try:
             team = Team.objects.get(code=team_code, lobbies=lobby_id)
             player_name = request.session.get('player_name')
-            print(f"Player name from session: {player_name}")
             if player_name:
-                # Create team member with player_name as both role and user
-                team_member = TeamMember.objects.create(
+                # Check if this player is already a member of the team
+                existing_member = TeamMember.objects.filter(
                     team=team,
-                    role=player_name,  # Store the player name as role
-                )
-                print(f"Created team member: {team_member.role} for team: {team.name}")
-                messages.success(request, f'Successfully joined team {team.name}!')
+                    role=player_name
+                ).first()
+                
+                if not existing_member:
+                    # Only create a new team member if they don't exist
+                    team_member = TeamMember.objects.create(
+                        team=team,
+                        role=player_name
+                    )
+                    messages.success(request, f'Successfully joined team {team.name}!')
+                else:
+                    messages.info(request, 'You are already a member of this team!')
             return redirect('team_dashboard', team_id=team.id)
         except Team.DoesNotExist:
-            print(f"No team found with code {team_code} in lobby {lobby_id}")
             messages.error(request, 'Invalid team code. Please try again.')
     
     lobby = get_object_or_404(Lobby, id=lobby_id)
@@ -227,15 +232,18 @@ def create_team(request, lobby_id):
             
             # Create a team member for the creator
             player_name = request.session.get('player_name')
-            print(f"Creating team with player name from session: {player_name}")  # Debug print
             if player_name:
-                team_member = TeamMember.objects.create(
+                # Check if this player is already a member
+                existing_member = TeamMember.objects.filter(
                     team=team,
                     role=player_name
-                )
-                print(f"Created team member: {team_member.id} - {team_member.role}")  # Debug print
-            else:
-                print("No player name found in session!")  # Debug print
+                ).first()
+                
+                if not existing_member:
+                    team_member = TeamMember.objects.create(
+                        team=team,
+                        role=player_name
+                    )
             
             request.session['team_id'] = team.id
             messages.success(request, f'Team created! Your team code is: {team.code}')
