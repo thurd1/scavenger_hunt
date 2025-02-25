@@ -76,17 +76,14 @@
         return teamSocket;
     }
 
-    // Initial connection
     let socket = connectWebSocket();
 
-    // Cleanup on page unload
     window.onbeforeunload = function() {
         if (socket) {
             socket.close();
         }
     };
 
-    // Also handle visibility change
     document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'hidden') {
             if (socket) {
