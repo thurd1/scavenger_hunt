@@ -13,6 +13,9 @@ from django.urls import reverse
 from django.http import HttpResponseRedirect
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+import logging
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def create_lobby(request):
@@ -145,6 +148,8 @@ def join_existing_team(request, lobby_id):
         try:
             team = Team.objects.get(code=team_code, lobbies=lobby_id)
             player_name = request.session.get('player_name')
+            logger.info(f"Player {player_name} attempting to join team {team.id}")
+            
             if player_name:
                 existing_member = TeamMember.objects.filter(
                     team=team,
@@ -158,13 +163,17 @@ def join_existing_team(request, lobby_id):
                     )
                     messages.success(request, f'Successfully joined team {team.name}!')
                     
+                    # Get updated list of team members
+                    members = list(team.team_members.values_list('role', flat=True))
+                    logger.info(f"Broadcasting team update for team {team.id}: {members}")
+                    
                     # Broadcast team update
                     channel_layer = get_channel_layer()
                     async_to_sync(channel_layer.group_send)(
                         f'team_{team.id}',
                         {
                             'type': 'team_update',
-                            'members': list(team.team_members.values_list('role', flat=True))
+                            'members': members
                         }
                     )
                 else:
