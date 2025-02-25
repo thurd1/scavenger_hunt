@@ -28,11 +28,11 @@
         </div>
 
         <div class="navigation-buttons">
-            <a href="{% url 'join_game_session' %}" class="btn home-btn">
+            <a href="{% url 'home' %}" class="btn home-btn">
                 <i class="fas fa-home"></i> Home
             </a>
-            <a href="{% url 'team_dashboard' team_id=team.id %}" class="btn change-team-btn">
-                <i class="fas fa-exchange-alt"></i> Back to Team Dashboard
+            <a href="{% url 'team_options' lobby_id=team.lobbies.first.id %}" class="btn change-team-btn">
+                <i class="fas fa-users"></i> Team Options
             </a>
         </div>
     </div>
