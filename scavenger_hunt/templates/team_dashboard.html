@@ -28,7 +28,7 @@
         </div>
 
         <div class="navigation-buttons">
-            <a href="{% url 'join_team' lobby_id=team.lobbies.first.id %}" class="btn home-btn">
+            <a href="{% url 'join_existing_team' lobby_id=team.lobbies.first.id %}" class="btn home-btn">
                 <i class="fas fa-users"></i> Join Team
             </a>
             <a href="{% url 'join_game_session' %}" class="btn change-team-btn">
