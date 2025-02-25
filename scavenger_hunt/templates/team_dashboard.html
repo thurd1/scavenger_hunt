@@ -39,28 +39,54 @@
 </div>
 
 <script>
-    const teamSocket = new WebSocket(
-        'ws://' + window.location.host + 
-        '/ws/team/{{ team.id }}/'
-    );
+    function connectWebSocket() {
+        const teamSocket = new WebSocket(
+            'ws://' + window.location.host + 
+            '/ws/team/{{ team.id }}/'
+        );
 
-    teamSocket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        if (data.type === 'team_members') {
-            const membersList = document.getElementById('members-list');
-            membersList.innerHTML = '';
-            
-            data.members.forEach(member => {
-                const memberDiv = document.createElement('div');
-                memberDiv.className = 'member-item';
-                memberDiv.textContent = member;
-                membersList.appendChild(memberDiv);
-            });
-        }
-    };
+        teamSocket.onopen = function(e) {
+            console.log('WebSocket connection established');
+        };
 
-    teamSocket.onclose = function(e) {
-        console.error('Team socket closed unexpectedly');
+        teamSocket.onmessage = function(e) {
+            console.log('Received message:', e.data);
+            const data = JSON.parse(e.data);
+            if (data.type === 'team_members') {
+                const membersList = document.getElementById('members-list');
+                membersList.innerHTML = '';
+                
+                data.members.forEach(member => {
+                    const memberDiv = document.createElement('div');
+                    memberDiv.className = 'member-item';
+                    memberDiv.textContent = member;
+                    membersList.appendChild(memberDiv);
+                });
+            }
+        };
+
+        teamSocket.onclose = function(e) {
+            console.log('WebSocket connection closed');
+            // Attempt to reconnect after 1 second
+            setTimeout(function() {
+                console.log('Attempting to reconnect...');
+                connectWebSocket();
+            }, 1000);
+        };
+
+        teamSocket.onerror = function(err) {
+            console.error('WebSocket encountered error: ', err);
+        };
+
+        return teamSocket;
+    }
+
+    // Initial connection
+    let socket = connectWebSocket();
+
+    // Cleanup on page unload
+    window.onbeforeunload = function() {
+        socket.close();
     };
 </script>
 
