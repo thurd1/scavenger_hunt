@@ -20,7 +20,7 @@
         .app-content {
             width: 100%;
             min-height: 100vh;
-            background-image: url('{% static "hunt/images/Map.png" %}');
+            background-image: url('{% static "scavenger_hunt/hunt/images/Map.png" %}');
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
@@ -50,7 +50,6 @@
             font-weight: bold;
         }
 
-        /* Only apply container styles when the class is explicitly used */
         .login-container {
             width: 100%;
             max-width: 400px;
@@ -123,7 +122,6 @@
             text-decoration: underline;
         }
 
-        /* Add flexible content container */
         .content-wrapper {
             width: 100%;
             flex: 1;
@@ -131,8 +129,7 @@
             flex-direction: column;
             align-items: center;
         }
-
-        /* Add responsive sizing for the logo */
+        
         @media (max-width: 768px) {
             header img {
                 max-width: 250px;
@@ -144,7 +141,7 @@
     <div class="app-content">
         <header>
             {% block header %}
-                <img src="{% static 'hunt/images/YoungLifeLogo.png' %}" alt="">
+                <img src="{% static 'scavenger_hunt/hunt/images/YoungLifeLogo.png' %}" alt="">
             {% endblock %}
         </header>
 
