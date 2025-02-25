@@ -67,11 +67,6 @@
 
         teamSocket.onclose = function(e) {
             console.log('WebSocket connection closed');
-            // Attempt to reconnect after 1 second
-            setTimeout(function() {
-                console.log('Attempting to reconnect...');
-                connectWebSocket();
-            }, 1000);
         };
 
         teamSocket.onerror = function(err) {
@@ -86,8 +81,21 @@
 
     // Cleanup on page unload
     window.onbeforeunload = function() {
-        socket.close();
+        if (socket) {
+            socket.close();
+        }
     };
+
+    // Also handle visibility change
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'hidden') {
+            if (socket) {
+                socket.close();
+            }
+        } else {
+            socket = connectWebSocket();
+        }
+    });
 </script>
 
 <style>
