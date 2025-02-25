@@ -125,13 +125,13 @@ def join_game_session(request):
 def save_player_name(request):
     if request.method == 'POST':
         player_name = request.POST.get('player_name')
-        print(f"Saving player name to session: {player_name}")  # Debug print
+        print(f"Saving player name to session: {player_name}")
         request.session['player_name'] = player_name
-        request.session.modified = True  # Force session save
-        print(f"Player name in session after save: {request.session.get('player_name')}")  # Verify save
+        request.session.modified = True
+        print(f"Player name in session after save: {request.session.get('player_name')}")
         
         lobby_code = request.session.get('lobby_code')
-        print(f"Lobby code in session: {lobby_code}")  # Debug print
+        print(f"Lobby code in session: {lobby_code}")
         
         lobby = get_object_or_404(Lobby, code=lobby_code)
         return render(request, 'team_options.html', {'lobby': lobby})
@@ -144,14 +144,12 @@ def join_existing_team(request, lobby_id):
             team = Team.objects.get(code=team_code, lobbies=lobby_id)
             player_name = request.session.get('player_name')
             if player_name:
-                # Check if this player is already a member of the team
                 existing_member = TeamMember.objects.filter(
                     team=team,
                     role=player_name
                 ).first()
                 
                 if not existing_member:
-                    # Only create a new team member if they don't exist
                     team_member = TeamMember.objects.create(
                         team=team,
                         role=player_name
@@ -229,11 +227,8 @@ def create_team(request, lobby_id):
         if form.is_valid():
             team = form.save()
             lobby.teams.add(team)
-            
-            # Create a team member for the creator
             player_name = request.session.get('player_name')
             if player_name:
-                # Check if this player is already a member
                 existing_member = TeamMember.objects.filter(
                     team=team,
                     role=player_name
@@ -262,11 +257,10 @@ def team_dashboard(request, team_id):
     
     print(f"Team ID: {team_id}")
     print(f"Team name: {team.name}")
-    print(f"Raw SQL query: {str(team_members.query)}")  # Print the SQL query
+    print(f"Raw SQL query: {str(team_members.query)}")
     print(f"Number of team members: {team_members.count()}")
     print(f"Team members found: {[m.role for m in team_members]}")
     
-    # Try to get all TeamMember objects for debugging
     all_members = TeamMember.objects.all()
     print(f"All TeamMembers in database: {[m.role for m in all_members]}")
     
