@@ -1,4 +1,5 @@
 Hierarchy
+
     A[home.html] -->|Enter Game Code| B[join_game_session.html]
     
     B -->|Enter Player Name| C[team_options.html]
