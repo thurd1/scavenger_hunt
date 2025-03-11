@@ -31,6 +31,11 @@
     <div id="zonesContainer" class="zone-container"></div>
 </div>
 
+<div class="back-button">
+        <a href="{% url 'leader_dashboard' %}" class="btn">Back to Dashboard</a>
+    </div>
+</div>
+
 <script>
     function generateZones() {
         let zoneCount = document.getElementById('zoneCount').value;
