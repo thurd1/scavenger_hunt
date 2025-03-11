@@ -4,29 +4,29 @@
 {% block title %}Question Maker{% endblock %}
 
 {% block welcome_text %}
-    <p style="color: #90C83C">Create and Manage Race Questions</p>
+    <p>Create and Manage Race Questions</p>
 {% endblock %}
 
 {% block content %}
     <div class="dashboard-container">
-        <h3 class="text-center" style="color: #90C83C">Race Name</h3>
+        <h3 class="text-center">Race Name</h3>
         <form method="POST" action="{% url 'manage_riddles' %}">
             {% csrf_token %}
-            <label for="raceName" class="form-label" style="color: #90C83C">Enter the title of the race</label>
+            <label for="raceName" class="form-label">Enter the title of the race</label>
             <input type="text" id="raceName" name="race_name" class="form-control" required>
         
-            <h3 class="text-center" style="color: #90C83C">Create Questions for the Race</h3>
+            <h3 class="text-center">Create Questions for the Race</h3>
         
             <div class="mb-3">
-                <label for="zoneCount" class="form-label" style="color: #90C83C">How many zones?</label>
+                <label for="zoneCount" class="form-label">How many zones?</label>
                 <input type="number" id="zoneCount" name="zoneCount" class="form-control" min="1" required>
             </div>
         
-            <button type="button" class="btn btn-primary w-100 mt-2" onclick="generateZones()" style="background-color: #90C83C; border-color: #90C83C; color: white;">Generate Zones</button>
+            <button type="button" class="btn btn-primary w-100" onclick="generateZones()">Generate Zones</button>
         
             <div id="zonesContainer" class="zone-container"></div>
         
-            <button type="submit" class="btn btn-success w-100 mt-3" style="background-color: #90C83C; border-color: #90C83C; color: white;">Submit Race</button>
+            <button type="submit" class="btn btn-success w-100 mt-3">Submit Race</button>
         </form>
     </div>
 
@@ -70,13 +70,3 @@
         }
     </script>
 {% endblock %}
-
-<style>
-button.btn {
-    margin-bottom: 1rem;
-}
-
-button.btn-primary, button.btn-success {
-    color: #90C83C;
-}
-</style>
