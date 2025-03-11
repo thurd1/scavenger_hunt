@@ -1,8 +1,72 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Manage Riddles{% endblock %}
+{% block title %}Question Maker{% endblock %}
+
+{% block welcome_text %}
+    <p>Create and manage race questions easily.</p>
+{% endblock %}
 
 {% block content %}
-    <h2>Manage Riddles</h2>
-    <p>Wow, you want to manage riddles?</p>
+    <div class="dashboard-container">
+        <h3 class="text-center">Race Name</h3>
+        <form method="POST" action="{% url 'manage_riddles' %}">
+            {% csrf_token %}
+            <label for="raceName" class="form-label">Enter the title of the race</label>
+            <input type="text" id="raceName" name="race_name" class="form-control" required>
+        
+            <h3 class="text-center">Create Questions for the Race</h3>
+        
+            <div class="mb-3">
+                <label for="zoneCount" class="form-label">How many zones?</label>
+                <input type="number" id="zoneCount" name="zoneCount" class="form-control" min="1" required>
+            </div>
+        
+            <button type="button" class="btn btn-primary w-100" onclick="generateZones()">Generate Zones</button>
+        
+            <div id="zonesContainer" class="zone-container"></div>
+        
+            <button type="submit" class="btn btn-success w-100 mt-3">Submit Race</button>
+        </form>
+    </div>
+
+    <script>
+        function generateZones() {
+            let zoneCount = document.getElementById('zoneCount').value;
+            let container = document.getElementById('zonesContainer');
+            container.innerHTML = ''; // Clear previous zones
+    
+            for (let i = 1; i <= zoneCount; i++) {
+                let zoneDiv = document.createElement('div');
+                zoneDiv.classList.add('mb-3', 'p-3', 'border', 'rounded', 'bg-light');
+    
+                zoneDiv.innerHTML = `
+                    <h4>Zone ${i}</h4>
+                    <div id="zone-${i}-questions">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestion(${i})">+ Add Question</button>
+                    </div>
+                `;
+                container.appendChild(zoneDiv);
+            }
+        }
+    
+        function addQuestion(zoneNumber) {
+            let questionContainer = document.getElementById(`zone-${zoneNumber}-questions`);
+
+            let questionInput = document.createElement('input');
+            questionInput.type = 'text';
+            questionInput.classList.add('form-control', 'mt-2');
+            questionInput.name = `zone-${zoneNumber}-questions[]`;  
+            questionInput.placeholder = 'Enter question here...';
+
+            let answerInput = document.createElement('input');
+            answerInput.type = 'text';
+            answerInput.classList.add('form-control', 'mt-2');
+            answerInput.name = `zone-${zoneNumber}-answers[]`;  
+            answerInput.placeholder = 'Enter answer here...';
+
+            questionContainer.appendChild(questionInput);
+            questionContainer.appendChild(answerInput);
+        }
+    </script>
 {% endblock %}
