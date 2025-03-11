@@ -209,7 +209,10 @@ def team_list(request):
 
 def assign_riddles(request):
     return HttpResponse("Riddles. wow.")
-
+    
+def manage_riddls(request):
+    return render(request, 'manage_riddles.html')
+    
 def leaderboard(request):
     return render(request, 'leaderboard.html')
 
