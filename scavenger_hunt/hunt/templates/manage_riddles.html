@@ -54,9 +54,8 @@
     function addQuestion(zoneNumber) {
         let questionContainer = document.getElementById(`zone-${zoneNumber}-questions`);
 
-        // Adding a space between the button and input fields
         let spacingDiv = document.createElement('div');
-        spacingDiv.style.marginTop = '15px'; // Adjust spacing as needed
+        spacingDiv.style.marginTop = '15px';
         questionContainer.appendChild(spacingDiv);
 
         let questionInput = document.createElement('input');
