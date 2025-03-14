@@ -26,40 +26,53 @@
                 <div class="dashboard-box">
                     {% if races %}
                     <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th class="px-4">Name</th>
-                                    <th>Start Location</th>
-                                    <th>Time Limit</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for race in races %}
-                                <tr>
-                                    <td class="px-4">{{ race.name }}</td>
-                                    <td>{{ race.start_location }}</td>
-                                    <td>{{ race.time_limit }}</td>
-                                    <td>
-                                        <span class="badge {% if race.is_active %}bg-success{% else %}bg-secondary{% endif %}">
-                                            {% if race.is_active %}Active{% else %}Inactive{% endif %}
-                                        </span>
-                                    </td>
-                                    <td class="text-end px-4">
-                                        <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-eye me-1"></i> View Details
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="container-fluid p-0">
+                        {% for race in races %}
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <div class="race-card p-3" style="border-radius: 10px; border-left: 5px solid #90C83C; background-color: #f8f9fa; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-3">
+                                            <h5 class="mb-0">{{ race.name }}</h5>
+                                            <span class="badge {% if race.is_active %}bg-success{% else %}bg-secondary{% endif %} mt-2">
+                                                {% if race.is_active %}Active{% else %}Inactive{% endif %}
+                                            </span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-map-marker-alt me-2" style="color: #90C83C;"></i>
+                                                <div>
+                                                    <small class="text-muted d-block">Start Location</small>
+                                                    <span>{{ race.start_location }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-clock me-2" style="color: #90C83C;"></i>
+                                                <div>
+                                                    <small class="text-muted d-block">Time Limit</small>
+                                                    <span>{{ race.time_limit }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3 text-md-end">
+                                            <a href="{% url 'race_detail' race.id %}" class="btn btn-primary">
+                                                <i class="fas fa-eye me-1"></i> View Details
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                     {% else %}
                     <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
-                    <p class="text-center text-muted mb-4">You haven't created any races yet. Use the form below to create your first race.</p>
+                    <div class="text-center p-4 my-3" style="background-color: #f8f9fa; border-radius: 10px;">
+                        <i class="fas fa-flag-checkered mb-3" style="font-size: 2.5rem; color: #90C83C;"></i>
+                        <p class="text-muted mb-0">You haven't created any races yet. Use the form below to create your first race.</p>
+                    </div>
                     {% endif %}
                 </div>
             </div>
