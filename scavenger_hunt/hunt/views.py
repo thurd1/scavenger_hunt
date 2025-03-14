@@ -396,3 +396,31 @@ def check_hunt_status(request, lobby_id):
         'hunt_started': lobby.hunt_started,
         'redirect_url': reverse('first_zone', args=[lobby_id]) if lobby.hunt_started else None
     })
+
+@login_required
+def manage_riddles(request):
+    return render(request, 'hunt/manage_riddles.html')
+
+@login_required
+def assign_riddles(request):
+    return render(request, 'hunt/assign_riddles.html')
+
+@login_required
+def leaderboard(request):
+    return render(request, 'hunt/leaderboard.html')
+
+@login_required
+def team_list(request):
+    return render(request, 'hunt/team_list.html')
+
+@login_required
+def register_team(request):
+    return render(request, 'hunt/register_team.html')
+
+@login_required
+def create_lobby(request):
+    return render(request, 'hunt/create_lobby.html')
+
+@login_required
+def manage_lobbies(request):
+    return render(request, 'hunt/manage_lobbies.html')
