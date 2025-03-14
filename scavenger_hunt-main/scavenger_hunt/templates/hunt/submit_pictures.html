@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit Picture</title>
+</head>
+<body>
+    <h1>Submit a Picture</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="picture">Upload Picture:</label>
+        <input type="file" name="picture" required>
+        <button type="submit">Submit Picture</button>
+    </form>
+    <p><a href="{% url 'team_details' team.id %}">Back to Team Details</a></p>
+</body>
+</html>

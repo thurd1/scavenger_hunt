@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="options-box">
+        <h1 style="color: #90C83C">Join the Game</h1>
+        
+        <div class="player-info-form">
+            <h2 style="color: #90C83C">First, tell us your name:</h2>
+            <form method="post" action="{% url 'save_player_name' %}" id="nameForm">
+                {% csrf_token %}
+                <input type="text" 
+                       name="player_name" 
+                       required 
+                       class="input-field" 
+                       placeholder="Your name"
+                       value="{{ request.session.player_name }}"
+                       autofocus>
+                <button type="submit" class="btn">Save Name</button>
+            </form>
+        </div>
+
+        <div class="team-options">
+            <h2 style="color: #90C83C">Then, choose an option:</h2>
+            <div class="button-group">
+                <a href="{% url 'create_team' lobby_id=lobby.id %}" class="btn">Create New Team</a>
+                <a href="{% url 'join_existing_team' lobby_id=lobby.id %}" class="btn secondary">Join Existing Team</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 600px;
+    margin: 3rem auto;
+    padding: 1rem;
+}
+
+.options-box {
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 15px;
+    padding: 2rem;
+    text-align: center;
+}
+
+.player-info-form {
+    margin: 2rem 0;
+}
+
+.input-field {
+    width: 100%;
+    padding: 0.8rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    font-size: 16px;
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.button-group {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.btn {
+    display: block;
+    padding: 1rem;
+    text-align: center;
+    background: linear-gradient(135deg, #FFA500, #FF7F00);
+    color: white;
+    text-decoration: none;
+    border-radius: 25px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background: linear-gradient(135deg, #FF7F00, #FF4500);
+    transform: scale(1.05);
+    text-decoration: none;
+    color: white;
+}
+
+.btn.secondary {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+}
+
+.btn.secondary:hover {
+    background: linear-gradient(135deg, #7AAF2F, #648F26);
+}
+</style>
+
+<script>
+document.querySelector('.input-field').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        document.getElementById('nameForm').submit();
+    }
+});
+</script>
+{% endblock %} 
