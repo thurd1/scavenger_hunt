@@ -6,29 +6,38 @@
 <div class="container">
     <h1 style="color: #90C83C">Leader Dashboard</h1>
     
-    <div class="dashboard-box mb-4">
-        <h2 style="color: #90C83C">Game Management</h2>
-        <div class="button-group">
-            <a href="{% url 'create_lobby' %}" class="btn">Create New Lobby</a>
-            <a href="{% url 'assign_riddles' %}" class="btn">Assign Riddles</a>
-            <a href="{% url 'leaderboard' %}" class="btn">View Leaderboard</a>
-            <a href="{% url 'manage_riddles' %}" class="btn">Manage Riddles</a>
+    <div class="dashboard-grid">
+        <div class="dashboard-box">
+            <h2 style="color: #90C83C">Game Management</h2>
+            <div class="button-group">
+                <a href="{% url 'create_lobby' %}" class="btn">Create New Lobby</a>
+                <a href="{% url 'assign_riddles' %}" class="btn">Assign Riddles</a>
+                <a href="{% url 'leaderboard' %}" class="btn">View Leaderboard</a>
+                <a href="{% url 'manage_riddles' %}" class="btn">Manage Riddles</a>
+            </div>
         </div>
-    </div>
 
-    <div class="dashboard-box">
-        <h2 style="color: #90C83C">Teams Overview</h2>
-        <div class="button-group">
-            <a href="{% url 'team_list' %}" class="btn">View All Teams</a>
-            <a href="{% url 'register_team' %}" class="btn">Register New Team</a>
+        <div class="dashboard-box">
+            <h2 style="color: #90C83C">Teams Overview</h2>
+            <div class="button-group">
+                <a href="{% url 'team_list' %}" class="btn">View All Teams</a>
+                <a href="{% url 'register_team' %}" class="btn">Register New Team</a>
+            </div>
         </div>
     </div>
 </div>
 
 <style>
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
 .button-group {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: 1fr;
     gap: 0.8rem;
     margin-top: 1.2rem;
 }
@@ -57,6 +66,12 @@ h1 {
 
 h2 {
     margin-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 {% endblock %} 
