@@ -16,12 +16,26 @@
         </div>
         {% endif %}
 
+        {% if user == lobby.host %}
+        <div class="host-controls">
+            <h3 style="color: #90C83C">Host Controls</h3>
+            <form method="post" action="{% url 'start_hunt' lobby.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn" 
+                        style="background: linear-gradient(135deg, #90C83C, #7AAF2F)">
+                    Start Hunt
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
         <div class="available-teams">
             <h3>Available Teams:</h3>
             {% for team in lobby.teams.all %}
                 <div class="team-item">
                     <span class="team-name">{{ team.name }}</span>
                     <span class="team-code">Code: {{ team.code }}</span>
+                    <span class="team-members">Players: {{ team.members.count }}</span>
                 </div>
             {% empty %}
                 <p class="no-teams">No teams available yet</p>
@@ -169,6 +183,19 @@ h1, h2 {
 .back-option {
     margin-top: 1rem;
     text-align: center;
+}
+
+.host-controls {
+    margin: 2rem 0;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    text-align: center;
+}
+
+.team-members {
+    color: #90C83C;
+    font-size: 0.9em;
 }
 </style>
 {% endblock %} 
