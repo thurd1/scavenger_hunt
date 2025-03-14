@@ -8,38 +8,45 @@
 {% endblock %}
 
 {% block content %}
-    <div class="container">
-        <div class="dashboard-container">
-            <h3 class="text-center" style="color: #90C83C">Race Name</h3>
-            <form method="POST" action="{% url 'manage_riddles' %}">
-                {% csrf_token %}
-                <label for="raceName" class="form-label" style="color: #90C83C">Enter the title of the race</label>
-                <input type="text" id="raceName" name="race_name" class="form-control" required>
-            
-                <h3 class="text-center" style="color: #90C83C">Create Questions for the Race</h3>
-            
-                <div class="mb-3">
-                    <label for="zoneCount" class="form-label" style="color: #90C83C">How many zones?</label>
-                    <input type="number" id="zoneCount" name="zoneCount" class="form-control" min="1" required>
-                </div>
-            
-                <div class="mb-3">
-                    <label for="startLocation" class="form-label" style="color: #90C83C">Starting Location</label>
-                    <input type="text" id="startLocation" name="start_location" class="form-control" required>
-                    <small class="text-muted">This is where players will begin their hunt</small>
-                </div>
-            
-                <div class="mb-3">
-                    <label for="timeLimit" class="form-label" style="color: #90C83C">Time Limit (minutes)</label>
-                    <input type="number" id="timeLimit" name="time_limit" class="form-control" min="1" value="60">
-                </div>
-            
-                <button type="button" class="btn btn-primary w-100" onclick="generateZones()" style="background-color: #90C83C; border-color: #90C83C">Generate Zones</button>
-            
-                <div id="zonesContainer" class="zone-container"></div>
-            
-                <button type="submit" class="btn btn-success w-100 mt-3">Create Race</button>
-            </form>
+    <div class="container py-4">
+        <div class="dashboard-container mx-auto" style="max-width: 800px;">
+            <div class="bg-dark p-4 rounded shadow-sm">
+                <h3 class="text-center mb-4" style="color: #90C83C">Race Name</h3>
+                <form method="POST" action="{% url 'manage_riddles' %}">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label for="raceName" class="form-label" style="color: #90C83C">Enter the title of the race</label>
+                        <input type="text" id="raceName" name="race_name" class="form-control form-control-lg" required>
+                    </div>
+                
+                    <h3 class="text-center my-4" style="color: #90C83C">Create Questions for the Race</h3>
+                
+                    <div class="mb-4">
+                        <label for="zoneCount" class="form-label" style="color: #90C83C">How many zones?</label>
+                        <input type="number" id="zoneCount" name="zoneCount" class="form-control" min="1" required>
+                    </div>
+                
+                    <div class="mb-4">
+                        <label for="startLocation" class="form-label" style="color: #90C83C">Starting Location</label>
+                        <input type="text" id="startLocation" name="start_location" class="form-control" required>
+                        <small class="text-muted d-block mt-2">This is where players will begin their hunt</small>
+                    </div>
+                
+                    <div class="mb-4">
+                        <label for="timeLimit" class="form-label" style="color: #90C83C">Time Limit (minutes)</label>
+                        <input type="number" id="timeLimit" name="time_limit" class="form-control" min="1" value="60">
+                    </div>
+                
+                    <button type="button" class="btn btn-primary w-100 py-2 mb-4" onclick="generateZones()" 
+                            style="background-color: #90C83C; border-color: #90C83C">
+                        Generate Zones
+                    </button>
+                
+                    <div id="zonesContainer" class="zone-container mb-4"></div>
+                
+                    <button type="submit" class="btn btn-success w-100 py-2">Create Race</button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -51,12 +58,14 @@
     
             for (let i = 1; i <= zoneCount; i++) {
                 let zoneDiv = document.createElement('div');
-                zoneDiv.classList.add('mb-3', 'p-3', 'border', 'rounded', 'bg-light');
+                zoneDiv.classList.add('mb-4', 'p-4', 'border', 'rounded', 'bg-dark');
     
                 zoneDiv.innerHTML = `
-                    <h4>Zone ${i}</h4>
+                    <h4 class="mb-3" style="color: #90C83C">Zone ${i}</h4>
                     <div id="zone-${i}-questions">
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestion(${i})">+ Add Question</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="addQuestion(${i})">
+                            + Add Question
+                        </button>
                     </div>
                 `;
                 container.appendChild(zoneDiv);
@@ -66,20 +75,24 @@
         function addQuestion(zoneNumber) {
             let questionContainer = document.getElementById(`zone-${zoneNumber}-questions`);
 
+            let questionGroup = document.createElement('div');
+            questionGroup.classList.add('mb-3', 'p-3', 'border', 'border-secondary', 'rounded');
+
             let questionInput = document.createElement('input');
             questionInput.type = 'text';
-            questionInput.classList.add('form-control', 'mt-2');
+            questionInput.classList.add('form-control', 'mb-2');
             questionInput.name = `zone-${zoneNumber}-questions[]`;  
             questionInput.placeholder = 'Enter question here...';
 
             let answerInput = document.createElement('input');
             answerInput.type = 'text';
-            answerInput.classList.add('form-control', 'mt-2');
+            answerInput.classList.add('form-control');
             answerInput.name = `zone-${zoneNumber}-answers[]`;  
             answerInput.placeholder = 'Enter answer here...';
 
-            questionContainer.appendChild(questionInput);
-            questionContainer.appendChild(answerInput);
+            questionGroup.appendChild(questionInput);
+            questionGroup.appendChild(answerInput);
+            questionContainer.appendChild(questionGroup);
         }
     </script>
 {% endblock %}
