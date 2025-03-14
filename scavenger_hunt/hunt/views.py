@@ -12,8 +12,10 @@ from django.contrib import messages
 from django.urls import reverse
 from django.http import HttpResponseRedirect
 from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync  
 import logging
+from django.views.decorators.http import require_POST
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +167,7 @@ def join_existing_team(request, lobby_id):
                     
                     members = list(team.team_members.values_list('role', flat=True))
                     logger.info(f"Broadcasting team update for team {team.id}: {members}")
-                    
+
                     channel_layer = get_channel_layer()
                     async_to_sync(channel_layer.group_send)(
                         f'team_{team.id}',
@@ -209,10 +211,7 @@ def team_list(request):
 
 def assign_riddles(request):
     return HttpResponse("Riddles. wow.")
-    
-def manage_riddles(request):
-    return render(request, 'manage_riddles.html')
-    
+
 def leaderboard(request):
     return render(request, 'leaderboard.html')
 
@@ -249,6 +248,7 @@ def create_team(request, lobby_id):
         if form.is_valid():
             team = form.save()
             lobby.teams.add(team)
+            
             player_name = request.session.get('player_name')
             if player_name:
                 existing_member = TeamMember.objects.filter(
@@ -282,7 +282,7 @@ def team_dashboard(request, team_id):
     print(f"Raw SQL query: {str(team_members.query)}")
     print(f"Number of team members: {team_members.count()}")
     print(f"Team members found: {[m.role for m in team_members]}")
-
+    
     all_members = TeamMember.objects.all()
     print(f"All TeamMembers in database: {[m.role for m in all_members]}")
     
@@ -344,4 +344,51 @@ def view_team(request, team_id):
     return render(request, 'view_team.html', {
         'team': team,
         'members': team.team_members.all()
+    })
+
+@require_POST
+def start_hunt(request, lobby_id):
+    """
+    View to handle starting the hunt. Only the host can start the hunt.
+    """
+    lobby = get_object_or_404(Lobby, id=lobby_id)
+    
+    # Check if user is the host
+    if request.user != lobby.host:
+        return JsonResponse({
+            'success': False,
+            'error': 'Only the host can start the hunt'
+        })
+    
+    # Check if there are any teams
+    if not lobby.teams.exists():
+        return JsonResponse({
+            'success': False,
+            'error': 'Cannot start hunt without any teams'
+        })
+    
+    empty_teams = lobby.teams.filter(members__isnull=True).exists()
+    if empty_teams:
+        return JsonResponse({
+            'success': False,
+            'error': 'All teams must have at least one member'
+        })
+
+    lobby.hunt_started = True
+    lobby.start_time = timezone.now()
+    lobby.save()
+
+    return JsonResponse({
+        'success': True,
+        'redirect_url': reverse('first_zone', args=[lobby_id])
+    })
+
+def check_hunt_status(request, lobby_id):
+    """
+    View to check if the hunt has started. Called periodically by clients.
+    """
+    lobby = get_object_or_404(Lobby, id=lobby_id)
+    return JsonResponse({
+        'hunt_started': lobby.hunt_started,
+        'redirect_url': reverse('first_zone', args=[lobby_id]) if lobby.hunt_started else None
     })
