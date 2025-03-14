@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Team List{% endblock %}
+
+{% block welcome_text %}
+    <p>All Teams</p>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <div class="dashboard-box">
+            <h2 style="color: #90C83C">All Teams</h2>
+            <div class="team-list">
+                {% for team in teams %}
+                    <div class="team-card">
+                        <div class="team-info">
+                            <h3>{{ team.name }}</h3>
+                            <p class="team-code">Team Code: {{ team.code }}</p>
+                            <p class="member-count">Members: {{ team.members.count }}</p>
+                        </div>
+                        <div class="team-actions">
+                            <a href="{% url 'team_details' team.id %}" class="btn">View Details</a>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="no-teams">No teams available</p>
+                {% endfor %}
+            </div>
+            <div class="mt-4">
+                <a href="{% url 'leader_dashboard' %}" class="btn w-100">Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <style>
+    .team-list {
+        display: grid;
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    .team-card {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 10px;
+        padding: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .team-info h3 {
+        color: #90C83C;
+        margin: 0 0 0.5rem 0;
+    }
+    .team-code {
+        color: #FFA500;
+        margin: 0 0 0.5rem 0;
+    }
+    .member-count {
+        color: white;
+        margin: 0;
+    }
+    .no-teams {
+        text-align: center;
+        color: #999;
+        padding: 2rem;
+    }
+    </style>
+{% endblock %} 

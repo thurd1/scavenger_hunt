@@ -7,17 +7,53 @@
 {% endblock %}
 
 {% block content %}
-    <table>
-        <tr>
-            <th>Team Name</th>
-            <th>Score</th>
-        </tr>
-        {% for team in teams %}
-        <tr>
-            <td>{{ team.name }}</td>
-            <td>{{ team.score }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-    <a href="{% url 'leader_dashboard' %}" class="btn">Back to Dashboard</a>
+    <div class="container">
+        <div class="dashboard-box">
+            <h2 style="color: #90C83C">Leaderboard</h2>
+            <div class="table-responsive">
+                <table class="w-100">
+                    <thead>
+                        <tr>
+                            <th>Team Name</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for team in teams %}
+                        <tr>
+                            <td>{{ team.name }}</td>
+                            <td>{{ team.score }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-4">
+                <a href="{% url 'leader_dashboard' %}" class="btn w-100">Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <style>
+    .table-responsive {
+        overflow-x: auto;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+    }
+    th, td {
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    }
+    th {
+        color: #90C83C;
+        font-weight: bold;
+    }
+    tr:hover {
+        background: rgba(144, 200, 60, 0.1);
+    }
+    </style>
 {% endblock %}

@@ -3,42 +3,41 @@
 {% block title %}Leader Dashboard{% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
+<div class="container">
     <h1 style="color: #90C83C">Leader Dashboard</h1>
     
-    <div class="dashboard-section">
+    <div class="dashboard-box mb-4">
         <h2 style="color: #90C83C">Game Management</h2>
         <div class="button-group">
-            <a href="{% url 'create_lobby' %}" class="btn">Create New Lobby</a>
-            <a href="{% url 'assign_riddles' %}" class="btn">Assign Riddles</a>
-            <a href="{% url 'leaderboard' %}" class="btn">View Leaderboard</a>
-            <a href="{% url 'manage_riddles' %}" class="btn">Manage Riddles</a>
+            <div class="container">
+                <a href="{% url 'create_lobby' %}" class="btn">Create New Lobby</a>
+            </div>
+            <div class="container">
+                <a href="{% url 'assign_riddles' %}" class="btn">Assign Riddles</a>
+            </div>
+            <div class="container">
+                <a href="{% url 'leaderboard' %}" class="btn">View Leaderboard</a>
+            </div>
+            <div class="container">
+                <a href="{% url 'manage_riddles' %}" class="btn">Manage Riddles</a>
+            </div>
         </div>
     </div>
 
-    <div class="dashboard-section">
+    <div class="dashboard-box">
         <h2 style="color: #90C83C">Teams Overview</h2>
         <div class="button-group">
-            <a href="{% url 'team_list' %}" class="btn">View All Teams</a>
-            <a href="{% url 'register_team' %}" class="btn">Register New Team</a>
+            <div class="container">
+                <a href="{% url 'team_list' %}" class="btn">View All Teams</a>
+            </div>
+            <div class="container">
+                <a href="{% url 'register_team' %}" class="btn">Register New Team</a>
+            </div>
         </div>
     </div>
 </div>
 
 <style>
-.dashboard-container {
-    max-width: 800px;
-    margin: 2rem auto;
-    padding: 1rem;
-}
-
-.dashboard-section {
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 10px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-}
-
 .button-group {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -50,8 +49,6 @@
     display: block;
     padding: 1rem;
     text-align: center;
-    background: linear-gradient(135deg, #FFA500, #FF7F00);
-    color: white;
     text-decoration: none;
     border-radius: 25px;
     font-weight: bold;
@@ -59,7 +56,6 @@
 }
 
 .btn:hover {
-    background: linear-gradient(135deg, #FF7F00, #FF4500);
     transform: scale(1.05);
     text-decoration: none;
     color: white;
