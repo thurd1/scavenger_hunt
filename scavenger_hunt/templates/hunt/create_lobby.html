@@ -9,12 +9,40 @@
 {% block content %}
     <div class="container">
         <div class="dashboard-box">
-            <h2 style="color: #90C83C">Create a New Lobby</h2>
+            <h2 style="color: #90C83C" class="mb-4">Create a New Lobby</h2>
             <form method="POST">
                 {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit" class="btn">Create Lobby</button>
+                <div class="form-group mb-4">
+                    {{ form.as_p }}
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn w-100">Create Lobby</button>
+                    <a href="{% url 'leader_dashboard' %}" class="btn w-100">Back to Dashboard</a>
+                </div>
             </form>
         </div>
     </div>
+
+    <style>
+    .button-group {
+        display: grid;
+        gap: 1rem;
+    }
+    .form-group p {
+        margin-bottom: 1rem;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #90C83C;
+    }
+    .form-group input {
+        width: 100%;
+        padding: 0.8rem;
+        border-radius: 8px;
+        border: 1px solid rgba(144, 200, 60, 0.2);
+        background-color: rgba(0, 0, 0, 0.3);
+        color: white;
+    }
+    </style>
 {% endblock %}

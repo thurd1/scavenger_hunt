@@ -9,30 +9,18 @@
     <div class="dashboard-box mb-4">
         <h2 style="color: #90C83C">Game Management</h2>
         <div class="button-group">
-            <div class="container">
-                <a href="{% url 'create_lobby' %}" class="btn">Create New Lobby</a>
-            </div>
-            <div class="container">
-                <a href="{% url 'assign_riddles' %}" class="btn">Assign Riddles</a>
-            </div>
-            <div class="container">
-                <a href="{% url 'leaderboard' %}" class="btn">View Leaderboard</a>
-            </div>
-            <div class="container">
-                <a href="{% url 'manage_riddles' %}" class="btn">Manage Riddles</a>
-            </div>
+            <a href="{% url 'create_lobby' %}" class="btn">Create New Lobby</a>
+            <a href="{% url 'assign_riddles' %}" class="btn">Assign Riddles</a>
+            <a href="{% url 'leaderboard' %}" class="btn">View Leaderboard</a>
+            <a href="{% url 'manage_riddles' %}" class="btn">Manage Riddles</a>
         </div>
     </div>
 
     <div class="dashboard-box">
         <h2 style="color: #90C83C">Teams Overview</h2>
         <div class="button-group">
-            <div class="container">
-                <a href="{% url 'team_list' %}" class="btn">View All Teams</a>
-            </div>
-            <div class="container">
-                <a href="{% url 'register_team' %}" class="btn">Register New Team</a>
-            </div>
+            <a href="{% url 'team_list' %}" class="btn">View All Teams</a>
+            <a href="{% url 'register_team' %}" class="btn">Register New Team</a>
         </div>
     </div>
 </div>
@@ -42,7 +30,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
-    margin-top: 1rem;
+    margin-top: 1.5rem;
 }
 
 .btn {
@@ -67,7 +55,7 @@ h1 {
 }
 
 h2 {
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
 }
 </style>
 {% endblock %} 

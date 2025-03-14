@@ -9,8 +9,8 @@
 {% block content %}
     <div class="container">
         <div class="dashboard-box">
-            <h2 style="color: #90C83C">All Teams</h2>
-            <div class="team-list">
+            <h2 style="color: #90C83C" class="mb-4">All Teams</h2>
+            <div class="team-list mb-4">
                 {% for team in teams %}
                     <div class="team-card">
                         <div class="team-info">
@@ -23,10 +23,12 @@
                         </div>
                     </div>
                 {% empty %}
-                    <p class="no-teams">No teams available</p>
+                    <div class="no-teams">
+                        <p>No teams available</p>
+                    </div>
                 {% endfor %}
             </div>
-            <div class="mt-4">
+            <div class="button-group">
                 <a href="{% url 'leader_dashboard' %}" class="btn w-100">Back to Dashboard</a>
             </div>
         </div>
@@ -36,19 +38,23 @@
     .team-list {
         display: grid;
         gap: 1rem;
-        margin: 1rem 0;
     }
     .team-card {
         background: rgba(0, 0, 0, 0.3);
         border-radius: 10px;
-        padding: 1rem;
+        padding: 1.5rem;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 1rem;
+    }
+    .team-info {
+        flex: 1;
     }
     .team-info h3 {
         color: #90C83C;
         margin: 0 0 0.5rem 0;
+        font-size: 1.2rem;
     }
     .team-code {
         color: #FFA500;
@@ -57,11 +63,22 @@
     .member-count {
         color: white;
         margin: 0;
+        opacity: 0.8;
+    }
+    .team-actions .btn {
+        white-space: nowrap;
+        padding: 0.8rem 1.5rem;
     }
     .no-teams {
         text-align: center;
         color: #999;
         padding: 2rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 10px;
+    }
+    .button-group {
+        display: grid;
+        gap: 1rem;
     }
     </style>
 {% endblock %} 

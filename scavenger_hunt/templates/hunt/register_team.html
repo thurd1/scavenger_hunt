@@ -9,37 +9,56 @@
 {% block content %}
     <div class="container">
         <div class="dashboard-box">
-            <h2 style="color: #90C83C">Register Your Team</h2>
+            <h2 style="color: #90C83C" class="mb-4">Register Your Team</h2>
             <form method="POST">
                 {% csrf_token %}
                 
-                <div class="form-group">
+                <div class="form-group mb-4">
                     <label for="team_name">Team Name:</label>
                     <input type="text" id="team_name" name="team_name" required class="input-field">
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group mb-4">
                     <label for="member_names">Member Names:</label>
                     <div class="member-inputs">
-                        <input type="text" name="member_names" placeholder="Enter member name" class="input-field mb-2">
-                        <input type="text" name="member_names" placeholder="Enter member name" class="input-field mb-2">
+                        <input type="text" name="member_names" placeholder="Enter member name" class="input-field">
+                        <input type="text" name="member_names" placeholder="Enter member name" class="input-field">
                         <input type="text" name="member_names" placeholder="Enter member name" class="input-field">
                     </div>
                 </div>
 
-                <button type="submit" class="btn w-100">Register Team</button>
+                <div class="button-group">
+                    <button type="submit" class="btn w-100">Register Team</button>
+                    <a href="{% url 'leader_dashboard' %}" class="btn w-100">Back to Dashboard</a>
+                </div>
             </form>
-
-            <div class="mt-4">
-                <a href="{% url 'leader_dashboard' %}" class="btn w-100">Back to Dashboard</a>
-            </div>
         </div>
     </div>
 
     <style>
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #90C83C;
+    }
     .member-inputs {
         display: grid;
-        gap: 0.5rem;
+        gap: 1rem;
+    }
+    .input-field {
+        width: 100%;
+        padding: 0.8rem;
+        border-radius: 8px;
+        border: 1px solid rgba(144, 200, 60, 0.2);
+        background-color: rgba(0, 0, 0, 0.3);
+        color: white;
+    }
+    .input-field::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+    }
+    .button-group {
+        display: grid;
+        gap: 1rem;
     }
     </style>
 {% endblock %}
