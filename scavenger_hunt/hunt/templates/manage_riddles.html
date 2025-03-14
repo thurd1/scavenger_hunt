@@ -4,133 +4,80 @@
 {% block title %}Question Maker{% endblock %}
 
 {% block welcome_text %}
-    <p style="color: #90C83C">Create and Manage Race Questions</p>
+    <p style="color: #90C83C">Create and manage race questions easily.</p>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
-    <div class="dashboard-section">
-        <h2 style="color: #90C83C">Create Race</h2>
+    <div class="dashboard-container">
+        <h3 class="text-center" style="color: #90C83C">Race Name</h3>
         <form method="POST" action="{% url 'manage_riddles' %}">
             {% csrf_token %}
-            <label for="raceName" class="form-label">Enter the title of the race</label>
+            <label for="raceName" class="form-label" style="color: #90C83C">Enter the title of the race</label>
             <input type="text" id="raceName" name="race_name" class="form-control" required>
-
+        
+            <h3 class="text-center" style="color: #90C83C">Create Questions for the Race</h3>
+        
             <div class="mb-3">
-                <label for="zoneCount" class="form-label">How many zones?</label>
+                <label for="zoneCount" class="form-label" style="color: #90C83C">How many zones?</label>
                 <input type="number" id="zoneCount" name="zoneCount" class="form-control" min="1" required>
             </div>
-
-            <div class="button-group">
-                <button type="button" class="btn" onclick="generateZones()">Generate Zones</button>
-                <button type="submit" class="btn">Submit Race</button>
+        
+            <div class="mb-3">
+                <label for="startLocation" class="form-label" style="color: #90C83C">Starting Location</label>
+                <input type="text" id="startLocation" name="start_location" class="form-control" required>
+                <small class="text-muted">This is where players will begin their hunt</small>
             </div>
+        
+            <div class="mb-3">
+                <label for="timeLimit" class="form-label" style="color: #90C83C">Time Limit (minutes)</label>
+                <input type="number" id="timeLimit" name="time_limit" class="form-control" min="1" value="60">
+            </div>
+        
+            <button type="button" class="btn btn-primary w-100" onclick="generateZones()" style="background-color: #90C83C; border-color: #90C83C">Generate Zones</button>
+        
+            <div id="zonesContainer" class="zone-container"></div>
+        
+            <button type="submit" class="btn btn-success w-100 mt-3">Create Race</button>
         </form>
     </div>
 
-    <div id="zonesContainer" class="zone-container"></div>
-</div>
-
-<div class="back-button">
-        <a href="{% url 'leader_dashboard' %}" class="btn">Back to Dashboard</a>
-    </div>
-</div>
-
-<script>
-    function generateZones() {
-        let zoneCount = document.getElementById('zoneCount').value;
-        let container = document.getElementById('zonesContainer');
-        container.innerHTML = ''; // Clear previous zones
-
-        for (let i = 1; i <= zoneCount; i++) {
-            let zoneDiv = document.createElement('div');
-            zoneDiv.classList.add('mb-3', 'p-3', 'border', 'rounded', 'bg-light');
-
-            zoneDiv.innerHTML = `
-                <h4>Zone ${i}</h4>
-                <div id="zone-${i}-questions">
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestion(${i})">+ Add Question</button>
-                </div>
-            `;
-            container.appendChild(zoneDiv);
+    <script>
+        function generateZones() {
+            let zoneCount = document.getElementById('zoneCount').value;
+            let container = document.getElementById('zonesContainer');
+            container.innerHTML = ''; // Clear previous zones
+    
+            for (let i = 1; i <= zoneCount; i++) {
+                let zoneDiv = document.createElement('div');
+                zoneDiv.classList.add('mb-3', 'p-3', 'border', 'rounded', 'bg-light');
+    
+                zoneDiv.innerHTML = `
+                    <h4>Zone ${i}</h4>
+                    <div id="zone-${i}-questions">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestion(${i})">+ Add Question</button>
+                    </div>
+                `;
+                container.appendChild(zoneDiv);
+            }
         }
-    }
+    
+        function addQuestion(zoneNumber) {
+            let questionContainer = document.getElementById(`zone-${zoneNumber}-questions`);
 
-    function addQuestion(zoneNumber) {
-        let questionContainer = document.getElementById(`zone-${zoneNumber}-questions`);
+            let questionInput = document.createElement('input');
+            questionInput.type = 'text';
+            questionInput.classList.add('form-control', 'mt-2');
+            questionInput.name = `zone-${zoneNumber}-questions[]`;  
+            questionInput.placeholder = 'Enter question here...';
 
-        let spacingDiv = document.createElement('div');
-        spacingDiv.style.marginTop = '15px';
-        questionContainer.appendChild(spacingDiv);
+            let answerInput = document.createElement('input');
+            answerInput.type = 'text';
+            answerInput.classList.add('form-control', 'mt-2');
+            answerInput.name = `zone-${zoneNumber}-answers[]`;  
+            answerInput.placeholder = 'Enter answer here...';
 
-        let questionInput = document.createElement('input');
-        questionInput.type = 'text';
-        questionInput.classList.add('form-control', 'mt-2');
-        questionInput.name = `zone-${zoneNumber}-questions[]`;  
-        questionInput.placeholder = 'Enter question here...';
-
-        let answerInput = document.createElement('input');
-        answerInput.type = 'text';
-        answerInput.classList.add('form-control', 'mt-2');
-        answerInput.name = `zone-${zoneNumber}-answers[]`;  
-        answerInput.placeholder = 'Enter answer here...';
-
-        questionContainer.appendChild(questionInput);
-        questionContainer.appendChild(answerInput);
-    }
-</script>
-
-<style>
-    .dashboard-container {
-        max-width: 800px;
-        margin: 2rem auto;
-        padding: 1rem;
-    }
-
-    .dashboard-section {
-        background: rgba(0, 0, 0, 0.5);
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    .button-group {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-        margin-top: 1rem;
-    }
-
-    .btn {
-        display: block;
-        padding: 1rem;
-        text-align: center;
-        background: linear-gradient(135deg, #FFA500, #FF7F00);
-        color: white;
-        text-decoration: none;
-        border-radius: 25px;
-        font-weight: bold;
-        transition: all 0.3s ease;
-    }
-
-    .btn:hover {
-        background: linear-gradient(135deg, #FF7F00, #FF4500);
-        transform: scale(1.05);
-        text-decoration: none;
-        color: white;
-    }
-
-    h1, h2 {
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-
-    h2 {
-        margin-bottom: 1rem;
-    }
-
-    .form-label {
-        color: #90C83C;
-    }
-</style>
+            questionContainer.appendChild(questionInput);
+            questionContainer.appendChild(answerInput);
+        }
+    </script>
 {% endblock %}
