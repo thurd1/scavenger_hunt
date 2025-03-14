@@ -1,119 +1,136 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Question Maker{% endblock %}
+{% block title %}Race Manager{% endblock %}
 
 {% block welcome_text %}
     <p style="color: #90C83C">Create and Manage Race Questions</p>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row mb-4">
-        <div class="col">
-            <h2 class="display-5 mb-0">Manage Races</h2>
-            <p class="text-muted">Create and manage your scavenger hunt races</p>
-        </div>
-    </div>
-
-    <!-- Existing Races -->
-    {% if races %}
-    <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-white py-3">
-            <h5 class="card-title mb-0">Your Races</h5>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="px-4">Name</th>
-                            <th>Start Location</th>
-                            <th>Time Limit</th>
-                            <th>Status</th>
-                            <th class="text-end px-4">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for race in races %}
-                        <tr>
-                            <td class="px-4">{{ race.name }}</td>
-                            <td>{{ race.start_location }}</td>
-                            <td>{{ race.time_limit }}</td>
-                            <td>
-                                <span class="badge {% if race.is_active %}bg-success{% else %}bg-secondary{% endif %}">
-                                    {% if race.is_active %}Active{% else %}Inactive{% endif %}
-                                </span>
-                            </td>
-                            <td class="text-end px-4">
-                                <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-eye me-1"></i> View Details
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+<div class="container-fluid py-4">
+    <div class="container mb-4">
+        <div class="row justify-content-center">
+            <div class="col-12">
+                <h2 class="display-5 mb-0 text-center">Manage Races</h2>
+                <p class="text-muted text-center">Create and manage your scavenger hunt races</p>
+                <hr class="my-4">
             </div>
         </div>
     </div>
-    {% endif %}
 
-    <!-- Create New Race -->
-    <div class="card shadow-sm">
-        <div class="card-header bg-white py-3">
-            <h5 class="card-title mb-0">Create New Race</h5>
-        </div>
-        <div class="card-body">
-            <form method="POST" id="raceForm">
-                {% csrf_token %}
-                <div class="row g-4">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="race_name" class="form-label">Race Name</label>
-                            <input type="text" class="form-control" id="race_name" name="race_name" 
-                                   placeholder="Enter race name" required>
-                        </div>
+    <div class="container">
+        <div class="row">
+            <!-- Existing Races -->
+            <div class="col-12 mb-4">
+                <div class="dashboard-box">
+                    {% if races %}
+                    <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="px-4">Name</th>
+                                    <th>Start Location</th>
+                                    <th>Time Limit</th>
+                                    <th>Status</th>
+                                    <th class="text-end px-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for race in races %}
+                                <tr>
+                                    <td class="px-4">{{ race.name }}</td>
+                                    <td>{{ race.start_location }}</td>
+                                    <td>{{ race.time_limit }}</td>
+                                    <td>
+                                        <span class="badge {% if race.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                            {% if race.is_active %}Active{% else %}Inactive{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="text-end px-4">
+                                        <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye me-1"></i> View Details
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="time_limit" class="form-label">Time Limit</label>
-                            <input type="text" class="form-control" id="time_limit" name="time_limit" 
-                                   placeholder="HH:MM:SS" required>
-                            <div class="form-text">Format: HH:MM:SS (e.g., 01:30:00 for 1.5 hours)</div>
-                        </div>
-                    </div>
-                    <div class="col-md-8">
-                        <div class="form-group">
-                            <label for="start_location" class="form-label">Starting Location</label>
-                            <input type="text" class="form-control" id="start_location" name="start_location" 
-                                   placeholder="Enter the physical starting point" required>
-                            <div class="form-text">Specify where teams will begin their hunt</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="zoneCount" class="form-label">Number of Zones</label>
-                            <input type="number" class="form-control" id="zoneCount" name="zoneCount" 
-                                   min="1" max="10" placeholder="1-10" required>
-                        </div>
-                    </div>
+                    {% else %}
+                    <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
+                    <p class="text-center text-muted mb-4">You haven't created any races yet. Use the form below to create your first race.</p>
+                    {% endif %}
                 </div>
+            </div>
 
-                <div id="zonesContainer" class="mt-4"></div>
+            <!-- Create New Race Section -->
+            <div class="col-12">
+                <div class="dashboard-box">
+                    <h3 class="text-center mb-4" style="color: #90C83C">Create New Race</h3>
+                    
+                    <form method="POST" id="raceForm">
+                        {% csrf_token %}
+                        <div class="container-fluid p-0">
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="race_name" class="form-label">Race Name</label>
+                                        <input type="text" class="form-control" id="race_name" name="race_name" 
+                                               placeholder="Enter race name" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="time_limit" class="form-label">Time Limit</label>
+                                        <input type="text" class="form-control" id="time_limit" name="time_limit" 
+                                               placeholder="HH:MM:SS" required>
+                                        <div class="form-text">Format: HH:MM:SS (e.g., 01:30:00 for 1.5 hours)</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="form-group">
+                                        <label for="start_location" class="form-label">Starting Location</label>
+                                        <input type="text" class="form-control" id="start_location" name="start_location" 
+                                               placeholder="Enter the physical starting point" required>
+                                        <div class="form-text">Specify where teams will begin their hunt</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="zoneCount" class="form-label">Number of Zones</label>
+                                        <input type="number" class="form-control" id="zoneCount" name="zoneCount" 
+                                               min="1" max="10" placeholder="1-10" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                <div class="button-group mt-4">
-                    <button type="button" class="btn btn-primary" onclick="generateZones()">
-                        <i class="fas fa-plus-circle me-2"></i>Generate Zones
-                    </button>
-                    <button type="submit" class="btn btn-success ms-2">
-                        <i class="fas fa-flag-checkered me-2"></i>Create Race
-                    </button>
-                    <a href="{% url 'leader_dashboard' %}" class="btn btn-secondary ms-2">
-                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                    </a>
+                        <!-- Zone Container -->
+                        <div class="container-fluid p-0 mt-4">
+                            <div id="zonesContainer" class="row"></div>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="container-fluid p-0 mt-4">
+                            <div class="row justify-content-center">
+                                <div class="col-12 d-flex justify-content-center gap-2">
+                                    <button type="button" class="btn btn-primary" onclick="generateZones()">
+                                        <i class="fas fa-plus-circle me-2"></i>Generate Zones
+                                    </button>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-flag-checkered me-2"></i>Create Race
+                                    </button>
+                                    <a href="{% url 'leader_dashboard' %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
@@ -131,11 +148,9 @@ function generateZones() {
 
     for (let i = 1; i <= zoneCount; i++) {
         const zoneHtml = `
-            <div class="card mb-4 border-light shadow-sm">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0">Zone ${i}</h6>
-                </div>
-                <div class="card-body">
+            <div class="col-md-6 mb-4">
+                <div class="dashboard-box p-3">
+                    <h4 class="mb-3 text-center" style="color: #90C83C">Zone ${i}</h4>
                     <div class="questions-container" id="zone-${i}-questions">
                         <div class="question-pair mb-4">
                             <div class="row g-3">
@@ -152,9 +167,11 @@ function generateZones() {
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="addQuestionToZone(${i})">
-                        <i class="fas fa-plus me-1"></i>Add Another Question
-                    </button>
+                    <div class="text-center">
+                        <button type="button" class="btn btn-sm btn-primary" onclick="addQuestionToZone(${i})">
+                            <i class="fas fa-plus me-1"></i>Add Question
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
