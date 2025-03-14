@@ -32,4 +32,5 @@ urlpatterns = [
     path('team/<int:team_id>/view/', views.view_team, name='view_team'),
     path('lobby/<int:lobby_id>/start/', views.start_hunt, name='start_hunt'),
     path('lobby/<int:lobby_id>/status/', views.check_hunt_status, name='check_hunt_status'),
+    path('manage-riddles/', views.manage_riddles, name='manage_riddles'),
 ]
