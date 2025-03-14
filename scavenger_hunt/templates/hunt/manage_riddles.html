@@ -9,33 +9,46 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2>Manage Races</h2>
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="display-5 mb-0">Manage Races</h2>
+            <p class="text-muted">Create and manage your scavenger hunt races</p>
+        </div>
+    </div>
 
     <!-- Existing Races -->
     {% if races %}
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Your Races</h5>
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="card-title mb-0">Your Races</h5>
+        </div>
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table">
-                    <thead>
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
                         <tr>
-                            <th>Name</th>
+                            <th class="px-4">Name</th>
                             <th>Start Location</th>
                             <th>Time Limit</th>
                             <th>Status</th>
-                            <th>Actions</th>
+                            <th class="text-end px-4">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for race in races %}
                         <tr>
-                            <td>{{ race.name }}</td>
+                            <td class="px-4">{{ race.name }}</td>
                             <td>{{ race.start_location }}</td>
                             <td>{{ race.time_limit }}</td>
-                            <td>{% if race.is_active %}Active{% else %}Inactive{% endif %}</td>
                             <td>
-                                <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-primary">View Details</a>
+                                <span class="badge {% if race.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {% if race.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                            </td>
+                            <td class="text-end px-4">
+                                <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye me-1"></i> View Details
+                                </a>
                             </td>
                         </tr>
                         {% endfor %}
@@ -47,38 +60,58 @@
     {% endif %}
 
     <!-- Create New Race -->
-    <div class="card">
+    <div class="card shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="card-title mb-0">Create New Race</h5>
+        </div>
         <div class="card-body">
-            <h5 class="card-title">Create New Race</h5>
             <form method="POST" id="raceForm">
                 {% csrf_token %}
-                <div class="mb-3">
-                    <label for="race_name" class="form-label">Race Name</label>
-                    <input type="text" class="form-control" id="race_name" name="race_name" required>
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="race_name" class="form-label">Race Name</label>
+                            <input type="text" class="form-control" id="race_name" name="race_name" 
+                                   placeholder="Enter race name" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="time_limit" class="form-label">Time Limit</label>
+                            <input type="text" class="form-control" id="time_limit" name="time_limit" 
+                                   placeholder="HH:MM:SS" required>
+                            <div class="form-text">Format: HH:MM:SS (e.g., 01:30:00 for 1.5 hours)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="form-group">
+                            <label for="start_location" class="form-label">Starting Location</label>
+                            <input type="text" class="form-control" id="start_location" name="start_location" 
+                                   placeholder="Enter the physical starting point" required>
+                            <div class="form-text">Specify where teams will begin their hunt</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="zoneCount" class="form-label">Number of Zones</label>
+                            <input type="number" class="form-control" id="zoneCount" name="zoneCount" 
+                                   min="1" max="10" placeholder="1-10" required>
+                        </div>
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label for="start_location" class="form-label">Starting Location</label>
-                    <input type="text" class="form-control" id="start_location" name="start_location" required>
-                    <small class="text-muted">Enter the physical location where teams will start the race</small>
-                </div>
-                <div class="mb-3">
-                    <label for="time_limit" class="form-label">Time Limit</label>
-                    <input type="text" class="form-control" id="time_limit" name="time_limit" required>
-                    <small class="text-muted">Format: HH:MM:SS</small>
-                </div>
-                <div class="mb-3">
-                    <label for="zoneCount" class="form-label">Number of Zones</label>
-                    <input type="number" class="form-control" id="zoneCount" name="zoneCount" min="1" required>
-                </div>
-                
-                <div id="zonesContainer"></div>
-                
-                <div class="button-group">
-                    <button type="button" class="btn btn-primary" onclick="generateZones()">Generate Zones</button>
-                    <br><br>
-                    <button type="submit" class="btn btn-success">Create Race</button>
-                    <br><br>
-                    <a href="{% url 'leader_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+
+                <div id="zonesContainer" class="mt-4"></div>
+
+                <div class="button-group mt-4">
+                    <button type="button" class="btn btn-primary" onclick="generateZones()">
+                        <i class="fas fa-plus-circle me-2"></i>Generate Zones
+                    </button>
+                    <button type="submit" class="btn btn-success ms-2">
+                        <i class="fas fa-flag-checkered me-2"></i>Create Race
+                    </button>
+                    <a href="{% url 'leader_dashboard' %}" class="btn btn-secondary ms-2">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
                 </div>
             </form>
         </div>
@@ -88,28 +121,39 @@
 <script>
 function generateZones() {
     const zoneCount = parseInt(document.getElementById('zoneCount').value);
+    if (zoneCount < 1 || zoneCount > 10) {
+        alert('Please enter a number between 1 and 10');
+        return;
+    }
+    
     const container = document.getElementById('zonesContainer');
     container.innerHTML = '';
 
     for (let i = 1; i <= zoneCount; i++) {
         const zoneHtml = `
-            <div class="card mb-3">
+            <div class="card mb-4 border-light shadow-sm">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">Zone ${i}</h6>
+                </div>
                 <div class="card-body">
-                    <h6>Zone ${i}</h6>
                     <div class="questions-container" id="zone-${i}-questions">
-                        <div class="question-pair mb-2">
-                            <div class="mb-2">
-                                <label class="form-label">Question</label>
-                                <input type="text" class="form-control" name="zone-${i}-questions[]" required>
-                            </div>
-                            <div class="mb-2">
-                                <label class="form-label">Answer</label>
-                                <input type="text" class="form-control" name="zone-${i}-answers[]" required>
+                        <div class="question-pair mb-4">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Question</label>
+                                    <input type="text" class="form-control" name="zone-${i}-questions[]" 
+                                           placeholder="Enter your question" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Answer</label>
+                                    <input type="text" class="form-control" name="zone-${i}-answers[]" 
+                                           placeholder="Enter the answer" required>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addQuestionToZone(${i})">
-                        Add Another Question
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="addQuestionToZone(${i})">
+                        <i class="fas fa-plus me-1"></i>Add Another Question
                     </button>
                 </div>
             </div>
@@ -121,14 +165,18 @@ function generateZones() {
 function addQuestionToZone(zoneNumber) {
     const container = document.getElementById(`zone-${zoneNumber}-questions`);
     const questionHtml = `
-        <div class="question-pair mb-2">
-            <div class="mb-2">
-                <label class="form-label">Question</label>
-                <input type="text" class="form-control" name="zone-${zoneNumber}-questions[]" required>
-            </div>
-            <div class="mb-2">
-                <label class="form-label">Answer</label>
-                <input type="text" class="form-control" name="zone-${zoneNumber}-answers[]" required>
+        <div class="question-pair mb-4">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Question</label>
+                    <input type="text" class="form-control" name="zone-${zoneNumber}-questions[]" 
+                           placeholder="Enter your question" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Answer</label>
+                    <input type="text" class="form-control" name="zone-${zoneNumber}-answers[]" 
+                           placeholder="Enter the answer" required>
+                </div>
             </div>
         </div>
     `;
