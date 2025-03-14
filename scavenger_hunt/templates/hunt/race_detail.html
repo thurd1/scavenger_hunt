@@ -34,13 +34,13 @@
     </div>
 
     <div class="button-group">
-        <a href="{% url 'edit_race' race.id %}" class="btn btn-primary">Edit Race</a>
         <form method="POST" action="{% url 'toggle_race' race.id %}" style="display: inline;">
             {% csrf_token %}
             <button type="submit" class="btn {% if race.is_active %}btn-danger{% else %}btn-success{% endif %}">
                 {% if race.is_active %}Deactivate{% else %}Activate{% endif %} Race
             </button>
         </form>
+        <br><br>
         <a href="{% url 'manage_riddles' %}" class="btn btn-secondary">Back to Races</a>
     </div>
 </div>
