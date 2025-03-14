@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Lobby: {{ lobby.name }}</h1>
+
+    <h2>Teams in this Lobby:</h2>
+    <ul>
+        {% if teams %}
+            {% for team in teams %}
+                <li>Team Name: {{ team.name }} | Members: {{ team.members.count }}</li>
+            {% endfor %}
+        {% else %}
+            <p>No teams found in this lobby.</p>
+        {% endif %}
+    </ul>
+    <div>
+        <a href="{% url 'join_game_session' %}" class="btn btn-info">Back to Join Game Session</a>
+    </div>
+
+{% endblock %}

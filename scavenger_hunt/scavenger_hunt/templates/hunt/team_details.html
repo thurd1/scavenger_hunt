@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Participant Dashboard{% endblock %}
+
+{% block welcome_text %}
+    <p class="green-text">Welcome, Hunt Leader!</p>
+{% endblock %}
+
+{% block content %}
+    <div class="dashboard-container">
+        <div class="dashboard-section">
+            <h2>Your Team</h2>
+            {% if team %}
+                <p><strong>Team Name:</strong> {{ team.name }}</p>
+                <a href="{% url 'team_details' team.id %}" class="btn">View Team Details</a>
+            {% else %}
+                <a href="{% url 'register_team' %}" class="btn">Join a Team</a>
+            {% endif %}
+        </div>
+        <br /><br><br> 
+        
+        
+        <div class="dashboard-section">
+            <a href="{% url 'leader_dashboard' %}" class="btn">Back to Dashboard</a>
+        </div>
+    </div>
+{% endblock %}
