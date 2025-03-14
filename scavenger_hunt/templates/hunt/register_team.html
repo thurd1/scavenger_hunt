@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Register Team{% endblock %}
+
+{% block welcome_text %}
+    <p>Register Your Team</p>
+{% endblock %}
+
+{% block content %}
+    <form method="POST" class="center-form">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="team_name">Team Name:</label>
+            <input type="text" id="team_name" name="team_name" required class="input-field">
+        </div>
+        
+        <div class="form-group">
+            <label for="member_names">Member Names:</label><br>
+            <input type="text" name="member_names" placeholder="Enter member name" class="input-field"><br>
+            <input type="text" name="member_names" placeholder="Enter member name" class="input-field"><br>
+            <input type="text" name="member_names" placeholder="Enter member name" class="input-field"><br>
+        </div>
+
+        <button type="submit" class="btn">Register</button>
+    </form>
+
+    <a href="{% url 'leader_dashboard' %}" class="btn">Back to Dashboard</a>
+{% endblock %}

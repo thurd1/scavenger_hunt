@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Young Life{% endblock %}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #003A5B;
+            color: gray;
+            text-align: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .app-content {
+            width: 100%;
+            min-height: 100vh;
+            background-image: url('{% static "hunt/images/Map.png" %}');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        header {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 0;
+        }
+
+        header img {
+            max-width: 400px;
+            height: auto;
+            margin: 10px 0 0 0;
+        }
+
+        .welcome-text {
+            font-size: 24px;
+            color: #90C83C;
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            width: 90%;
+            padding: 16px;
+            text-decoration: none;
+            font-size: 18px;
+            color: white;
+            background: linear-gradient(135deg, #FFA500, #FF7F00);
+            border-radius: 25px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease-in-out;
+            font-weight: bold;
+            text-align: center;
+            border: none;
+        }
+
+        .btn:hover {
+            background: linear-gradient(135deg, #FF7F00, #FF4500);
+            transform: scale(1.05);
+        }
+
+        input[type="text"], input[type="password"], input[type="email"] {
+            width: 100%;
+            padding: 8px;
+            border-radius: 8px;
+            border: .5px solid #ccc;
+            font-size: 18px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            background-color: #90C83C;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focus {
+            outline: none;
+            border-color: #90C83C;
+        }
+
+        #invite_code {
+            letter-spacing: 2px;
+            font-family: monospace;
+            text-align: center;
+            width: 200px;
+            font-size: 24px;
+        }
+
+        .team-id {
+            margin-top: 20px;
+            font-size: 16px;
+            color: white;
+        }
+
+        .team-id a {
+            color: #90C83C;
+            text-decoration: none;
+        }
+
+        .team-id a:hover {
+            text-decoration: underline;
+        }
+
+        .content-wrapper {
+            width: 100%;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            header img {
+                max-width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-content">
+        <header>
+            {% block header %}
+                <img src="{% static 'hunt/images/YoungLifeLogo.png' %}" alt="">
+            {% endblock %}
+        </header>
+
+        <div class="welcome-text">
+            {% block welcome_text %}{% endblock %}
+        </div>
+
+        <div class="content-wrapper">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</body>
+</html>
