@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from .models import Team, Riddle, Submission, Lobby, TeamMember
+from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question
 from django.http import JsonResponse
 from .forms import JoinLobbyForm, LobbyForm, TeamForm
 from django.http import HttpResponse
@@ -399,7 +399,51 @@ def check_hunt_status(request, lobby_id):
 
 @login_required
 def manage_riddles(request):
-    return render(request, 'hunt/manage_riddles.html')
+    if request.method == 'POST':
+        race_name = request.POST.get('race_name')
+        start_location = request.POST.get('start_location')
+        time_limit = request.POST.get('time_limit')
+        zone_count = int(request.POST.get('zoneCount', 0))
+        
+        # Create the race
+        race = Race.objects.create(
+            name=race_name,
+            start_location=start_location,
+            time_limit=time_limit,
+            created_by=request.user
+        )
+        
+        # Process zones and questions
+        for i in range(1, zone_count + 1):
+            zone = Zone.objects.create(
+                race=race,
+                number=i
+            )
+            
+            # Get questions for this zone
+            questions = request.POST.getlist(f'zone-{i}-questions[]')
+            answers = request.POST.getlist(f'zone-{i}-answers[]')
+            
+            # Create questions
+            for q, a in zip(questions, answers):
+                if q and a:  # Only create if both question and answer are provided
+                    Question.objects.create(
+                        zone=zone,
+                        question_text=q,
+                        answer=a
+                    )
+        
+        messages.success(request, 'Race created successfully!')
+        return redirect('race_detail', race_id=race.id)
+    
+    # Get all races for display
+    races = Race.objects.filter(created_by=request.user).order_by('-created_at')
+    return render(request, 'hunt/manage_riddles.html', {'races': races})
+
+@login_required
+def race_detail(request, race_id):
+    race = get_object_or_404(Race, id=race_id, created_by=request.user)
+    return render(request, 'hunt/race_detail.html', {'race': race})
 
 @login_required
 def assign_riddles(request):
@@ -424,3 +468,13 @@ def create_lobby(request):
 @login_required
 def manage_lobbies(request):
     return render(request, 'hunt/manage_lobbies.html')
+
+@login_required
+def toggle_race(request, race_id):
+    if request.method == 'POST':
+        race = get_object_or_404(Race, id=race_id, created_by=request.user)
+        race.is_active = not race.is_active
+        race.save()
+        status = 'activated' if race.is_active else 'deactivated'
+        messages.success(request, f'Race {status} successfully!')
+    return redirect('race_detail', race_id=race_id)

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Race Details: {{ race.name }}</h2>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Race Information</h5>
+            <p><strong>Start Location:</strong> {{ race.start_location }}</p>
+            <p><strong>Time Limit:</strong> {{ race.time_limit }}</p>
+            <p><strong>Status:</strong> {% if race.is_active %}Active{% else %}Inactive{% endif %}</p>
+            <p><strong>Created:</strong> {{ race.created_at|date:"F j, Y" }}</p>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Zones and Questions</h5>
+            {% for zone in race.zone_set.all %}
+            <div class="zone-section mb-4">
+                <h6>Zone {{ zone.number }}</h6>
+                <div class="questions-list">
+                    {% for question in zone.question_set.all %}
+                    <div class="question-item mb-2">
+                        <p class="mb-1"><strong>Q:</strong> {{ question.question_text }}</p>
+                        <p class="mb-1"><strong>A:</strong> {{ question.answer }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="button-group">
+        <a href="{% url 'edit_race' race.id %}" class="btn btn-primary">Edit Race</a>
+        <form method="POST" action="{% url 'toggle_race' race.id %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn {% if race.is_active %}btn-danger{% else %}btn-success{% endif %}">
+                {% if race.is_active %}Deactivate{% else %}Activate{% endif %} Race
+            </button>
+        </form>
+        <a href="{% url 'manage_riddles' %}" class="btn btn-secondary">Back to Races</a>
+    </div>
+</div>
+{% endblock %} 
