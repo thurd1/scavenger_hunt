@@ -14,6 +14,8 @@ class Lobby(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     teams = models.ManyToManyField('Team', related_name='lobbies', blank=True)
     is_active = models.BooleanField(default=True)
+    hunt_started = models.BooleanField(default=False)
+    start_time = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.code:
@@ -22,6 +24,8 @@ class Lobby(models.Model):
                 if not Lobby.objects.filter(code=code).exists():
                     self.code = code
                     break
+        if self.hunt_started and not self.start_time:
+            self.start_time = timezone.now()
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -112,4 +116,3 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return self.user.username
-
