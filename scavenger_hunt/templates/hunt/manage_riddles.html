@@ -28,9 +28,9 @@
                         {% for race in races %}
                         <div class="row mb-4 justify-content-center">
                             <div class="col-md-8">
-                                <div style="position: relative; background-color: #003148; border-radius: 20px; padding: 30px 20px; color: white;">
+                                <div style="position: relative; background-color: #003148; border-radius: 20px; padding: 30px 20px; color: #90C83C">
                                     
-                                    <div class="text-center" style="color: #ccc;">
+                                    <div class="text-center" style="color: #90C83C;">
                                         <h4 class="mb-4" style="color: #90C83C;">{{ race.name }}</h4>
                                         
                                         <p class="mb-2" style="color: #90C83C;">{{ race.is_active|yesno:"Active,Inactive" }}</p>
@@ -41,7 +41,7 @@
                                         <p class="mb-2" style="color: #90C83C;">Time Limit</p>
                                         <p class="mb-4">{{ race.time_limit }}</p>
                                         
-                                        <a href="{% url 'race_detail' race.id %}" class="btn" style="background-color: #FF9900; color: white; border-radius: 30px; padding: 8px 30px; font-weight: 500;">
+                                        <a href="{% url 'race_detail' race.id %}" class="btn" style="background-color: #FF9900; color: #90C83C; border-radius: 30px; padding: 8px 30px; font-weight: 500;">
                                             View Details
                                         </a>
                                     </div>
