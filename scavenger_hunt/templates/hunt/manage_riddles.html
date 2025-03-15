@@ -29,30 +29,24 @@
                     <div class="container-fluid px-4">
                         {% for race in races %}
                         <div class="row mb-4 justify-content-center">
-                            <div class="col-md-10">
-                                <div class="card" style="border-radius: 15px; border-left: 5px solid #90C83C; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-                                    <div class="card-body text-center p-4">
-                                        <h4 class="mb-3">{{ race.name }}</h4>
-                                        <div class="mb-2">
-                                            <span class="badge {% if race.is_active %}bg-success{% else %}bg-secondary{% endif %} px-3 py-2">
-                                                {% if race.is_active %}Active{% else %}Inactive{% endif %}
-                                            </span>
-                                        </div>
-                                        <div class="row justify-content-center mb-3">
-                                            <div class="col-md-8">
-                                                <div class="d-flex justify-content-between">
-                                                    <div>
-                                                        <p class="mb-1 text-muted">Start Location</p>
-                                                        <p class="mb-0"><strong>{{ race.start_location }}</strong></p>
-                                                    </div>
-                                                    <div>
-                                                        <p class="mb-1 text-muted">Time Limit</p>
-                                                        <p class="mb-0"><strong>{{ race.time_limit }}</strong></p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <a href="{% url 'race_detail' race.id %}" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px; padding: 8px 25px;">
+                            <div class="col-md-8">
+                                <div style="position: relative; background-color: #003148; border-radius: 20px; padding: 30px 20px; color: white;">
+                                    <!-- Green left border -->
+                                    <div style="position: absolute; left: 0; top: 15%; height: 70%; width: 5px; background-color: #90C83C; border-radius: 10px;"></div>
+                                    
+                                    <!-- Race details - vertical stacked layout -->
+                                    <div class="text-center" style="color: #ccc;">
+                                        <h4 class="mb-4" style="color: white;">{{ race.name }}</h4>
+                                        
+                                        <p class="mb-2" style="color: #aaa;">{{ race.is_active|yesno:"Active,Inactive" }}</p>
+                                        
+                                        <p class="mb-2" style="color: #aaa;">Start Location</p>
+                                        <p class="mb-4">{{ race.start_location }}</p>
+                                        
+                                        <p class="mb-2" style="color: #aaa;">Time Limit</p>
+                                        <p class="mb-4">{{ race.time_limit }}</p>
+                                        
+                                        <a href="{% url 'race_detail' race.id %}" class="btn" style="background-color: #FF9900; color: white; border-radius: 30px; padding: 8px 30px; font-weight: 500;">
                                             View Details
                                         </a>
                                     </div>
@@ -63,9 +57,9 @@
                     </div>
                     {% else %}
                     <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
-                    <div class="text-center p-5 my-3">
+                    <div class="text-center p-5 my-3" style="background-color: #003148; border-radius: 20px; color: white;">
                         <i class="fas fa-flag-checkered mb-3" style="font-size: 3rem; color: #90C83C;"></i>
-                        <p class="text-muted mb-0">You haven't created any races yet. Use the form below to create your first race.</p>
+                        <p class="mb-0">You haven't created any races yet. Use the form below to create your first race.</p>
                     </div>
                     {% endif %}
                 </div>
