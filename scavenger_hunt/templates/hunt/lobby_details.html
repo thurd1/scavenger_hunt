@@ -1,20 +1,105 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Lobby Details{% endblock %}
+
+{% block welcome_text %}
+    <p style="color: #90C83C">Game Lobby Management</p>
+{% endblock %}
 
 {% block content %}
-    <h1>Lobby: {{ lobby.name }}</h1>
-
-    <h2>Teams in this Lobby:</h2>
-    <ul>
-        {% if teams %}
-            {% for team in teams %}
-                <li>Team Name: {{ team.name }} | Members: {{ team.members.count }}</li>
-            {% endfor %}
-        {% else %}
-            <p>No teams found in this lobby.</p>
-        {% endif %}
-    </ul>
-    <div>
-        <a href="{% url 'join_game_session' %}" class="btn btn-info">Back to Join Game Session</a>
+<div class="container-fluid py-4">
+    <!-- Alert for messages -->
+    {% if messages %}
+    <div class="container mb-3">
+        {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
     </div>
+    {% endif %}
 
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8 text-center">
+                <h2 class="display-5 mb-0" style="color: #90C83C">{{ lobby.name }}</h2>
+                <hr class="my-4" style="border-color: #666;">
+            </div>
+        </div>
+        
+        <!-- Lobby Information -->
+        <div class="row justify-content-center mb-5">
+            <div class="col-md-6">
+                <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px; padding: 20px;">
+                    <div class="text-center">
+                        <p><span style="color: #90C83C; font-weight: bold;">Game Code:</span> {{ lobby.game_code }}</p>
+                        <p><span style="color: #90C83C; font-weight: bold;">Race:</span> {{ lobby.race.name }}</p>
+                        <p><span style="color: #90C83C; font-weight: bold;">Status:</span> 
+                            <span class="badge {% if lobby.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if lobby.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
+                        </p>
+                        <p><span style="color: #90C83C; font-weight: bold;">Created:</span> {{ lobby.created_at|date:"F j, Y" }}</p>
+                        
+                        <div class="mt-4 d-flex justify-content-center gap-3">
+                            <form method="POST" action="{% url 'toggle_lobby' lobby.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="toggle" value="true">
+                                <button type="submit" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px; padding: 8px 24px;">
+                                    {% if lobby.is_active %}Deactivate{% else %}Activate{% endif %}
+                                </button>
+                            </form>
+                            <a href="{% url 'start_hunt' lobby.id %}" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px; padding: 8px 24px;">
+                                <i class="fas fa-play me-2"></i>Start Hunt
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Teams Section -->
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <h3 class="text-center mb-4" style="color: #90C83C">Teams</h3>
+            </div>
+        </div>
+        
+        <!-- Display teams -->
+        {% if teams %}
+            <div class="row justify-content-center">
+                {% for team in teams %}
+                <div class="col-md-6 mb-4">
+                    <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px; padding: 20px;">
+                        <h4 class="text-center mb-3" style="color: #90C83C">{{ team.name }}</h4>
+                        <p class="text-center">Team Members: {{ team.member_count }}</p>
+                        <div class="text-center mt-3">
+                            <a href="{% url 'view_team' team.id %}" class="btn btn-sm" style="background-color: #FF9900; color: white; border-radius: 25px;">
+                                View Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="row justify-content-center mb-4">
+                <div class="col-md-8 text-center">
+                    <p>No teams have joined this lobby yet.</p>
+                </div>
+            </div>
+        {% endif %}
+        
+        <!-- Action Buttons -->
+        <div class="row justify-content-center mt-4">
+            <div class="col-md-8 text-center">
+                <a href="{% url 'leader_dashboard' %}" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px; padding: 8px 24px; margin: 0 10px;">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

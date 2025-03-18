@@ -21,24 +21,70 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def create_lobby(request):
+    # Get active races for the selection dropdown
+    active_races = Race.objects.filter(created_by=request.user, is_active=True)
+    
     if request.method == 'POST':
-        form = LobbyForm(request.POST)
-        if form.is_valid():
-            lobby = form.save()
-            return render(request, 'hunt/lobby_code_display.html', {'lobby': lobby})
-    else:
-        form = LobbyForm()
-    return render(request, 'hunt/create_lobby.html', {'form': form})
+        lobby_name = request.POST.get('lobby_name')
+        game_code = request.POST.get('game_code')
+        race_id = request.POST.get('race_id')
+        
+        # Validate inputs
+        if not lobby_name or not game_code or not race_id:
+            messages.error(request, "All fields are required.")
+            return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
+        
+        # Validate game code format
+        if not game_code.isdigit() or len(game_code) != 4:
+            messages.error(request, "Game code must be a 4-digit number.")
+            return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
+        
+        # Check if game code is already in use
+        if Lobby.objects.filter(game_code=game_code, is_active=True).exists():
+            messages.error(request, "This game code is already in use. Please choose another.")
+            return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
+        
+        # Get the race
+        try:
+            race = Race.objects.get(id=race_id, created_by=request.user)
+        except Race.DoesNotExist:
+            messages.error(request, "Selected race does not exist or you don't have permission to use it.")
+            return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
+        
+        # Create the lobby
+        try:
+            lobby = Lobby.objects.create(
+                name=lobby_name,
+                game_code=game_code,
+                race=race,
+                created_by=request.user,
+                is_active=True
+            )
+            messages.success(request, f"Lobby '{lobby_name}' created successfully with game code {game_code}.")
+            return redirect('lobby_details', lobby_id=lobby.id)
+        except Exception as e:
+            messages.error(request, f"Error creating lobby: {str(e)}")
+            return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
+    
+    return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
 
 @login_required
 def lobby_details(request, lobby_id):
     lobby = get_object_or_404(Lobby, id=lobby_id)
-    teams = lobby.teams.all()
+    
+    # Check if user is authorized to view this lobby
+    if lobby.created_by != request.user:
+        messages.error(request, "You don't have permission to view this lobby.")
+        return redirect('leader_dashboard')
+    
+    # Get teams in this lobby
+    teams = Team.objects.filter(lobby=lobby)
     
     context = {
         'lobby': lobby,
         'teams': teams,
     }
+    
     return render(request, 'hunt/lobby_details.html', context)
 
 class LobbyDetailsView(DetailView):
@@ -309,12 +355,22 @@ def manage_lobbies(request):
 
 @login_required
 def toggle_lobby(request, lobby_id):
-    if request.method == 'POST':
         lobby = get_object_or_404(Lobby, id=lobby_id)
+    
+    # Check if user is authorized
+    if lobby.created_by != request.user:
+        messages.error(request, "You don't have permission to modify this lobby.")
+        return redirect('leader_dashboard')
+    
+    if request.method == 'POST' and request.POST.get('toggle') == 'true':
+        # Toggle the active status
         lobby.is_active = not lobby.is_active
         lobby.save()
-        messages.success(request, f'Lobby "{lobby.name}" has been {"activated" if lobby.is_active else "deactivated"}.')
-    return redirect('manage_lobbies')
+        
+        status = "activated" if lobby.is_active else "deactivated"
+        messages.success(request, f"Lobby '{lobby.name}' has been {status}.")
+    
+    return redirect('lobby_details', lobby_id=lobby.id)
 
 @login_required
 def delete_lobby(request, lobby_id):
