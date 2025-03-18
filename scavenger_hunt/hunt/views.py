@@ -478,3 +478,20 @@ def toggle_race(request, race_id):
         status = 'activated' if race.is_active else 'deactivated'
         messages.success(request, f'Race {status} successfully!')
     return redirect('race_detail', race_id=race_id)
+
+@login_required
+def delete_race(request, race_id):
+    race = get_object_or_404(Race, id=race_id)
+    
+    # Check if the user is authorized to delete this race
+    if race.created_by != request.user:
+        messages.error(request, "You don't have permission to delete this race.")
+        return redirect('manage_riddles')
+    
+    if request.method == 'POST' and request.POST.get('delete_race') == 'true':
+        race_name = race.name
+        # Delete the race
+        race.delete()
+        messages.success(request, f"Race '{race_name}' has been deleted successfully.")
+    
+    return redirect('manage_riddles')

@@ -35,4 +35,5 @@ urlpatterns = [
     path('manage-riddles/', views.manage_riddles, name='manage_riddles'),
     path('race/<int:race_id>/', views.race_detail, name='race_detail'),
     path('race/<int:race_id>/toggle/', views.toggle_race, name='toggle_race'),
+    path('delete-race/<int:race_id>/', views.delete_race, name='delete_race'),
 ]

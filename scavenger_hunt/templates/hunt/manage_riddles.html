@@ -210,7 +210,7 @@ function showError(message) {
 function showDeleteModal(raceId, raceName) {
     // Set the race name and form action
     document.getElementById('raceNameToDelete').textContent = raceName;
-    document.getElementById('deleteForm').action = `/delete-race/${raceId}/`;
+    document.getElementById('deleteForm').action = "{% url 'delete_race' 0 %}".replace('0', raceId);
     
     // Show the modal
     const modal = document.getElementById('deleteModalOverlay');
