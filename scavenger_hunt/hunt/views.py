@@ -401,44 +401,112 @@ def check_hunt_status(request, lobby_id):
 def manage_riddles(request):
     if request.method == 'POST':
         race_name = request.POST.get('race_name')
-        start_location = request.POST.get('start_location')
         time_limit = request.POST.get('time_limit')
+        start_location = request.POST.get('start_location')
         zone_count = int(request.POST.get('zoneCount', 0))
         
+        # Convert time_limit from string format to minutes (integer)
+        try:
+            # Check if the time_limit is in HH:MM:SS format
+            if ':' in time_limit:
+                # Split the time string and convert to minutes
+                time_parts = time_limit.split(':')
+                if len(time_parts) == 3:  # HH:MM:SS format
+                    hours = int(time_parts[0])
+                    minutes = int(time_parts[1])
+                    seconds = int(time_parts[2])
+                    # Convert to total minutes (round up if there are seconds)
+                    total_minutes = hours * 60 + minutes
+                    if seconds > 0:
+                        total_minutes += 1  # Round up to the next minute
+                    time_limit = total_minutes
+                elif len(time_parts) == 2:  # MM:SS format
+                    minutes = int(time_parts[0])
+                    seconds = int(time_parts[1])
+                    # Convert to total minutes (round up if there are seconds)
+                    total_minutes = minutes
+                    if seconds > 0:
+                        total_minutes += 1  # Round up to the next minute
+                    time_limit = total_minutes
+            else:
+                # If it's already a number (e.g., "90"), convert to integer
+                time_limit = int(time_limit)
+                
+            print(f"Converted time_limit to {time_limit} minutes")
+            
+        except ValueError as e:
+            messages.error(request, f"Invalid time format. Please use HH:MM:SS format or enter minutes directly. Error: {str(e)}")
+            return redirect('manage_riddles')
+        
         # Create the race
+        try:
         race = Race.objects.create(
             name=race_name,
+                time_limit=time_limit,  # Now this is an integer in minutes
             start_location=start_location,
-            time_limit=time_limit,
-            created_by=request.user
+                created_by=request.user,
+                is_active=False  # Default to inactive
         )
         
         # Process zones and questions
         for i in range(1, zone_count + 1):
-            zone = Zone.objects.create(
-                race=race,
-                number=i
-            )
-            
-            # Get questions for this zone
+                # Get questions and answers for this zone
             questions = request.POST.getlist(f'zone-{i}-questions[]')
             answers = request.POST.getlist(f'zone-{i}-answers[]')
             
-            # Create questions
-            for q, a in zip(questions, answers):
-                if q and a:  # Only create if both question and answer are provided
-                    Question.objects.create(
-                        zone=zone,
-                        question_text=q,
-                        answer=a
+                if questions and answers and len(questions) == len(answers):
+                    # Create the zone
+                    zone = Zone.objects.create(
+                        race=race,
+                        number=i  # Set the zone number explicitly
                     )
-        
-        messages.success(request, 'Race created successfully!')
-        return redirect('race_detail', race_id=race.id)
+                    
+                    # Create all questions for this zone
+                    for j in range(len(questions)):
+                        question_text = questions[j]
+                        answer_text = answers[j]
+                        
+                        # Create question with appropriate field name
+                        try:
+                            question = Question(zone=zone, answer=answer_text)
+                            
+                            # Try to find the right field for question text
+                            available_fields = [f.name for f in Question._meta.get_fields()]
+                            
+                            field_set = False
+                            for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
+                                if field_name in available_fields:
+                                    setattr(question, field_name, question_text)
+                                    field_set = True
+                                    break
+                            
+                            # If no field was set, use any non-standard field
+                            if not field_set:
+                                for field in Question._meta.get_fields():
+                                    if field.name not in ['id', 'zone', 'answer']:
+                                        setattr(question, field.name, question_text)
+                                        field_set = True
+                                        break
+                            
+                            question.save()
+                        except Exception as e:
+                            messages.warning(request, f"Error creating question in zone {i}: {str(e)}")
+            
+            messages.success(request, f"Race '{race_name}' created successfully with {zone_count} zones.")
+            return redirect('manage_riddles')
+            
+        except Exception as e:
+            messages.error(request, f"Error creating race: {str(e)}")
+            return redirect('manage_riddles')
     
     # Get all races for display
     races = Race.objects.filter(created_by=request.user).order_by('-created_at')
-    return render(request, 'hunt/manage_riddles.html', {'races': races})
+    
+    context = {
+        'races': races
+    }
+    
+    return render(request, 'hunt/manage_riddles.html', context)
 
 @login_required
 def race_detail(request, race_id):
