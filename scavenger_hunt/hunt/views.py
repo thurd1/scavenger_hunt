@@ -355,7 +355,7 @@ def manage_lobbies(request):
 
 @login_required
 def toggle_lobby(request, lobby_id):
-        lobby = get_object_or_404(Lobby, id=lobby_id)
+    lobby = get_object_or_404(Lobby, id=lobby_id)
     
     # Check if user is authorized
     if lobby.created_by != request.user:
