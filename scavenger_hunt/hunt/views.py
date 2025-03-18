@@ -468,10 +468,10 @@ def race_detail(request, race_id):
             # Create new zone
             zone = Zone.objects.create(race=race)
             
-            # Create initial question
+            # Create initial question - using correct field names
             Question.objects.create(
                 zone=zone,
-                text=initial_question,
+                question=initial_question,  # Changed from text to question
                 answer=initial_answer
             )
             
@@ -488,7 +488,7 @@ def race_detail(request, race_id):
             
             Question.objects.create(
                 zone=zone,
-                text=question_text,
+                question=question_text,
                 answer=question_answer
             )
             
@@ -506,7 +506,7 @@ def race_detail(request, race_id):
             'id': zone.id,
             'questions': [{
                 'id': q.id,
-                'text': q.text,
+                'text': q.question,  # Changed from q.text to q.question
                 'answer': q.answer
             } for q in questions]
         }
