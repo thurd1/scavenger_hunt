@@ -123,28 +123,80 @@
                     </div>
                     
                     <div class="p-3 mt-4">
-                        <!-- Questions -->
-                        {% for question in zone.questions %}
-                        <div class="mb-3 p-3" style="background-color: rgba(255,255,255,0.05); border-radius: 8px;">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
-                                    <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Question:</p>
-                                    <p style="margin-bottom: 10px;">{{ question.text }}</p>
-                                    <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Answer:</p>
-                                    <p style="margin-bottom: 0;">{{ question.answer }}</p>
+                        <!-- 
+                        Try multiple ways to access questions, depending on how your data is structured.
+                        Uncomment the section that matches your data structure.
+                        -->
+                        
+                        <!-- Option 1: If questions are directly in zone object -->
+                        {% if zone.questions %}
+                            {% for question in zone.questions %}
+                            <div class="mb-3 p-3" style="background-color: rgba(255,255,255,0.05); border-radius: 8px;">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Question:</p>
+                                        <p style="margin-bottom: 10px;">{{ question.text }}</p>
+                                        <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Answer:</p>
+                                        <p style="margin-bottom: 0;">{{ question.answer }}</p>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            style="border-radius: 20px;"
+                                            title="Delete Question">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                 </div>
-                                <button class="btn btn-sm btn-outline-danger" 
-                                        style="border-radius: 20px;"
-                                        title="Delete Question">
-                                    <i class="fas fa-trash"></i>
-                                </button>
                             </div>
-                        </div>
-                        {% empty %}
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <!-- Option 2: If using question_set -->
+                        {% if zone.question_set.all %}
+                            {% for question in zone.question_set.all %}
+                            <div class="mb-3 p-3" style="background-color: rgba(255,255,255,0.05); border-radius: 8px;">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Question:</p>
+                                        <p style="margin-bottom: 10px;">{{ question.text }}</p>
+                                        <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Answer:</p>
+                                        <p style="margin-bottom: 0;">{{ question.answer }}</p>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            style="border-radius: 20px;"
+                                            title="Delete Question">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <!-- Option 3: If questions are stored differently -->
+                        {% for question in questions %}
+                            {% if question.zone_id == zone.id %}
+                            <div class="mb-3 p-3" style="background-color: rgba(255,255,255,0.05); border-radius: 8px;">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Question:</p>
+                                        <p style="margin-bottom: 10px;">{{ question.text }}</p>
+                                        <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Answer:</p>
+                                        <p style="margin-bottom: 0;">{{ question.answer }}</p>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            style="border-radius: 20px;"
+                                            title="Delete Question">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        <!-- Fallback if no questions found -->
+                        {% if not zone.questions and not zone.question_set.all and not questions %}
                         <div class="text-center py-4">
                             <p>No questions in this zone yet.</p>
                         </div>
-                        {% endfor %}
+                        {% endif %}
                         
                         <!-- Add Question Button -->
                         <div class="text-center mt-3">
