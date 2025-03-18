@@ -440,20 +440,20 @@ def manage_riddles(request):
         
         # Create the race
         try:
-        race = Race.objects.create(
-            name=race_name,
+            race = Race.objects.create(
+                name=race_name,
                 time_limit=time_limit,  # Now this is an integer in minutes
-            start_location=start_location,
+                start_location=start_location,
                 created_by=request.user,
                 is_active=False  # Default to inactive
-        )
-        
-        # Process zones and questions
-        for i in range(1, zone_count + 1):
-                # Get questions and answers for this zone
-            questions = request.POST.getlist(f'zone-{i}-questions[]')
-            answers = request.POST.getlist(f'zone-{i}-answers[]')
+            )
             
+            # Process zones and questions
+            for i in range(1, zone_count + 1):
+                # Get questions and answers for this zone
+                questions = request.POST.getlist(f'zone-{i}-questions[]')
+                answers = request.POST.getlist(f'zone-{i}-answers[]')
+                
                 if questions and answers and len(questions) == len(answers):
                     # Create the zone
                     zone = Zone.objects.create(
