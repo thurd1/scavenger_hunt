@@ -10,29 +10,57 @@
         <div class="dashboard-box">
             <h2 style="color: #90C83C">Game Management</h2>
             <div class="button-group">
-                <a href="{% url 'create_lobby' %}" class="btn">Create New Lobby</a>
-                <a href="{% url 'assign_riddles' %}" class="btn">Assign Riddles</a>
-                <a href="{% url 'leaderboard' %}" class="btn">View Leaderboard</a>
-                <a href="{% url 'manage_riddles' %}" class="btn">Manage Riddles</a>
+                <a href="{% url 'create_lobby' %}" class="btn">
+                    <i class="fas fa-plus-circle"></i> Create New Lobby
+                </a>
+                <a href="{% url 'manage_lobbies' %}" class="btn">
+                    <i class="fas fa-tasks"></i> Manage Lobbies
+                </a>
+                <a href="{% url 'assign_riddles' %}" class="btn">
+                    <i class="fas fa-puzzle-piece"></i> Assign Riddles
+                </a>
+                <a href="{% url 'leaderboard' %}" class="btn">
+                    <i class="fas fa-trophy"></i> View Leaderboard
+                </a>
+                <a href="{% url 'manage_riddles' %}" class="btn">
+                    <i class="fas fa-cog"></i> Manage Riddles
+                </a>
             </div>
         </div>
 
         <div class="dashboard-box">
             <h2 style="color: #90C83C">Teams Overview</h2>
             <div class="button-group">
-                <a href="{% url 'team_list' %}" class="btn">View All Teams</a>
-                <a href="{% url 'register_team' %}" class="btn">Register New Team</a>
+                <a href="{% url 'team_list' %}" class="btn">
+                    <i class="fas fa-users"></i> View All Teams
+                </a>
+                <a href="{% url 'register_team' %}" class="btn">
+                    <i class="fas fa-user-plus"></i> Register New Team
+                </a>
             </div>
         </div>
     </div>
 </div>
 
 <style>
+.container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 1rem;
+}
+
 .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
     margin-top: 1rem;
+}
+
+.dashboard-box {
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .button-group {
@@ -43,7 +71,9 @@
 }
 
 .btn {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 0.6rem 1.2rem;
     text-align: center;
     text-decoration: none;
@@ -51,12 +81,19 @@
     font-weight: bold;
     font-size: 0.95rem;
     transition: all 0.3s ease;
+    background: linear-gradient(135deg, #FFA500, #FF7F00);
+    color: white;
 }
 
 .btn:hover {
-    transform: scale(1.05);
+    transform: scale(1.02);
+    background: linear-gradient(135deg, #FF7F00, #FF4500);
     text-decoration: none;
     color: white;
+}
+
+.btn i {
+    margin-right: 0.5rem;
 }
 
 h1 {
@@ -74,4 +111,7 @@ h2 {
     }
 }
 </style>
+
+<!-- Add Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 {% endblock %} 
