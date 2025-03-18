@@ -774,10 +774,6 @@ def register_team(request):
     return render(request, 'hunt/register_team.html')
 
 @login_required
-def create_lobby(request):
-    return render(request, 'hunt/create_lobby.html')
-
-@login_required
 def manage_lobbies(request):
     return render(request, 'hunt/manage_lobbies.html')
 
