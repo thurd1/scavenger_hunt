@@ -1,110 +1,74 @@
 {% extends "base.html" %}
-{% load static %}
 
 {% block title %}Create Lobby{% endblock %}
 
 {% block welcome_text %}
-    <p style="color: #90C83C">Create a New Game Lobby</p>
+    <h2>Create a New Lobby</h2>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
     <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px; padding: 20px;">
-                    <h3 class="text-center mb-4" style="color: #90C83C">Create New Lobby</h3>
-                    
-                    <form method="POST" action="{% url 'create_lobby' %}" id="createLobbyForm">
-                        {% csrf_token %}
-                        
-                        <div class="mb-3">
-                            <label for="lobby_name" class="form-label" style="color: #90C83C;">Lobby Name</label>
-                            <input type="text" class="form-control" id="lobby_name" name="lobby_name" 
-                                  placeholder="Enter a name for your game lobby" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="game_code" class="form-label" style="color: #90C83C;">Game Code</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="game_code" name="game_code" 
-                                      placeholder="4-digit code for players to join" required
-                                      pattern="[0-9]{4}" maxlength="4" minlength="4">
-                                <button type="button" class="btn btn-secondary" id="generateCodeBtn">
-                                    <i class="fas fa-random me-1"></i>Generate
-                                </button>
-                            </div>
-                            <div class="form-text text-light">4-digit code that players will use to join your game</div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="race_selection" class="form-label" style="color: #90C83C;">Select Race</label>
-                            <select class="form-select" id="race_selection" name="race_id" required>
-                                <option value="" selected disabled>Choose a race for this lobby</option>
-                                {% for race in active_races %}
-                                <option value="{{ race.id }}">{{ race.name }} ({{ race.time_limit }} min)</option>
-                                {% empty %}
-                                <option value="" disabled>No active races available. Please create a race first.</option>
-                                {% endfor %}
-                            </select>
-                            <div class="form-text text-light">Select a race to use for this game lobby</div>
-                        </div>
-                        
-                        <div class="d-flex justify-content-center mt-4">
-                            <button type="submit" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px; padding: 8px 24px;">
-                                <i class="fas fa-plus-circle me-2"></i>Create Lobby
-                            </button>
-                            <a href="{% url 'leader_dashboard' %}" class="btn ms-3" style="background-color: #6c757d; color: white; border-radius: 25px; padding: 8px 24px;">
-                                <i class="fas fa-arrow-left me-2"></i>Back
-                            </a>
-                        </div>
-                    </form>
-                </div>
-            </div>
+        <form method="POST" class="center-form">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn">Create Lobby</button>
+        </form>
+        
+        <div class="join-link">
+            <p>Already have a game code? <a href="{% url 'home' %}">Join an existing game</a></p>
         </div>
     </div>
-</div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Generate random 4-digit code
-    const generateCodeBtn = document.getElementById('generateCodeBtn');
-    const gameCodeInput = document.getElementById('game_code');
+    <style>
+    .container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 1rem;
+    }
     
-    generateCodeBtn.addEventListener('click', function() {
-        const randomCode = Math.floor(1000 + Math.random() * 9000);
-        gameCodeInput.value = randomCode;
-    });
+    .center-form {
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
     
-    // Form submission
-    const createLobbyForm = document.getElementById('createLobbyForm');
+    .btn {
+        display: block;
+        width: 100%;
+        padding: 1rem;
+        text-align: center;
+        background: linear-gradient(135deg, #FFA500, #FF7F00);
+        color: white;
+        text-decoration: none;
+        border-radius: 25px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        margin-top: 1rem;
+    }
     
-    createLobbyForm.addEventListener('submit', function(event) {
-        // Basic validation
-        const lobbyName = document.getElementById('lobby_name').value.trim();
-        const gameCode = document.getElementById('game_code').value.trim();
-        const raceSelection = document.getElementById('race_selection').value;
-        
-        if (lobbyName === '') {
-            alert('Please enter a lobby name');
-            event.preventDefault();
-            return;
-        }
-        
-        if (gameCode.length !== 4 || isNaN(gameCode)) {
-            alert('Game code must be a 4-digit number');
-            event.preventDefault();
-            return;
-        }
-        
-        if (raceSelection === '') {
-            alert('Please select a race');
-            event.preventDefault();
-            return;
-        }
-        
-        // If all validation passes, the form will submit normally
-    });
-});
-</script>
+    .btn:hover {
+        background: linear-gradient(135deg, #FF7F00, #FF4500);
+        transform: scale(1.05);
+        text-decoration: none;
+        color: white;
+    }
+    
+    .join-link {
+        text-align: center;
+        margin-top: 1rem;
+    }
+    
+    .join-link a {
+        color: #90C83C;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+    
+    .join-link a:hover {
+        text-decoration: underline;
+    }
+    </style>
 {% endblock %}
