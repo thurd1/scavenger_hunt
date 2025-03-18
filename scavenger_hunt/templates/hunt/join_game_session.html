@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container">
-    <h1 style="color: #90C83C">Welcome to The Amazing Race</h1>
+    <h1 style="color: #90C83C">Welcome to The Scavenger Hunt!</h1>
     
     <div class="join-options">
         <div class="option-box">
@@ -24,11 +24,6 @@
                 </div>
                 <button type="submit" class="btn">Join Game</button>
             </form>
-            
-            <div class="create-link">
-                <p>Don't have a game code? <a href="{% url 'create_lobby' %}">Create a new lobby</a></p>
-            </div>
-            
             <div class="admin-link">
                 <a href="{% url 'login' %}">Are you an Admin? Log in here</a>
             </div>
@@ -108,24 +103,9 @@
     color: white;
 }
 
-.create-link {
-    text-align: center;
-    margin: 1rem 0;
-}
-
-.create-link a {
-    color: #90C83C;
-    text-decoration: none;
-    transition: all 0.3s ease;
-}
-
-.create-link a:hover {
-    text-decoration: underline;
-}
-
 .admin-link {
     text-align: center;
-    margin-top: 0.5rem;
+    margin-top: 1rem;
     font-size: 0.9rem;
 }
 
@@ -169,4 +149,4 @@ h2 {
     color: #90C83C;
 }
 </style>
-{% endblock %}
+{% endblock %} 
