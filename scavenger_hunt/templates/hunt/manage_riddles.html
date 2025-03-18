@@ -31,41 +31,40 @@
         <div class="row">
             <!-- Existing Races -->
             <div class="col-12 mb-4">
-                <div class="dashboard-box">
-                    {% if races %}
+                <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px;">
                     <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
                     <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead class="table-light">
+                        <table class="table" style="color: white;">
+                            <thead>
                                 <tr>
-                                    <th class="px-4">Name</th>
+                                    <th>Name</th>
                                     <th>Start Location</th>
                                     <th>Time Limit</th>
                                     <th>Status</th>
-                                    <th class="text-end">Actions</th>
+                                    <th class="text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for race in races %}
                                 <tr>
-                                    <td class="px-4">{{ race.name }}</td>
+                                    <td>{{ race.name }}</td>
                                     <td>{{ race.start_location }}</td>
                                     <td>{{ race.time_limit }}</td>
                                     <td>
-                                        <span class="badge {% if race.is_active %}bg-success{% else %}bg-secondary{% endif %}">
-                                            {% if race.is_active %}Active{% else %}Inactive{% endif %}
-                                        </span>
+                                        {% if race.is_active %}Active{% else %}Inactive{% endif %}
                                     </td>
-                                    <td class="text-end px-4">
-                                        <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-outline-primary me-1">
-                                            <i class="fas fa-eye"></i>
+                                    <td class="text-center">
+                                        <a href="{% url 'race_detail' race.id %}" 
+                                            class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
+                                            View
                                         </a>
-                                        <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-outline-success me-1">
-                                            <i class="fas fa-edit"></i>
+                                        <a href="{% url 'race_detail' race.id %}" 
+                                            class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
+                                            Edit
                                         </a>
-                                        <button class="btn btn-sm btn-outline-danger" 
+                                        <button class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;"
                                                 onclick="confirmDelete('{{ race.id }}', '{{ race.name }}')">
-                                            <i class="fas fa-trash"></i>
+                                            Delete
                                         </button>
                                     </td>
                                 </tr>
@@ -73,8 +72,7 @@
                             </tbody>
                         </table>
                     </div>
-                    {% else %}
-                    <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
+                    {% if not races %}
                     <p class="text-center text-muted mb-4">You haven't created any races yet. Use the form below to create your first race.</p>
                     {% endif %}
                 </div>
@@ -120,13 +118,13 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
+            </div>
+        
                         <!-- Zone Container -->
                         <div class="container-fluid p-0 mt-4">
                             <div id="zonesContainer" class="row"></div>
-                        </div>
-
+            </div>
+        
                         <!-- Buttons -->
                         <div class="container-fluid p-0 mt-4">
                             <div class="row justify-content-center">
@@ -148,33 +146,38 @@
             </div>
         </div>
     </div>
-</div>
-
+            </div>
+        
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background-color: #003148; color: white; border-radius: 10px;">
+            <div class="modal-header border-0">
+                <h5 class="modal-title" id="deleteModalLabel" style="color: #90C83C; margin: 0 auto;">Confirm Delete</h5>
             </div>
-            <div class="modal-body">
-                Are you sure you want to delete the race "<span id="raceNameToDelete"></span>"? 
-                This action cannot be undone.
+            <div class="modal-body text-center">
+                <p>Are you sure you want to delete the race "<span id="raceNameToDelete"></span>"?</p>
+                <p>This action cannot be undone.</p>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form id="deleteForm" method="POST" action="">
+            <div class="modal-footer border-0 justify-content-center">
+                <form id="deleteForm" method="POST" action="" class="d-flex gap-2 justify-content-center w-100">
                     {% csrf_token %}
                     <input type="hidden" name="delete_race" value="true">
-                    <button type="submit" class="btn btn-danger">Delete</button>
-                </form>
+                    <button type="button" class="btn" data-bs-dismiss="modal" 
+                            style="background-color: #FF9900; color: white; border-radius: 25px; padding: 8px 24px;">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn" 
+                            style="background-color: #FF9900; color: white; border-radius: 25px; padding: 8px 24px;">
+                        Delete
+                    </button>
+        </form>
             </div>
         </div>
     </div>
-</div>
+    </div>
 
-<script>
+    <script>
 function validateForm() {
     const timeLimit = document.getElementById('time_limit').value.trim();
     
@@ -218,7 +221,7 @@ function confirmDelete(raceId, raceName) {
     deleteModal.show();
 }
 
-function generateZones() {
+        function generateZones() {
     const zoneCount = parseInt(document.getElementById('zoneCount').value);
     if (zoneCount < 1 || zoneCount > 10) {
         showError('Please enter a number between 1 and 10');
@@ -227,8 +230,8 @@ function generateZones() {
     
     const container = document.getElementById('zonesContainer');
     container.innerHTML = '';
-
-    for (let i = 1; i <= zoneCount; i++) {
+    
+            for (let i = 1; i <= zoneCount; i++) {
         const zoneHtml = `
             <div class="col-md-6 mb-4">
                 <div class="dashboard-box p-3">
@@ -260,8 +263,8 @@ function generateZones() {
                         </button>
                     </div>
                 </div>
-            </div>
-        `;
+                    </div>
+                `;
         container.insertAdjacentHTML('beforeend', zoneHtml);
     }
 }
@@ -296,6 +299,6 @@ function removeQuestion(button) {
     // Get the parent question-pair div and remove it
     const questionPair = button.closest('.question-pair');
     questionPair.remove();
-}
-</script>
+        }
+    </script>
 {% endblock %}
