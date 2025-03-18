@@ -125,7 +125,6 @@ class Race(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     time_limit_minutes = models.IntegerField(default=60)
     start_location = models.CharField(max_length=200)
-    time_limit = models.IntegerField(default=60)  # in minutes
 
     def __str__(self):
         return self.name
