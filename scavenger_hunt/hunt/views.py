@@ -40,7 +40,7 @@ def create_lobby(request):
             return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
         
         # Check if game code is already in use
-        if Lobby.objects.filter(game_code=game_code, is_active=True).exists():
+        if Lobby.objects.filter(code=game_code, is_active=True).exists():
             messages.error(request, "This game code is already in use. Please choose another.")
             return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
         
@@ -55,7 +55,7 @@ def create_lobby(request):
         try:
             lobby = Lobby.objects.create(
                 name=lobby_name,
-                game_code=game_code,
+                code=game_code,
                 race=race,
                 created_by=request.user,
                 is_active=True
@@ -355,7 +355,7 @@ def manage_lobbies(request):
 
 @login_required
 def toggle_lobby(request, lobby_id):
-    lobby = get_object_or_404(Lobby, id=lobby_id)
+        lobby = get_object_or_404(Lobby, id=lobby_id)
     
     # Check if user is authorized
     if lobby.created_by != request.user:
