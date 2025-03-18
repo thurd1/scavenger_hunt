@@ -442,8 +442,82 @@ def manage_riddles(request):
 
 @login_required
 def race_detail(request, race_id):
-    race = get_object_or_404(Race, id=race_id, created_by=request.user)
-    return render(request, 'hunt/race_detail.html', {'race': race})
+    race = get_object_or_404(Race, id=race_id)
+    
+    # Check if user is authorized to view this race
+    if race.created_by != request.user:
+        messages.error(request, "You don't have permission to view this race.")
+        return redirect('manage_riddles')
+    
+    # Process form submissions
+    if request.method == 'POST':
+        # Edit race details
+        if 'edit_race' in request.POST:
+            race.name = request.POST.get('race_name')
+            race.start_location = request.POST.get('start_location')
+            race.time_limit = request.POST.get('time_limit')
+            race.save()
+            messages.success(request, "Race details updated successfully.")
+            return redirect('race_detail', race_id=race.id)
+        
+        # Add new zone
+        elif 'add_zone' in request.POST:
+            initial_question = request.POST.get('initial_question')
+            initial_answer = request.POST.get('initial_answer')
+            
+            # Create new zone
+            zone = Zone.objects.create(race=race)
+            
+            # Create initial question
+            Question.objects.create(
+                zone=zone,
+                text=initial_question,
+                answer=initial_answer
+            )
+            
+            messages.success(request, "New zone added successfully.")
+            return redirect('race_detail', race_id=race.id)
+        
+        # Add question to existing zone
+        elif 'add_question' in request.POST:
+            zone_id = request.POST.get('zone_id')
+            question_text = request.POST.get('question_text')
+            question_answer = request.POST.get('question_answer')
+            
+            zone = get_object_or_404(Zone, id=zone_id, race=race)
+            
+            Question.objects.create(
+                zone=zone,
+                text=question_text,
+                answer=question_answer
+            )
+            
+            messages.success(request, "Question added successfully.")
+            return redirect('race_detail', race_id=race.id)
+    
+    # Get all zones for this race
+    zones = Zone.objects.filter(race=race)
+    
+    # Build a structured data set with zones and their questions
+    zones_with_questions = []
+    for zone in zones:
+        questions = Question.objects.filter(zone=zone)
+        zone_data = {
+            'id': zone.id,
+            'questions': [{
+                'id': q.id,
+                'text': q.text,
+                'answer': q.answer
+            } for q in questions]
+        }
+        zones_with_questions.append(zone_data)
+    
+    context = {
+        'race': race,
+        'zones': zones_with_questions
+    }
+    
+    return render(request, 'hunt/race_detail.html', context)
 
 @login_required
 def assign_riddles(request):
