@@ -187,7 +187,7 @@ def join_existing_team(request, lobby_id):
             messages.error(request, 'Invalid team code. Please try again.')
     
     lobby = get_object_or_404(Lobby, id=lobby_id)
-    return render(request, 'join_team.html', {'lobby': lobby})
+    return render(request, 'hunt/join_team.html', {'lobby': lobby})
 
 def register(request):
     if request.method == 'POST':
