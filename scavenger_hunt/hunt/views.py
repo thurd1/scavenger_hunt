@@ -402,95 +402,15 @@ def check_hunt_status(request, lobby_id):
 @login_required
 def manage_riddles(request):
     if request.method == 'POST':
-        # Make sure you're only passing fields that exist in the Race model
         race = Race.objects.create(
             name=request.POST.get('race_name'),
-            description=request.POST.get('description'),
+            time_limit_minutes=request.POST.get('time_limit', 60),
             created_by=request.user,
-            time_limit_minutes=request.POST.get('time_limit_minutes', 60),  # Add default value
-            is_active=False  # Set default value for is_active
+            is_active=False
         )
-        # ... rest of your view code ...
+        return redirect('manage_riddles')
+    
     races = Race.objects.all().order_by('-created_at')
-    
-    if request.method == 'POST':
-        action = request.POST.get('action', 'create')
-        
-        # Create a new race
-        if action == 'create':
-            race_name = request.POST.get('race_name')
-            start_location = request.POST.get('start_location')
-            time_limit = request.POST.get('time_limit')
-            zone_count = request.POST.get('zoneCount')
-            
-            # Input validation
-            if not race_name or not start_location or not time_limit or not zone_count:
-                return render(request, 'hunt/manage_riddles.html', {
-                    'races': races,
-                    'error': 'All fields are required'
-                })
-            
-            try:
-                time_limit = int(time_limit)
-                zone_count = int(zone_count)
-            except ValueError:
-                return render(request, 'hunt/manage_riddles.html', {
-                    'races': races,
-                    'error': 'Time limit and zone count must be numbers'
-                })
-            
-            # Create race
-            race = Race.objects.create(
-                name=race_name,
-                start_location=start_location,
-                time_limit_minutes=time_limit,
-                created_by=request.user
-            )
-            
-            # Create zones
-            for i in range(1, zone_count + 1):
-                zone = Zone.objects.create(race=race, number=i)
-                
-                # Get questions for this zone
-                questions = request.POST.getlist(f'zone-{i}-questions[]', [])
-                answers = request.POST.getlist(f'zone-{i}-answers[]', [])
-                
-                # Create questions
-                for j in range(len(questions)):
-                    if j < len(answers) and questions[j].strip() and answers[j].strip():
-                        Question.objects.create(
-                            zone=zone,
-                            question_text=questions[j],
-                            answer_text=answers[j]
-                        )
-            
-            return redirect('manage_riddles')
-        
-        # Edit an existing race
-        elif action == 'edit':
-            race_id = request.POST.get('race_id')
-            race = get_object_or_404(Race, id=race_id)
-            
-            race.name = request.POST.get('race_name', race.name)
-            race.start_location = request.POST.get('start_location', race.start_location)
-            
-            time_limit = request.POST.get('time_limit')
-            if time_limit:
-                try:
-                    race.time_limit_minutes = int(time_limit)
-                except ValueError:
-                    pass
-            
-            race.save()
-            return redirect('manage_riddles')
-        
-        # Delete a race
-        elif action == 'delete':
-            race_id = request.POST.get('race_id')
-            race = get_object_or_404(Race, id=race_id)
-            race.delete()
-            return redirect('manage_riddles')
-    
     return render(request, 'hunt/manage_riddles.html', {'races': races})
 
 @login_required

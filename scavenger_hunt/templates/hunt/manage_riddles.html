@@ -39,17 +39,15 @@
                             <thead>
                                 <tr>
                                     <th>Name</th>
-                                    <th>Description</th>
                                     <th>Time Limit</th>
                                     <th>Status</th>
-                                    <th class="text-center">Actions</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for race in races %}
                                 <tr>
                                     <td>{{ race.name }}</td>
-                                    <td>{{ race.description|truncatewords:10 }}</td>
                                     <td>{{ race.time_limit_minutes }} minutes</td>
                                     <td>
                                         {% if race.is_active %}
@@ -58,19 +56,8 @@
                                             <span class="badge bg-secondary">Inactive</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-center">
-                                        <a href="{% url 'race_detail' race.id %}" 
-                                            class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
-                                            View
-                                        </a>
-                                        <a href="{% url 'race_detail' race.id %}" 
-                                            class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
-                                            Edit
-                                        </a>
-                                        <button class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;"
-                                                onclick="showDeleteModal('{{ race.id }}', '{{ race.name }}')">
-                                            Delete
-                                        </button>
+                                    <td>
+                                        <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-primary">View</a>
                                     </td>
                                 </tr>
                                 {% endfor %}
