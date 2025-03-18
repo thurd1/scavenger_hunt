@@ -466,55 +466,67 @@ def race_detail(request, race_id):
                 initial_question = request.POST.get('initial_question')
                 initial_answer = request.POST.get('initial_answer')
                 
+                # Explicitly print debugging info to console
+                print(f"Creating new zone for race {race.id}")
+                print(f"Initial question: {initial_question}")
+                print(f"Initial answer: {initial_answer}")
+                
                 # Create new zone with proper error handling
                 try:
+                    # Create a zone explicitly connected to this race
                     zone = Zone(race=race)
                     zone.save()
+                    print(f"Created zone with ID {zone.id}")
                 except Exception as e:
-                    messages.error(request, f"Error creating zone: {str(e)}")
+                    error_msg = f"Error creating zone: {str(e)}"
+                    print(error_msg)
+                    messages.error(request, error_msg)
                     return redirect('race_detail', race_id=race.id)
                 
                 # Try to create the question - inspect the model first
                 try:
                     question = Question(zone=zone)
                     
-                    # First handle the answer
+                    # Set answer field
                     setattr(question, 'answer', initial_answer)
                     
                     # Now try to set the question text with multiple field names
+                    available_fields = [f.name for f in Question._meta.get_fields()]
+                    print(f"Available Question fields: {available_fields}")
+                    
                     field_set = False
                     for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
-                        try:
-                            model_fields = [f.name for f in Question._meta.get_fields()]
-                            if field_name in model_fields:
-                                setattr(question, field_name, initial_question)
-                                field_set = True
-                                break
-                        except Exception:
-                            continue
+                        if field_name in available_fields:
+                            print(f"Setting question field '{field_name}' to '{initial_question}'")
+                            setattr(question, field_name, initial_question)
+                            field_set = True
+                            break
                     
-                    # If no field was set, create a fallback
+                    # If no field was set, look for any text-like field
                     if not field_set:
-                        # Just try the first field that's not id, zone, or answer
                         for field in Question._meta.get_fields():
                             if field.name not in ['id', 'zone', 'answer']:
+                                print(f"Using fallback field '{field.name}' for question text")
                                 setattr(question, field.name, initial_question)
                                 field_set = True
                                 break
                     
                     # Save the question
                     question.save()
+                    print(f"Saved question with ID {question.id}")
                     
                 except Exception as e:
-                    # If question creation fails, still keep the zone but show error
-                    messages.warning(request, f"Zone created but error adding question: {str(e)}")
+                    error_msg = f"Zone created but error adding question: {str(e)}"
+                    print(error_msg)
+                    messages.warning(request, error_msg)
                     return redirect('race_detail', race_id=race.id)
                 
                 messages.success(request, "New zone added successfully.")
                 
             except Exception as e:
-                # Catch any other unexpected errors
-                messages.error(request, f"Unexpected error: {str(e)}")
+                error_msg = f"Unexpected error adding zone: {str(e)}"
+                print(error_msg)
+                messages.error(request, error_msg)
             
             return redirect('race_detail', race_id=race.id)
         
