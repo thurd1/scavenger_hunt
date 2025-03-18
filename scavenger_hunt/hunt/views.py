@@ -404,7 +404,6 @@ def manage_riddles(request):
     if request.method == 'POST':
         race = Race.objects.create(
             name=request.POST.get('race_name'),
-            time_limit_minutes=request.POST.get('time_limit', 60),
             created_by=request.user,
             is_active=False
         )

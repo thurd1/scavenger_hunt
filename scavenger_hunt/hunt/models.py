@@ -122,7 +122,6 @@ class Race(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     is_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    time_limit_minutes = models.IntegerField(default=60)
 
     def __str__(self):
         return self.name
