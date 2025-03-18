@@ -149,14 +149,3 @@ class Question(models.Model):
 
     def __str__(self):
         return f"Question for {self.zone}: {self.question_text[:50]}"
-
-class Race(models.Model):
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)  # Adding the missing description field
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    is_active = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    time_limit_minutes = models.IntegerField(default=60)
-
-    def __str__(self):
-        return self.name 
