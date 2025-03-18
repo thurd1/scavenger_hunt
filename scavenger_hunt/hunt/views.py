@@ -16,74 +16,31 @@ from asgiref.sync import async_to_sync
 import logging
 from django.views.decorators.http import require_POST
 from django.utils import timezone
+import random
+import string
 
 logger = logging.getLogger(__name__)
 
 @login_required
 def create_lobby(request):
-    # Get active races for the selection dropdown
-    active_races = Race.objects.filter(created_by=request.user, is_active=True)
-    
     if request.method == 'POST':
-        lobby_name = request.POST.get('lobby_name')
-        game_code = request.POST.get('game_code')
-        race_id = request.POST.get('race_id')
-        
-        # Validate inputs
-        if not lobby_name or not game_code or not race_id:
-            messages.error(request, "All fields are required.")
-            return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
-        
-        # Validate game code format
-        if not game_code.isdigit() or len(game_code) != 4:
-            messages.error(request, "Game code must be a 4-digit number.")
-            return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
-        
-        # Check if game code is already in use
-        if Lobby.objects.filter(code=game_code, is_active=True).exists():
-            messages.error(request, "This game code is already in use. Please choose another.")
-            return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
-        
-        # Get the race
-        try:
-            race = Race.objects.get(id=race_id, created_by=request.user)
-        except Race.DoesNotExist:
-            messages.error(request, "Selected race does not exist or you don't have permission to use it.")
-            return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
-        
-        # Create the lobby
-        try:
-            lobby = Lobby.objects.create(
-                name=lobby_name,
-                code=game_code,
-                is_active=True  # Only include fields that exist in the Lobby model
-            )
-            lobby.teams.add(race)  # If you want to associate the race with the lobby, you need to adjust this logic
-            messages.success(request, f"Lobby '{lobby_name}' created successfully with game code {game_code}.")
-            return redirect('lobby_details', lobby_id=lobby.id)
-        except Exception as e:
-            messages.error(request, f"Error creating lobby: {str(e)}")
-            return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
-    
-    return render(request, 'hunt/create_lobby.html', {'active_races': active_races})
+        form = LobbyForm(request.POST)
+        if form.is_valid():
+            lobby = form.save()
+            return render(request, 'hunt/lobby_code_display.html', {'lobby': lobby})
+    else:
+        form = LobbyForm()
+    return render(request, 'hunt/create_lobby.html', {'form': form})
 
 @login_required
 def lobby_details(request, lobby_id):
     lobby = get_object_or_404(Lobby, id=lobby_id)
-    
-    # Check if user is authorized to view this lobby
-    if lobby.created_by != request.user:
-        messages.error(request, "You don't have permission to view this lobby.")
-        return redirect('leader_dashboard')
-    
-    # Get teams in this lobby
-    teams = Team.objects.filter(lobby=lobby)
+    teams = lobby.teams.all()
     
     context = {
         'lobby': lobby,
         'teams': teams,
     }
-    
     return render(request, 'hunt/lobby_details.html', context)
 
 class LobbyDetailsView(DetailView):
@@ -354,22 +311,12 @@ def manage_lobbies(request):
 
 @login_required
 def toggle_lobby(request, lobby_id):
-    lobby = get_object_or_404(Lobby, id=lobby_id)
-    
-    # Check if user is authorized
-    if lobby.created_by != request.user:
-        messages.error(request, "You don't have permission to modify this lobby.")
-        return redirect('leader_dashboard')
-    
-    if request.method == 'POST' and request.POST.get('toggle') == 'true':
-        # Toggle the active status
+    if request.method == 'POST':
+        lobby = get_object_or_404(Lobby, id=lobby_id)
         lobby.is_active = not lobby.is_active
         lobby.save()
-        
-        status = "activated" if lobby.is_active else "deactivated"
-        messages.success(request, f"Lobby '{lobby.name}' has been {status}.")
-    
-    return redirect('lobby_details', lobby_id=lobby.id)
+        messages.success(request, f'Lobby "{lobby.name}" has been {"activated" if lobby.is_active else "deactivated"}.')
+    return redirect('manage_lobbies')
 
 @login_required
 def delete_lobby(request, lobby_id):
@@ -454,351 +401,97 @@ def check_hunt_status(request, lobby_id):
 
 @login_required
 def manage_riddles(request):
+    races = Race.objects.all().order_by('-created_at')
+    
     if request.method == 'POST':
-        race_name = request.POST.get('race_name')
-        time_limit = request.POST.get('time_limit')
-        start_location = request.POST.get('start_location')
-        zone_count = int(request.POST.get('zoneCount', 0))
+        action = request.POST.get('action', 'create')
         
-        # Convert time_limit from string format to minutes (integer)
-        try:
-            # Check if the time_limit is in HH:MM:SS format
-            if ':' in time_limit:
-                # Split the time string and convert to minutes
-                time_parts = time_limit.split(':')
-                if len(time_parts) == 3:  # HH:MM:SS format
-                    hours = int(time_parts[0])
-                    minutes = int(time_parts[1])
-                    seconds = int(time_parts[2])
-                    # Convert to total minutes (round up if there are seconds)
-                    total_minutes = hours * 60 + minutes
-                    if seconds > 0:
-                        total_minutes += 1  # Round up to the next minute
-                    time_limit = total_minutes
-                elif len(time_parts) == 2:  # MM:SS format
-                    minutes = int(time_parts[0])
-                    seconds = int(time_parts[1])
-                    # Convert to total minutes (round up if there are seconds)
-                    total_minutes = minutes
-                    if seconds > 0:
-                        total_minutes += 1  # Round up to the next minute
-                    time_limit = total_minutes
-            else:
-                # If it's already a number (e.g., "90"), convert to integer
-                time_limit = int(time_limit)
-                
-            print(f"Converted time_limit to {time_limit} minutes")
+        # Create a new race
+        if action == 'create':
+            race_name = request.POST.get('race_name')
+            start_location = request.POST.get('start_location')
+            time_limit = request.POST.get('time_limit')
+            zone_count = request.POST.get('zoneCount')
             
-        except ValueError as e:
-            messages.error(request, f"Invalid time format. Please use HH:MM:SS format or enter minutes directly. Error: {str(e)}")
-            return redirect('manage_riddles')
-        
-        # Create the race
-        try:
+            # Input validation
+            if not race_name or not start_location or not time_limit or not zone_count:
+                return render(request, 'hunt/manage_riddles.html', {
+                    'races': races,
+                    'error': 'All fields are required'
+                })
+            
+            try:
+                time_limit = int(time_limit)
+                zone_count = int(zone_count)
+            except ValueError:
+                return render(request, 'hunt/manage_riddles.html', {
+                    'races': races,
+                    'error': 'Time limit and zone count must be numbers'
+                })
+            
+            # Create race
             race = Race.objects.create(
                 name=race_name,
-                time_limit=time_limit,  # Now this is an integer in minutes
                 start_location=start_location,
-                created_by=request.user,
-                is_active=False  # Default to inactive
+                time_limit_minutes=time_limit,
+                created_by=request.user
             )
             
-            # Process zones and questions
+            # Create zones
             for i in range(1, zone_count + 1):
-                # Get questions and answers for this zone
-                questions = request.POST.getlist(f'zone-{i}-questions[]')
-                answers = request.POST.getlist(f'zone-{i}-answers[]')
+                zone = Zone.objects.create(race=race, number=i)
                 
-                if questions and answers and len(questions) == len(answers):
-                    # Create the zone
-                    zone = Zone.objects.create(
-                        race=race,
-                        number=i  # Set the zone number explicitly
-                    )
-                    
-                    # Create all questions for this zone
-                    for j in range(len(questions)):
-                        question_text = questions[j]
-                        answer_text = answers[j]
-                        
-                        # Create question with appropriate field name
-                        try:
-                            question = Question(zone=zone, answer=answer_text)
-                            
-                            # Try to find the right field for question text
-                            available_fields = [f.name for f in Question._meta.get_fields()]
-                            
-                            field_set = False
-                            for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
-                                if field_name in available_fields:
-                                    setattr(question, field_name, question_text)
-                                    field_set = True
-                                    break
-                            
-                            # If no field was set, use any non-standard field
-                            if not field_set:
-                                for field in Question._meta.get_fields():
-                                    if field.name not in ['id', 'zone', 'answer']:
-                                        setattr(question, field.name, question_text)
-                                        field_set = True
-                                        break
-                            
-                            question.save()
-                        except Exception as e:
-                            messages.warning(request, f"Error creating question in zone {i}: {str(e)}")
+                # Get questions for this zone
+                questions = request.POST.getlist(f'zone-{i}-questions[]', [])
+                answers = request.POST.getlist(f'zone-{i}-answers[]', [])
+                
+                # Create questions
+                for j in range(len(questions)):
+                    if j < len(answers) and questions[j].strip() and answers[j].strip():
+                        Question.objects.create(
+                            zone=zone,
+                            question_text=questions[j],
+                            answer_text=answers[j]
+                        )
             
-            messages.success(request, f"Race '{race_name}' created successfully with {zone_count} zones.")
             return redirect('manage_riddles')
+        
+        # Edit an existing race
+        elif action == 'edit':
+            race_id = request.POST.get('race_id')
+            race = get_object_or_404(Race, id=race_id)
             
-        except Exception as e:
-            messages.error(request, f"Error creating race: {str(e)}")
+            race.name = request.POST.get('race_name', race.name)
+            race.start_location = request.POST.get('start_location', race.start_location)
+            
+            time_limit = request.POST.get('time_limit')
+            if time_limit:
+                try:
+                    race.time_limit_minutes = int(time_limit)
+                except ValueError:
+                    pass
+            
+            race.save()
+            return redirect('manage_riddles')
+        
+        # Delete a race
+        elif action == 'delete':
+            race_id = request.POST.get('race_id')
+            race = get_object_or_404(Race, id=race_id)
+            race.delete()
             return redirect('manage_riddles')
     
-    # Get all races for display
-    races = Race.objects.filter(created_by=request.user).order_by('-created_at')
-    
-    context = {
-        'races': races
-    }
-    
-    return render(request, 'hunt/manage_riddles.html', context)
+    return render(request, 'hunt/manage_riddles.html', {'races': races})
 
 @login_required
 def race_detail(request, race_id):
     race = get_object_or_404(Race, id=race_id)
-    
-    # Check if user is authorized to view this race
-    if race.created_by != request.user:
-        messages.error(request, "You don't have permission to view this race.")
-        return redirect('manage_riddles')
-    
-    # Process form submissions
-    if request.method == 'POST':
-        # Edit race details
-        if 'edit_race' in request.POST:
-            race.name = request.POST.get('race_name')
-            race.start_location = request.POST.get('start_location')
-            race.time_limit = request.POST.get('time_limit')
-            race.save()
-            messages.success(request, "Race details updated successfully.")
-            return redirect('race_detail', race_id=race.id)
-        
-        # Add new zone
-        elif 'add_zone' in request.POST:
-            try:
-                initial_question = request.POST.get('initial_question')
-                initial_answer = request.POST.get('initial_answer')
-                
-                # First calculate the next zone number for this race
-                try:
-                    # Get the highest zone number for this race
-                    highest_zone = Zone.objects.filter(race=race).order_by('-number').first()
-                    next_zone_number = 1
-                    if highest_zone:
-                        next_zone_number = highest_zone.number + 1
-                    
-                    print(f"Creating zone #{next_zone_number} for race ID {race.id}")
-                    
-                    # Create new zone with the calculated number
-                    zone = Zone()
-                    zone.race = race
-                    zone.number = next_zone_number  # Set the zone number
-                    zone.save()
-                    print(f"Created zone ID {zone.id} with number {zone.number}")
-                except Exception as e:
-                    error_msg = f"Error creating zone: {str(e)}"
-                    print(error_msg)
-                    messages.error(request, error_msg)
-                    return redirect('race_detail', race_id=race.id)
-                
-                # Try to create the question
-                try:
-                    question = Question()
-                    question.zone = zone
-                    question.answer = initial_answer
-                    
-                    # Try to set the question text with multiple field names
-                    available_fields = [f.name for f in Question._meta.get_fields()]
-                    print(f"Available Question fields: {available_fields}")
-                    
-                    field_set = False
-                    for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
-                        if field_name in available_fields:
-                            print(f"Setting question field '{field_name}' to '{initial_question}'")
-                            setattr(question, field_name, initial_question)
-                            field_set = True
-                            break
-                    
-                    # If no field was set, use any non-standard field
-                    if not field_set:
-                        for field in Question._meta.get_fields():
-                            if field.name not in ['id', 'zone', 'answer']:
-                                print(f"Using fallback field '{field.name}' for question text")
-                                setattr(question, field.name, initial_question)
-                                field_set = True
-                                break
-                    
-                    # Save the question
-                    question.save()
-                    print(f"Saved question with ID {question.id}")
-                    
-                except Exception as e:
-                    error_msg = f"Zone created but error adding question: {str(e)}"
-                    print(error_msg)
-                    messages.warning(request, error_msg)
-                    # Attempt to delete the zone since the question failed
-                    try:
-                        zone.delete()
-                        messages.warning(request, "Deleted zone since question creation failed")
-                    except:
-                        pass
-                    # Don't redirect yet - we still want to show all zones
-                
-                messages.success(request, "New zone added successfully.")
-                
-            except Exception as e:
-                error_msg = f"Unexpected error adding zone: {str(e)}"
-                print(error_msg)
-                messages.error(request, error_msg)
-            
-            # In any case, we want to show the page with all zones
-            # so we continue through to the display code below
-        
-        # Add question to existing zone
-        elif 'add_question' in request.POST:
-            try:
-                zone_id = request.POST.get('zone_id')
-                question_text = request.POST.get('question_text')
-                question_answer = request.POST.get('question_answer')
-                
-                zone = get_object_or_404(Zone, id=zone_id, race=race)
-                print(f"Adding question to zone ID {zone.id}")
-                
-                # Create the question with similar robust approach
-                question = Question()
-                question.zone = zone
-                question.answer = question_answer
-                
-                # Try to set the question field
-                available_fields = [f.name for f in Question._meta.get_fields()]
-                field_set = False
-                for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
-                    if field_name in available_fields:
-                        setattr(question, field_name, question_text)
-                        field_set = True
-                        break
-                
-                # If no field was set, use fallback
-                if not field_set:
-                    for field in Question._meta.get_fields():
-                        if field.name not in ['id', 'zone', 'answer']:
-                            setattr(question, field.name, question_text)
-                            field_set = True
-                            break
-                
-                question.save()
-                messages.success(request, "Question added successfully.")
-                
-            except Exception as e:
-                error_msg = f"Error adding question: {str(e)}"
-                print(error_msg)
-                messages.error(request, error_msg)
-    
-    # Get all zones for this race - explicitly print count for debugging
-    zones = Zone.objects.filter(race=race).order_by('id')
-    print(f"Found {zones.count()} zones for race ID {race.id}")
-    for z in zones:
-        print(f"Zone ID: {z.id}, Race ID: {z.race.id}")
-    
-    # Build a structured data set with zones and their questions
-    zones_with_questions = []
-    
-    for zone in zones:
-        questions = Question.objects.filter(zone=zone)
-        print(f"Zone {zone.id} has {questions.count()} questions")
-        
-        # For each question, get all of its fields and values
-        question_data = []
-        for q in questions:
-            q_data = {'id': q.id}
-            q_data['answer'] = q.answer
-            
-            # Try to get the question text field
-            for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
-                if hasattr(q, field_name):
-                    q_data['question_text'] = getattr(q, field_name, '')
-                    break
-            
-            # If we still don't have question text, get all non-standard fields
-            if 'question_text' not in q_data:
-                for field in q._meta.fields:
-                    field_name = field.name
-                    if field_name not in ['id', 'zone', 'answer']:
-                        q_data['question_text'] = getattr(q, field_name, '')
-                        break
-            
-            question_data.append(q_data)
-        
-        zone_data = {
-            'id': zone.id,
-            'questions': question_data
-        }
-        zones_with_questions.append(zone_data)
-    
-    # Print final count for debugging
-    print(f"Sending {len(zones_with_questions)} zones to template")
-    
-    context = {
-        'race': race,
-        'zones': zones_with_questions,
-        'zones_count': len(zones_with_questions),
-    }
-    
-    return render(request, 'hunt/race_detail.html', context)
-
-@login_required
-def assign_riddles(request):
-    return render(request, 'hunt/assign_riddles.html')
-
-@login_required
-def leaderboard(request):
-    return render(request, 'hunt/leaderboard.html')
-
-@login_required
-def team_list(request):
-    return render(request, 'hunt/team_list.html')
-
-@login_required
-def register_team(request):
-    return render(request, 'hunt/register_team.html')
-
-@login_required
-def manage_lobbies(request):
-    return render(request, 'hunt/manage_lobbies.html')
-
-@login_required
-def toggle_race(request, race_id):
-    if request.method == 'POST':
-        race = get_object_or_404(Race, id=race_id, created_by=request.user)
-        race.is_active = not race.is_active
-        race.save()
-        status = 'activated' if race.is_active else 'deactivated'
-        messages.success(request, f'Race {status} successfully!')
-    return redirect('race_detail', race_id=race_id)
+    return render(request, 'hunt/race_detail.html', {'race': race})
 
 @login_required
 def delete_race(request, race_id):
-    race = get_object_or_404(Race, id=race_id)
-    
-    # Check if the user is authorized to delete this race
-    if race.created_by != request.user:
-        messages.error(request, "You don't have permission to delete this race.")
-        return redirect('manage_riddles')
-    
-    if request.method == 'POST' and request.POST.get('delete_race') == 'true':
-        race_name = race.name
-        # Delete the race
+    if request.method == 'POST':
+        race = get_object_or_404(Race, id=race_id)
         race.delete()
-        messages.success(request, f"Race '{race_name}' has been deleted successfully.")
-    
+        return redirect('manage_riddles')
     return redirect('manage_riddles')
