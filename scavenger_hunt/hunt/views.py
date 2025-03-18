@@ -466,13 +466,22 @@ def race_detail(request, race_id):
                 initial_question = request.POST.get('initial_question')
                 initial_answer = request.POST.get('initial_answer')
                 
-                # Create new zone with proper error handling
+                # First calculate the next zone number for this race
                 try:
-                    # Make sure we explicitly set the race
+                    # Get the highest zone number for this race
+                    highest_zone = Zone.objects.filter(race=race).order_by('-number').first()
+                    next_zone_number = 1
+                    if highest_zone:
+                        next_zone_number = highest_zone.number + 1
+                    
+                    print(f"Creating zone #{next_zone_number} for race ID {race.id}")
+                    
+                    # Create new zone with the calculated number
                     zone = Zone()
                     zone.race = race
+                    zone.number = next_zone_number  # Set the zone number
                     zone.save()
-                    print(f"Created zone ID {zone.id} for race ID {race.id}")
+                    print(f"Created zone ID {zone.id} with number {zone.number}")
                 except Exception as e:
                     error_msg = f"Error creating zone: {str(e)}"
                     print(error_msg)
@@ -502,7 +511,7 @@ def race_detail(request, race_id):
                         for field in Question._meta.get_fields():
                             if field.name not in ['id', 'zone', 'answer']:
                                 print(f"Using fallback field '{field.name}' for question text")
-                                setattr(question, field_name, initial_question)
+                                setattr(question, field.name, initial_question)
                                 field_set = True
                                 break
                     
@@ -514,6 +523,12 @@ def race_detail(request, race_id):
                     error_msg = f"Zone created but error adding question: {str(e)}"
                     print(error_msg)
                     messages.warning(request, error_msg)
+                    # Attempt to delete the zone since the question failed
+                    try:
+                        zone.delete()
+                        messages.warning(request, "Deleted zone since question creation failed")
+                    except:
+                        pass
                     # Don't redirect yet - we still want to show all zones
                 
                 messages.success(request, "New zone added successfully.")
