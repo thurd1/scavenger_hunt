@@ -495,3 +495,13 @@ def delete_race(request, race_id):
         race.delete()
         return redirect('manage_riddles')
     return redirect('manage_riddles')
+
+@login_required
+def toggle_race(request, race_id):
+    if request.method == 'POST':
+        race = get_object_or_404(Race, id=race_id, created_by=request.user)
+        race.is_active = not race.is_active
+        race.save()
+        status = 'activated' if race.is_active else 'deactivated'
+        messages.success(request, f'Race {status} successfully!')
+    return redirect('race_detail', race_id=race_id)
