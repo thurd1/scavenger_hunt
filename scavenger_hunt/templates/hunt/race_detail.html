@@ -13,142 +13,155 @@
         <div class="row justify-content-center">
             <div class="col-12">
                 <h2 class="display-5 mb-0 text-center" style="color: #90C83C">{{ race.name }}</h2>
-                <p class="text-center" style="color: #90C83C">Race Details and Management</p>
                 <hr class="my-4">
             </div>
         </div>
     </div>
 
-    <!-- Race Information Section -->
-    <div class="container mb-4">
-        <div class="row">
-            <div class="col-lg-6 mb-4">
-                <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px; height: 100%;">
-                    <h3 class="text-center mb-4" style="color: #90C83C">Race Information</h3>
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <p class="mb-1" style="color: #90C83C; font-weight: bold;">Start Location</p>
-                            <p class="mb-3">{{ race.start_location }}</p>
+    <div class="container">
+        <!-- Race Information and Controls -->
+        <div class="dashboard-box mb-4" style="background-color: #002a3f; color: white; border-radius: 10px;">
+            <div class="row">
+                <!-- Race Info -->
+                <div class="col-md-9">
+                    <div class="row p-3">
+                        <div class="col-md-4">
+                            <span style="color: #90C83C; font-weight: bold;">Start Location:</span>
+                            <span class="ms-2">{{ race.start_location }}</span>
                         </div>
-                        <div class="col-md-6">
-                            <p class="mb-1" style="color: #90C83C; font-weight: bold;">Time Limit</p>
-                            <p class="mb-3">{{ race.time_limit }}</p>
+                        <div class="col-md-3">
+                            <span style="color: #90C83C; font-weight: bold;">Time Limit:</span>
+                            <span class="ms-2">{{ race.time_limit }}</span>
                         </div>
-                    </div>
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <p class="mb-1" style="color: #90C83C; font-weight: bold;">Status</p>
-                            <p class="mb-3">
-                                <span class="badge {% if race.is_active %}bg-success{% else %}bg-secondary{% endif %}" 
-                                      style="font-size: 1rem; padding: 0.5rem 1rem;">
-                                    {% if race.is_active %}Active{% else %}Inactive{% endif %}
-                                </span>
-                            </p>
+                        <div class="col-md-2">
+                            <span style="color: #90C83C; font-weight: bold;">Status:</span>
+                            <span class="ms-2 badge {% if race.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if race.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
                         </div>
-                        <div class="col-md-6">
-                            <p class="mb-1" style="color: #90C83C; font-weight: bold;">Created</p>
-                            <p class="mb-3">{{ race.created_at|date:"F j, Y" }}</p>
+                        <div class="col-md-3">
+                            <span style="color: #90C83C; font-weight: bold;">Created:</span>
+                            <span class="ms-2">{{ race.created_at|date:"F j, Y" }}</span>
                         </div>
                     </div>
-                    
-                    <div class="text-center mt-4">
-                        <form method="POST" action="{% url 'toggle_race' race.id %}" style="display: inline-block;">
+                </div>
+                
+                <!-- Race Controls -->
+                <div class="col-md-3 d-flex align-items-center justify-content-center">
+                    <div class="d-flex gap-2">
+                        <form method="POST" action="{% url 'toggle_race' race.id %}">
                             {% csrf_token %}
                             <input type="hidden" name="toggle" value="true">
-                            <button type="submit" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px; margin: 0 5px;">
+                            <button type="submit" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
                                 {% if race.is_active %}Deactivate{% else %}Activate{% endif %}
                             </button>
                         </form>
-                        <button id="editRaceBtn" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px; margin: 0 5px;">
-                            <i class="fas fa-edit me-2"></i>Edit Race
+                        <button id="editRaceBtn" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
+                            Edit
                         </button>
                     </div>
                 </div>
             </div>
-            
-            <!-- Edit Race Form (initially hidden) -->
-            <div class="col-lg-6 mb-4" id="editRaceForm" style="display: none;">
-                <div class="dashboard-box">
-                    <h3 class="text-center mb-4" style="color: #90C83C">Edit Race Details</h3>
-                    <form method="POST" action="{% url 'race_detail' race.id %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="edit_race" value="true">
-                        
-                        <div class="mb-3">
-                            <label for="race_name" class="form-label" style="color: #90C83C;">Race Name</label>
-                            <input type="text" class="form-control" id="race_name" name="race_name" 
-                                   value="{{ race.name }}" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="start_location" class="form-label" style="color: #90C83C;">Start Location</label>
-                            <input type="text" class="form-control" id="start_location" name="start_location" 
-                                   value="{{ race.start_location }}" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="time_limit" class="form-label" style="color: #90C83C;">Time Limit (minutes)</label>
-                            <input type="text" class="form-control" id="time_limit" name="time_limit" 
-                                   value="{{ race.time_limit }}" required>
-                        </div>
-                        
-                        <div class="text-center mt-4">
-                            <button type="submit" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
-                                Save Changes
-                            </button>
-                            <button type="button" id="cancelEditBtn" class="btn" style="background-color: #6c757d; color: white; border-radius: 25px; margin-left: 10px;">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
+        </div>
+        
+        <!-- Edit Race Form (initially hidden) -->
+        <div id="editRaceForm" class="dashboard-box mb-4" style="display: none;">
+            <h4 class="text-center mb-3" style="color: #90C83C">Edit Race Details</h4>
+            <form method="POST" action="{% url 'race_detail' race.id %}" class="row g-3">
+                {% csrf_token %}
+                <input type="hidden" name="edit_race" value="true">
+                
+                <div class="col-md-4">
+                    <label for="race_name" class="form-label" style="color: #90C83C;">Race Name</label>
+                    <input type="text" class="form-control" id="race_name" name="race_name" 
+                           value="{{ race.name }}" required>
                 </div>
+                
+                <div class="col-md-4">
+                    <label for="start_location" class="form-label" style="color: #90C83C;">Start Location</label>
+                    <input type="text" class="form-control" id="start_location" name="start_location" 
+                           value="{{ race.start_location }}" required>
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="time_limit" class="form-label" style="color: #90C83C;">Time Limit (minutes)</label>
+                    <input type="text" class="form-control" id="time_limit" name="time_limit" 
+                           value="{{ race.time_limit }}" required>
+                </div>
+                
+                <div class="col-12 text-center mt-3">
+                    <button type="submit" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
+                        Save Changes
+                    </button>
+                    <button type="button" id="cancelEditBtn" class="btn" style="background-color: #6c757d; color: white; border-radius: 25px; margin-left: 10px;">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Zones and Questions Header -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <h3 style="color: #90C83C">Zones and Questions</h3>
             </div>
-            
-            <!-- Zones and Questions Section -->
-            <div class="col-12">
-                <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px;">
-                    <h3 class="text-center mb-4" style="color: #90C83C">Zones and Questions</h3>
+            <div class="col-md-6 text-end">
+                <button id="addZoneBtn" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
+                    <i class="fas fa-plus-circle me-2"></i>Add New Zone
+                </button>
+            </div>
+        </div>
+        
+        <!-- Zones and Questions -->
+        <div class="row">
+            {% for zone in zones %}
+            <div class="col-md-6 mb-4">
+                <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px; height: 100%; position: relative;">
+                    <!-- Zone number label -->
+                    <div style="position: absolute; top: -10px; left: 20px; background-color: #90C83C; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold;">
+                        Zone {{ forloop.counter }}
+                    </div>
                     
-                    <div class="row">
-                        {% for zone in zones %}
-                        <div class="col-md-6 mb-4">
-                            <div class="card" style="border-left: 4px solid #90C83C; border-radius: 10px; background-color: rgba(255, 255, 255, 0.05);">
-                                <div class="card-body">
-                                    <h4 style="color: #90C83C; text-align: center; margin-bottom: 20px;">Zone {{ forloop.counter }}</h4>
-                                    
-                                    {% for question in zone.questions %}
-                                    <div class="mb-3 p-3" style="background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
-                                        <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Question:</p>
-                                        <p style="margin-bottom: 10px;">{{ question.text }}</p>
-                                        <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Answer:</p>
-                                        <p style="margin-bottom: 0;">{{ question.answer }}</p>
-                                    </div>
-                                    {% endfor %}
-                                    
-                                    <div class="text-center mt-3">
-                                        <button class="btn btn-sm add-question-btn" style="background-color: #FF9900; color: white; border-radius: 25px;" 
-                                                data-zone-id="{{ zone.id }}">
-                                            <i class="fas fa-plus me-1"></i>Add Question
-                                        </button>
-                                    </div>
+                    <div class="p-3 mt-4">
+                        <!-- Questions -->
+                        {% for question in zone.questions %}
+                        <div class="mb-3 p-3" style="background-color: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Question:</p>
+                                    <p style="margin-bottom: 10px;">{{ question.text }}</p>
+                                    <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Answer:</p>
+                                    <p style="margin-bottom: 0;">{{ question.answer }}</p>
                                 </div>
+                                <button class="btn btn-sm btn-outline-danger" 
+                                        style="border-radius: 20px;"
+                                        title="Delete Question">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </div>
                         </div>
+                        {% empty %}
+                        <div class="text-center py-4">
+                            <p>No questions in this zone yet.</p>
+                        </div>
                         {% endfor %}
-                    </div>
-                    
-                    <div class="text-center mt-4 mb-2">
-                        <button id="addZoneBtn" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
-                            <i class="fas fa-plus-circle me-2"></i>Add New Zone
-                        </button>
+                        
+                        <!-- Add Question Button -->
+                        <div class="text-center mt-3">
+                            <button class="btn btn-sm add-question-btn" style="background-color: #FF9900; color: white; border-radius: 25px;" 
+                                    data-zone-id="{{ zone.id }}">
+                                <i class="fas fa-plus me-1"></i>Add Question
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Back to Races Button -->
-            <div class="col-12 text-center mt-4">
+            {% endfor %}
+        </div>
+        
+        <!-- Back to Races Button -->
+        <div class="row mt-4 mb-2">
+            <div class="col-12 text-center">
                 <a href="{% url 'manage_riddles' %}" class="btn" style="background-color: #6c757d; color: white; border-radius: 25px;">
                     <i class="fas fa-arrow-left me-2"></i>Back to Races
                 </a>
