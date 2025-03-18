@@ -19,303 +19,70 @@
         </div>
     </div>
 
-    <!-- Error Alert - Hidden until needed -->
-    <div id="errorAlert" class="container" style="display: none;">
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <span id="errorMessage"></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    </div>
-
-    <div class="container">
-        <div class="row">
-            <!-- Existing Races - Only show if races exist -->
-            <div class="col-12 mb-4">
-                <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px;">
-                    <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
-                    <div class="table-responsive">
-                        <table class="table" style="color: white;">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <!-- Remove or comment out the Description column -->
-                                    <!-- <th>Description</th> -->
-                                    <th>Time Limit</th>
-                                    <th>Status</th>
-                                    <th class="text-center">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>{{ race.name }}</td>
-                                    <!-- Remove or comment out the Description cell -->
-                                    <!-- <td>{{ race.description }}</td> -->
-                                    <td>{{ race.time_limit_minutes }} minutes</td>
-                                    <td>
-                                        {% if race.is_active %}
-                                            <span class="badge bg-success">Active</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">Inactive</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-center">
-                                        <a href="{% url 'race_detail' race.id %}" 
-                                            class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
-                                            View
-                                        </a>
-                                        <a href="{% url 'race_detail' race.id %}" 
-                                            class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
-                                            Edit
-                                        </a>
-                                        <button class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;"
-                                                onclick="showDeleteModal('{{ race.id }}', '{{ race.name }}')">
-                                            Delete
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <br><br>
-            
-            <!-- Create New Race Section -->
-            <div class="col-12">
-                <div class="dashboard-box">
-                    <h3 class="text-center mb-4" style="color: #90C83C">Create New Race</h3>
-                    
-                    <form method="POST" id="raceForm" onsubmit="return validateForm()">
-                        {% csrf_token %}
-                        <div class="container-fluid p-0">
-                            <div class="row g-4">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label for="race_name" class="form-label">Race Name</label>
-                                        <input type="text" class="form-control" id="race_name" name="race_name" 
-                                               placeholder="Enter race name" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label for="time_limit_minutes" class="form-label">Time Limit (minutes)</label>
-                                        <input type="number" class="form-control" id="time_limit_minutes" name="time_limit_minutes" 
-                                               value="60" min="1" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-8">
-                                    <div class="form-group">
-                                        <label for="start_location" class="form-label">Starting Location</label>
-                                        <input type="text" class="form-control" id="start_location" name="start_location" 
-                                               placeholder="Enter the physical starting point" required>
-                                        <div class="form-text">Specify where teams will begin their hunt</div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label for="zoneCount" class="form-label">Number of Zones</label>
-                                        <input type="number" class="form-control" id="zoneCount" name="zoneCount" 
-                                               min="1" max="10" placeholder="1-10" required>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Zone Container -->
-                        <div class="container-fluid p-0 mt-4">
-                            <div id="zonesContainer" class="row"></div>
-                        </div>
-
-                        <!-- Buttons -->
-                        <div class="container-fluid p-0 mt-4">
-                            <div class="row justify-content-center">
-                                <div class="col-12 d-flex justify-content-center gap-2">
-                                    <button type="button" class="btn btn-primary" onclick="generateZones()">
-                                        <i class="fas fa-plus-circle me-2"></i>Generate Zones
-                                    </button>
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-flag-checkered me-2"></i>Create Race
-                                    </button>
-                                    <a href="{% url 'leader_dashboard' %}" class="btn btn-secondary">
-                                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Delete Modal -->
-<div id="deleteModalOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-    <div id="deleteModalContent" style="background-color: #003148; color: white; border-radius: 10px; width: 90%; max-width: 500px; padding: 20px; text-align: center;">
-        <h3 style="color: #90C83C; margin-bottom: 20px;">Confirm Delete</h3>
-        
-        <p>Are you sure you want to delete the race "<span id="raceNameToDelete"></span>"?</p>
-        <p>This action cannot be undone.</p>
-        
-        <div style="display: flex; justify-content: center; gap: 15px; margin-top: 25px;">
-            <button id="cancelDeleteBtn" style="background-color: #FF9900; color: white; border: none; border-radius: 25px; padding: 10px 25px; cursor: pointer;">
-                Cancel
-            </button>
-            <form id="deleteForm" method="POST" action="">
+    <!-- Create Race Form -->
+    <div class="container mb-4">
+        <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px; padding: 20px;">
+            <h3 class="text-center mb-4" style="color: #90C83C">Create New Race</h3>
+            <form method="POST">
                 {% csrf_token %}
-                <input type="hidden" name="delete_race" value="true">
-                <button type="submit" style="background-color: #FF9900; color: white; border: none; border-radius: 25px; padding: 10px 25px; cursor: pointer;">
-                    Delete
-                </button>
+                <div class="mb-3">
+                    <label for="race_name" class="form-label">Race Name</label>
+                    <input type="text" class="form-control" id="race_name" name="race_name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="start_location" class="form-label">Start Location</label>
+                    <input type="text" class="form-control" id="start_location" name="start_location" required>
+                </div>
+                <div class="mb-3">
+                    <label for="time_limit" class="form-label">Time Limit (minutes)</label>
+                    <input type="number" class="form-control" id="time_limit" name="time_limit" value="60" min="1" required>
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn" style="background-color: #90C83C; color: white;">Create Race</button>
+                </div>
             </form>
         </div>
     </div>
-</div>
 
-<script>
-function validateForm() {
-    const timeLimit = document.getElementById('time_limit_minutes').value.trim();
-    
-    if (timeLimit < 1) {
-        showError("Time limit must be at least 1 minute");
-        return false;
-    }
-    
-    // Check if zones have been generated
-    const zonesContainer = document.getElementById('zonesContainer');
-    if (zonesContainer.children.length === 0) {
-        showError("Please generate zones before submitting");
-        return false;
-    }
-    
-    return true;
-}
-
-function showError(message) {
-    const errorAlert = document.getElementById('errorAlert');
-    const errorMessage = document.getElementById('errorMessage');
-    
-    errorMessage.textContent = message;
-    errorAlert.style.display = 'block';
-    
-    // Scroll to the error message
-    errorAlert.scrollIntoView({ behavior: 'smooth' });
-    
-    // Hide after 5 seconds
-    setTimeout(function() {
-        errorAlert.style.display = 'none';
-    }, 5000);
-}
-
-function showDeleteModal(raceId, raceName) {
-    // Set the race name and form action
-    document.getElementById('raceNameToDelete').textContent = raceName;
-    document.getElementById('deleteForm').action = "{% url 'delete_race' 0 %}".replace('0', raceId);
-    
-    // Show the modal
-    const modal = document.getElementById('deleteModalOverlay');
-    modal.style.display = 'flex';
-    
-    // Set up the cancel button
-    document.getElementById('cancelDeleteBtn').onclick = function() {
-        modal.style.display = 'none';
-    };
-    
-    // Close modal when clicking outside
-    modal.onclick = function(event) {
-        if (event.target === modal) {
-            modal.style.display = 'none';
-        }
-    };
-}
-
-function generateZones() {
-    const zoneCount = parseInt(document.getElementById('zoneCount').value);
-    if (zoneCount < 1 || zoneCount > 10) {
-        showError('Please enter a number between 1 and 10');
-        return;
-    }
-    
-    const container = document.getElementById('zonesContainer');
-    container.innerHTML = '';
-
-    for (let i = 1; i <= zoneCount; i++) {
-        const zoneHtml = `
-            <div class="col-md-6 mb-4">
-                <div class="dashboard-box p-3">
-                    <h4 class="mb-3 text-center" style="color: #90C83C">Zone ${i}</h4>
-                    <div class="questions-container" id="zone-${i}-questions">
-                        <div class="question-pair mb-4">
-                            <div class="row g-3">
-                                <div class="col-md-5">
-                                    <label class="form-label">Question</label>
-                                    <input type="text" class="form-control" name="zone-${i}-questions[]" 
-                                           placeholder="Enter your question" required>
-                                </div>
-                                <div class="col-md-5">
-                                    <label class="form-label">Answer</label>
-                                    <input type="text" class="form-control" name="zone-${i}-answers[]" 
-                                           placeholder="Enter the answer" required>
-                                </div>
-                                <div class="col-md-2 d-flex align-items-end justify-content-center">
-                                    <button type="button" class="btn btn-sm btn-outline-danger" 
-                                            style="width: 120px; border-radius: 25px;" 
-                                            onclick="removeQuestion(this)" 
-                                            title="Delete Question" aria-label="Delete Question">
-                                        <i class="fas fa-trash me-1"></i> Delete
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <hr class="my-4">
-                    <div class="text-center">
-                        <button type="button" class="btn btn-sm btn-primary" 
-                                style="width: 120px; border-radius: 25px;"
-                                onclick="addQuestionToZone(${i})">
-                            <i class="fas fa-plus me-1"></i>Add Question
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        container.insertAdjacentHTML('beforeend', zoneHtml);
-    }
-}
-
-function addQuestionToZone(zoneNumber) {
-    const container = document.getElementById(`zone-${zoneNumber}-questions`);
-    const questionHtml = `
-        <div class="question-pair mb-4">
-            <div class="row g-3">
-                <div class="col-md-5">
-                    <label class="form-label">Question</label>
-                    <input type="text" class="form-control" name="zone-${zoneNumber}-questions[]" 
-                           placeholder="Enter your question" required>
-                </div>
-                <div class="col-md-5">
-                    <label class="form-label">Answer</label>
-                    <input type="text" class="form-control" name="zone-${zoneNumber}-answers[]" 
-                           placeholder="Enter the answer" required>
-                </div>
-                <div class="col-md-2 d-flex align-items-end justify-content-center">
-                    <button type="button" class="btn btn-sm btn-outline-danger" 
-                            style="width: 120px; border-radius: 25px;"
-                            onclick="removeQuestion(this)"
-                            title="Delete Question" aria-label="Delete Question">
-                        <i class="fas fa-trash me-1"></i> Delete
-                    </button>
-                </div>
+    <!-- Existing Races -->
+    {% if races %}
+    <div class="container">
+        <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px; padding: 20px;">
+            <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
+            <div class="table-responsive">
+                <table class="table" style="color: white;">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Start Location</th>
+                            <th>Time Limit</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for race in races %}
+                        <tr>
+                            <td>{{ race.name }}</td>
+                            <td>{{ race.start_location }}</td>
+                            <td>{{ race.time_limit_minutes }} minutes</td>
+                            <td>
+                                {% if race.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-primary">View</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
-    `;
-    container.insertAdjacentHTML('beforeend', questionHtml);
-}
-
-function removeQuestion(button) {
-    // Get the parent question-pair div and remove it
-    const questionPair = button.closest('.question-pair');
-    questionPair.remove();
-}
-</script>
+    </div>
+    {% endif %}
+</div>
 {% endblock %}
