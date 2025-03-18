@@ -56,10 +56,9 @@ def create_lobby(request):
             lobby = Lobby.objects.create(
                 name=lobby_name,
                 code=game_code,
-                race=race,
-                created_by=request.user,
-                is_active=True
+                is_active=True  # Only include fields that exist in the Lobby model
             )
+            lobby.teams.add(race)  # If you want to associate the race with the lobby, you need to adjust this logic
             messages.success(request, f"Lobby '{lobby_name}' created successfully with game code {game_code}.")
             return redirect('lobby_details', lobby_id=lobby.id)
         except Exception as e:
