@@ -19,8 +19,8 @@
         </div>
     </div>
 
-    <!-- Error Alert -->
-    <div id="errorAlert" class="container d-none">
+    <!-- Error Alert - Hidden until needed -->
+    <div id="errorAlert" class="container" style="display: none;">
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <span id="errorMessage"></span>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -201,10 +201,15 @@ function showError(message) {
     const errorMessage = document.getElementById('errorMessage');
     
     errorMessage.textContent = message;
-    errorAlert.classList.remove('d-none');
+    errorAlert.style.display = 'block';
     
     // Scroll to the error message
     errorAlert.scrollIntoView({ behavior: 'smooth' });
+    
+    // Hide after 5 seconds
+    setTimeout(function() {
+        errorAlert.style.display = 'none';
+    }, 5000);
 }
 
 function showDeleteModal(raceId, raceName) {
@@ -257,16 +262,17 @@ function generateZones() {
                                     <input type="text" class="form-control" name="zone-${i}-answers[]" 
                                            placeholder="Enter the answer" required>
                                 </div>
-                                <div class="col-md-2 d-flex align-items-end">
-                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeQuestion(this)" 
+                                <div class="col-md-2 d-flex align-items-end justify-content-center">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" style="width: 100%;" onclick="removeQuestion(this)" 
                                             title="Delete Question" aria-label="Delete Question">
-                                        <i class="fas fa-trash"></i> Delete
+                                        <i class="fas fa-trash me-1"></i> Delete
                                     </button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="text-center mt-4">
+                    <hr class="my-4">
+                    <div class="text-center">
                         <button type="button" class="btn btn-sm btn-primary" onclick="addQuestionToZone(${i})">
                             <i class="fas fa-plus me-1"></i>Add Question
                         </button>
@@ -293,10 +299,10 @@ function addQuestionToZone(zoneNumber) {
                     <input type="text" class="form-control" name="zone-${zoneNumber}-answers[]" 
                            placeholder="Enter the answer" required>
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeQuestion(this)"
+                <div class="col-md-2 d-flex align-items-end justify-content-center">
+                    <button type="button" class="btn btn-sm btn-outline-danger" style="width: 100%;" onclick="removeQuestion(this)"
                             title="Delete Question" aria-label="Delete Question">
-                        <i class="fas fa-trash"></i> Delete
+                        <i class="fas fa-trash me-1"></i> Delete
                     </button>
                 </div>
             </div>
