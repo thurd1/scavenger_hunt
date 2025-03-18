@@ -112,6 +112,8 @@
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <h3 class="text-center mb-4" style="color: #90C83C">Zones and Questions</h3>
+                <!-- Debug count -->
+                <p class="text-center" style="display: none;">Found {{ zones_count }} zones</p>
             </div>
         </div>
         
@@ -122,7 +124,7 @@
                 <div class="col-md-6 mb-4">
                     <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px; padding: 20px; position: relative;">
                         <div style="position: absolute; top: -10px; left: 20px; background-color: #90C83C; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold;">
-                            Zone {{ forloop.counter }}
+                            Zone {{ forloop.counter }} (ID: {{ zone.id }})
                         </div>
                         
                         <!-- Display questions from this zone -->
