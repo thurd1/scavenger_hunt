@@ -30,12 +30,13 @@
             </div>
         </div>
         
-        <!-- Debug Info (hidden in production) -->
+        <!-- Debug Info -->
         <div class="row justify-content-center mb-3" style="display: none;">
             <div class="col-md-8">
                 <div class="alert alert-info">
-                    <h5>Debug: Question Fields</h5>
-                    <p>Available fields: {{ question_fields|join:", " }}</p>
+                    <h5>Debug Info</h5>
+                    <p><strong>Question Fields:</strong> {{ question_fields|join:", " }}</p>
+                    <p><strong>Zone Fields:</strong> {{ zone_fields|join:", " }}</p>
                 </div>
             </div>
         </div>
@@ -124,27 +125,23 @@
                             Zone {{ forloop.counter }}
                         </div>
                         
-                        <!-- Display questions from this zone - more dynamic approach -->
+                        <!-- Display questions from this zone -->
                         <div class="mt-4">
-                            {% if zone.questions %}
+                            {% if zone.error %}
+                                <div class="alert alert-warning">Error: {{ zone.error }}</div>
+                            {% endif %}
+                            
+                            {% if zone.questions and zone.questions|length > 0 %}
                                 {% for question in zone.questions %}
                                     <div class="mb-3 p-3" style="background-color: rgba(255,255,255,0.05); border-radius: 8px;">
                                         <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Question:</p>
-                                        <!-- Try different possible field names -->
                                         <p style="margin-bottom: 10px;">
                                             {% if question.question_text %}{{ question.question_text }}
-                                            {% elif question.text %}{{ question.text }}
-                                            {% elif question.content %}{{ question.content }}
-                                            {% elif question.question %}{{ question.question }}
-                                            {% elif question.body %}{{ question.body }}
-                                            {% elif question.prompt %}{{ question.prompt }}
                                             {% else %}[Question text not found]{% endif %}
                                         </p>
                                         <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Answer:</p>
                                         <p style="margin-bottom: 0;">{{ question.answer }}</p>
                                     </div>
-                                {% empty %}
-                                    <p class="text-center">No questions in this zone yet.</p>
                                 {% endfor %}
                             {% else %}
                                 <p class="text-center">No questions in this zone yet.</p>

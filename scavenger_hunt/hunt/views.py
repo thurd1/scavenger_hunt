@@ -462,98 +462,170 @@ def race_detail(request, race_id):
         
         # Add new zone
         elif 'add_zone' in request.POST:
-            initial_question = request.POST.get('initial_question')
-            initial_answer = request.POST.get('initial_answer')
-            
-            # Create new zone
-            zone = Zone.objects.create(race=race)
-            
-            # Create initial question - using generic approach
-            question = Question(zone=zone)
-            # We'll dynamically set field values
-            setattr(question, 'answer', initial_answer)
-            # Try different potential field names for the question text
-            for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
-                try:
-                    setattr(question, field_name, initial_question)
-                    question.save()
-                    # If we get here, the field exists and we saved successfully
-                    field_found = field_name
-                    break
-                except Exception as e:
-                    continue
-            else:
-                # No field name worked, let's try to create it anyway
-                question.save()
-                messages.warning(request, "Zone created but couldn't determine question field name.")
+            try:
+                initial_question = request.POST.get('initial_question')
+                initial_answer = request.POST.get('initial_answer')
                 
-            messages.success(request, "New zone added successfully.")
+                # Create new zone with proper error handling
+                try:
+                    zone = Zone(race=race)
+                    zone.save()
+                except Exception as e:
+                    messages.error(request, f"Error creating zone: {str(e)}")
+                    return redirect('race_detail', race_id=race.id)
+                
+                # Try to create the question - inspect the model first
+                try:
+                    question = Question(zone=zone)
+                    
+                    # First handle the answer
+                    setattr(question, 'answer', initial_answer)
+                    
+                    # Now try to set the question text with multiple field names
+                    field_set = False
+                    for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
+                        try:
+                            model_fields = [f.name for f in Question._meta.get_fields()]
+                            if field_name in model_fields:
+                                setattr(question, field_name, initial_question)
+                                field_set = True
+                                break
+                        except Exception:
+                            continue
+                    
+                    # If no field was set, create a fallback
+                    if not field_set:
+                        # Just try the first field that's not id, zone, or answer
+                        for field in Question._meta.get_fields():
+                            if field.name not in ['id', 'zone', 'answer']:
+                                setattr(question, field.name, initial_question)
+                                field_set = True
+                                break
+                    
+                    # Save the question
+                    question.save()
+                    
+                except Exception as e:
+                    # If question creation fails, still keep the zone but show error
+                    messages.warning(request, f"Zone created but error adding question: {str(e)}")
+                    return redirect('race_detail', race_id=race.id)
+                
+                messages.success(request, "New zone added successfully.")
+                
+            except Exception as e:
+                # Catch any other unexpected errors
+                messages.error(request, f"Unexpected error: {str(e)}")
+            
             return redirect('race_detail', race_id=race.id)
         
         # Add question to existing zone
         elif 'add_question' in request.POST:
-            zone_id = request.POST.get('zone_id')
-            question_text = request.POST.get('question_text')
-            question_answer = request.POST.get('question_answer')
-            
-            zone = get_object_or_404(Zone, id=zone_id, race=race)
-            
-            # Similar approach for adding questions
-            question = Question(zone=zone)
-            setattr(question, 'answer', question_answer)
-            for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
-                try:
-                    setattr(question, field_name, question_text)
-                    question.save()
-                    break
-                except Exception as e:
-                    continue
-            else:
+            try:
+                zone_id = request.POST.get('zone_id')
+                question_text = request.POST.get('question_text')
+                question_answer = request.POST.get('question_answer')
+                
+                zone = get_object_or_404(Zone, id=zone_id, race=race)
+                
+                # Create the question with similar robust approach
+                question = Question(zone=zone)
+                setattr(question, 'answer', question_answer)
+                
+                # Try to set the question field
+                field_set = False
+                for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
+                    try:
+                        model_fields = [f.name for f in Question._meta.get_fields()]
+                        if field_name in model_fields:
+                            setattr(question, field_name, question_text)
+                            field_set = True
+                            break
+                    except Exception:
+                        continue
+                
+                # If no field was set, use fallback
+                if not field_set:
+                    for field in Question._meta.get_fields():
+                        if field.name not in ['id', 'zone', 'answer']:
+                            setattr(question, field.name, question_text)
+                            field_set = True
+                            break
+                
                 question.save()
-                messages.warning(request, "Question added but couldn't determine question field name.")
-            
-            messages.success(request, "Question added successfully.")
+                messages.success(request, "Question added successfully.")
+                
+            except Exception as e:
+                messages.error(request, f"Error adding question: {str(e)}")
+                
             return redirect('race_detail', race_id=race.id)
     
-    # Get all zones for this race
-    zones = Zone.objects.filter(race=race)
-    
-    # DEBUGGING: First find out what fields exist on Question model
-    question_fields = []
+    # Get all zones for this race with proper error handling
     try:
-        if Question.objects.exists():
-            sample_question = Question.objects.first()
-            # Get all field names from the model
-            question_fields = [field.name for field in sample_question._meta.get_fields()]
+        zones = Zone.objects.filter(race=race).order_by('id')
+        
+        # Build a structured data set with zones and their questions
+        zones_with_questions = []
+        
+        for zone in zones:
+            try:
+                questions = Question.objects.filter(zone=zone)
+                
+                # For each question, get all of its fields and values
+                question_data = []
+                for q in questions:
+                    q_data = {'id': q.id}
+                    
+                    # Get answer field
+                    q_data['answer'] = getattr(q, 'answer', '')
+                    
+                    # Try to get the question text field
+                    for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
+                        if hasattr(q, field_name):
+                            q_data['question_text'] = getattr(q, field_name, '')
+                            break
+                    
+                    # If we still don't have question text, get all non-standard fields
+                    if 'question_text' not in q_data:
+                        for field in q._meta.fields:
+                            field_name = field.name
+                            if field_name not in ['id', 'zone', 'answer']:
+                                q_data['question_text'] = getattr(q, field_name, '')
+                                break
+                    
+                    question_data.append(q_data)
+                
+                zone_data = {
+                    'id': zone.id,
+                    'questions': question_data
+                }
+                zones_with_questions.append(zone_data)
+                
+            except Exception as e:
+                # If there's an error with a particular zone, add it with an error message
+                zone_data = {
+                    'id': zone.id,
+                    'error': str(e),
+                    'questions': []
+                }
+                zones_with_questions.append(zone_data)
+        
     except Exception as e:
-        question_fields = ["Error: " + str(e)]
+        zones_with_questions = []
+        messages.error(request, f"Error retrieving zones: {str(e)}")
     
-    # Build a structured data set with zones and their questions
-    zones_with_questions = []
-    for zone in zones:
-        questions = Question.objects.filter(zone=zone)
-        
-        # For each question, get all of its fields and values
-        question_data = []
-        for q in questions:
-            q_data = {'id': q.id}
-            # Try to get all field values
-            for field in q._meta.fields:
-                field_name = field.name
-                if field_name not in ['id', 'zone']:
-                    q_data[field_name] = getattr(q, field_name, '')
-            question_data.append(q_data)
-        
-        zone_data = {
-            'id': zone.id,
-            'questions': question_data
-        }
-        zones_with_questions.append(zone_data)
+    # Get model information for debugging
+    try:
+        question_fields = [field.name for field in Question._meta.get_fields()]
+        zone_fields = [field.name for field in Zone._meta.get_fields()]
+    except Exception as e:
+        question_fields = [f"Error: {str(e)}"]
+        zone_fields = [f"Error: {str(e)}"]
     
     context = {
         'race': race,
         'zones': zones_with_questions,
-        'question_fields': question_fields,  # For debugging
+        'question_fields': question_fields,
+        'zone_fields': zone_fields,
     }
     
     return render(request, 'hunt/race_detail.html', context)
