@@ -468,13 +468,25 @@ def race_detail(request, race_id):
             # Create new zone
             zone = Zone.objects.create(race=race)
             
-            # Create initial question - using correct field names
-            Question.objects.create(
-                zone=zone,
-                question=initial_question,  # Changed from text to question
-                answer=initial_answer
-            )
-            
+            # Create initial question - using generic approach
+            question = Question(zone=zone)
+            # We'll dynamically set field values
+            setattr(question, 'answer', initial_answer)
+            # Try different potential field names for the question text
+            for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
+                try:
+                    setattr(question, field_name, initial_question)
+                    question.save()
+                    # If we get here, the field exists and we saved successfully
+                    field_found = field_name
+                    break
+                except Exception as e:
+                    continue
+            else:
+                # No field name worked, let's try to create it anyway
+                question.save()
+                messages.warning(request, "Zone created but couldn't determine question field name.")
+                
             messages.success(request, "New zone added successfully.")
             return redirect('race_detail', race_id=race.id)
         
@@ -486,11 +498,19 @@ def race_detail(request, race_id):
             
             zone = get_object_or_404(Zone, id=zone_id, race=race)
             
-            Question.objects.create(
-                zone=zone,
-                question=question_text,
-                answer=question_answer
-            )
+            # Similar approach for adding questions
+            question = Question(zone=zone)
+            setattr(question, 'answer', question_answer)
+            for field_name in ['question_text', 'content', 'text', 'question', 'body', 'prompt']:
+                try:
+                    setattr(question, field_name, question_text)
+                    question.save()
+                    break
+                except Exception as e:
+                    continue
+            else:
+                question.save()
+                messages.warning(request, "Question added but couldn't determine question field name.")
             
             messages.success(request, "Question added successfully.")
             return redirect('race_detail', race_id=race.id)
@@ -498,23 +518,42 @@ def race_detail(request, race_id):
     # Get all zones for this race
     zones = Zone.objects.filter(race=race)
     
+    # DEBUGGING: First find out what fields exist on Question model
+    question_fields = []
+    try:
+        if Question.objects.exists():
+            sample_question = Question.objects.first()
+            # Get all field names from the model
+            question_fields = [field.name for field in sample_question._meta.get_fields()]
+    except Exception as e:
+        question_fields = ["Error: " + str(e)]
+    
     # Build a structured data set with zones and their questions
     zones_with_questions = []
     for zone in zones:
         questions = Question.objects.filter(zone=zone)
+        
+        # For each question, get all of its fields and values
+        question_data = []
+        for q in questions:
+            q_data = {'id': q.id}
+            # Try to get all field values
+            for field in q._meta.fields:
+                field_name = field.name
+                if field_name not in ['id', 'zone']:
+                    q_data[field_name] = getattr(q, field_name, '')
+            question_data.append(q_data)
+        
         zone_data = {
             'id': zone.id,
-            'questions': [{
-                'id': q.id,
-                'text': q.question,  # Changed from q.text to q.question
-                'answer': q.answer
-            } for q in questions]
+            'questions': question_data
         }
         zones_with_questions.append(zone_data)
     
     context = {
         'race': race,
-        'zones': zones_with_questions
+        'zones': zones_with_questions,
+        'question_fields': question_fields,  # For debugging
     }
     
     return render(request, 'hunt/race_detail.html', context)

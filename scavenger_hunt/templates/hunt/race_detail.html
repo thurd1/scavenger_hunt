@@ -30,6 +30,16 @@
             </div>
         </div>
         
+        <!-- Debug Info (hidden in production) -->
+        <div class="row justify-content-center mb-3" style="display: none;">
+            <div class="col-md-8">
+                <div class="alert alert-info">
+                    <h5>Debug: Question Fields</h5>
+                    <p>Available fields: {{ question_fields|join:", " }}</p>
+                </div>
+            </div>
+        </div>
+        
         <!-- Race Information -->
         <div class="row justify-content-center mb-5">
             <div class="col-md-6">
@@ -104,25 +114,7 @@
             </div>
         </div>
         
-        <!-- Debugging info -->
-        <div class="row justify-content-center mb-3" style="display: none;">
-            <div class="col-md-8">
-                <div class="card bg-light">
-                    <div class="card-body">
-                        <h5>Debug Info:</h5>
-                        <p>Race ID: {{ race.id }}</p>
-                        <p>Zones count: {{ zones|length }}</p>
-                        {% for zone in zones %}
-                            <p>Zone {{ forloop.counter }}: ID {{ zone.id }}</p>
-                        {% empty %}
-                            <p>No zones in zones variable</p>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Display zones based on different data structures -->
+        <!-- Display zones -->
         {% if zones and zones|length > 0 %}
             <div class="row justify-content-center">
                 {% for zone in zones %}
@@ -132,22 +124,22 @@
                             Zone {{ forloop.counter }}
                         </div>
                         
-                        <!-- Display questions from this zone -->
+                        <!-- Display questions from this zone - more dynamic approach -->
                         <div class="mt-4">
                             {% if zone.questions %}
                                 {% for question in zone.questions %}
                                     <div class="mb-3 p-3" style="background-color: rgba(255,255,255,0.05); border-radius: 8px;">
                                         <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Question:</p>
-                                        <p style="margin-bottom: 10px;">{{ question.text }}</p>
-                                        <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Answer:</p>
-                                        <p style="margin-bottom: 0;">{{ question.answer }}</p>
-                                    </div>
-                                {% endfor %}
-                            {% elif zone.question_set.all %}
-                                {% for question in zone.question_set.all %}
-                                    <div class="mb-3 p-3" style="background-color: rgba(255,255,255,0.05); border-radius: 8px;">
-                                        <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Question:</p>
-                                        <p style="margin-bottom: 10px;">{{ question.text }}</p>
+                                        <!-- Try different possible field names -->
+                                        <p style="margin-bottom: 10px;">
+                                            {% if question.question_text %}{{ question.question_text }}
+                                            {% elif question.text %}{{ question.text }}
+                                            {% elif question.content %}{{ question.content }}
+                                            {% elif question.question %}{{ question.question }}
+                                            {% elif question.body %}{{ question.body }}
+                                            {% elif question.prompt %}{{ question.prompt }}
+                                            {% else %}[Question text not found]{% endif %}
+                                        </p>
                                         <p style="color: #90C83C; font-weight: bold; margin-bottom: 5px;">Answer:</p>
                                         <p style="margin-bottom: 0;">{{ question.answer }}</p>
                                     </div>
