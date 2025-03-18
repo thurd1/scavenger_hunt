@@ -39,7 +39,7 @@
                             <thead>
                                 <tr>
                                     <th>Name</th>
-                                    <th>Start Location</th>
+                                    <th>Description</th>
                                     <th>Time Limit</th>
                                     <th>Status</th>
                                     <th class="text-center">Actions</th>
@@ -49,10 +49,14 @@
                                 {% for race in races %}
                                 <tr>
                                     <td>{{ race.name }}</td>
-                                    <td>{{ race.start_location }}</td>
-                                    <td>{{ race.time_limit }}</td>
+                                    <td>{{ race.description|truncatewords:10 }}</td>
+                                    <td>{{ race.time_limit_minutes }} minutes</td>
                                     <td>
-                                        {% if race.is_active %}Active{% else %}Inactive{% endif %}
+                                        {% if race.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
                                     </td>
                                     <td class="text-center">
                                         <a href="{% url 'race_detail' race.id %}" 
