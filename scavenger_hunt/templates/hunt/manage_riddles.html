@@ -63,7 +63,7 @@
                                             Edit
                                         </a>
                                         <button class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;"
-                                                onclick="confirmDelete('{{ race.id }}', '{{ race.name }}')">
+                                                onclick="showDeleteModal('{{ race.id }}', '{{ race.name }}')">
                                             Delete
                                         </button>
                                     </td>
@@ -118,13 +118,13 @@
                                     </div>
                                 </div>
                             </div>
-            </div>
-        
+                        </div>
+
                         <!-- Zone Container -->
                         <div class="container-fluid p-0 mt-4">
                             <div id="zonesContainer" class="row"></div>
-            </div>
-        
+                        </div>
+
                         <!-- Buttons -->
                         <div class="container-fluid p-0 mt-4">
                             <div class="row justify-content-center">
@@ -146,38 +146,32 @@
             </div>
         </div>
     </div>
-            </div>
+</div>
+
+<!-- Delete Modal -->
+<div id="deleteModalOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div id="deleteModalContent" style="background-color: #003148; color: white; border-radius: 10px; width: 90%; max-width: 500px; padding: 20px; text-align: center;">
+        <h3 style="color: #90C83C; margin-bottom: 20px;">Confirm Delete</h3>
         
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="background-color: #003148; color: white; border-radius: 10px;">
-            <div class="modal-header border-0">
-                <h5 class="modal-title" id="deleteModalLabel" style="color: #90C83C; margin: 0 auto;">Confirm Delete</h5>
-            </div>
-            <div class="modal-body text-center">
-                <p>Are you sure you want to delete the race "<span id="raceNameToDelete"></span>"?</p>
-                <p>This action cannot be undone.</p>
-            </div>
-            <div class="modal-footer border-0 justify-content-center">
-                <form id="deleteForm" method="POST" action="" class="d-flex gap-2 justify-content-center w-100">
-                    {% csrf_token %}
-                    <input type="hidden" name="delete_race" value="true">
-                    <button type="button" class="btn" data-bs-dismiss="modal" 
-                            style="background-color: #FF9900; color: white; border-radius: 25px; padding: 8px 24px;">
-                        Cancel
-                    </button>
-                    <button type="submit" class="btn" 
-                            style="background-color: #FF9900; color: white; border-radius: 25px; padding: 8px 24px;">
-                        Delete
-                    </button>
-        </form>
-            </div>
+        <p>Are you sure you want to delete the race "<span id="raceNameToDelete"></span>"?</p>
+        <p>This action cannot be undone.</p>
+        
+        <div style="display: flex; justify-content: center; gap: 15px; margin-top: 25px;">
+            <button id="cancelDeleteBtn" style="background-color: #FF9900; color: white; border: none; border-radius: 25px; padding: 10px 25px; cursor: pointer;">
+                Cancel
+            </button>
+            <form id="deleteForm" method="POST" action="">
+                {% csrf_token %}
+                <input type="hidden" name="delete_race" value="true">
+                <button type="submit" style="background-color: #FF9900; color: white; border: none; border-radius: 25px; padding: 10px 25px; cursor: pointer;">
+                    Delete
+                </button>
+            </form>
         </div>
     </div>
-    </div>
+</div>
 
-    <script>
+<script>
 function validateForm() {
     const timeLimit = document.getElementById('time_limit').value.trim();
     
@@ -213,15 +207,29 @@ function showError(message) {
     errorAlert.scrollIntoView({ behavior: 'smooth' });
 }
 
-function confirmDelete(raceId, raceName) {
+function showDeleteModal(raceId, raceName) {
+    // Set the race name and form action
     document.getElementById('raceNameToDelete').textContent = raceName;
     document.getElementById('deleteForm').action = `/delete-race/${raceId}/`;
     
-    const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-    deleteModal.show();
+    // Show the modal
+    const modal = document.getElementById('deleteModalOverlay');
+    modal.style.display = 'flex';
+    
+    // Set up the cancel button
+    document.getElementById('cancelDeleteBtn').onclick = function() {
+        modal.style.display = 'none';
+    };
+    
+    // Close modal when clicking outside
+    modal.onclick = function(event) {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    };
 }
 
-        function generateZones() {
+function generateZones() {
     const zoneCount = parseInt(document.getElementById('zoneCount').value);
     if (zoneCount < 1 || zoneCount > 10) {
         showError('Please enter a number between 1 and 10');
@@ -230,8 +238,8 @@ function confirmDelete(raceId, raceName) {
     
     const container = document.getElementById('zonesContainer');
     container.innerHTML = '';
-    
-            for (let i = 1; i <= zoneCount; i++) {
+
+    for (let i = 1; i <= zoneCount; i++) {
         const zoneHtml = `
             <div class="col-md-6 mb-4">
                 <div class="dashboard-box p-3">
@@ -263,8 +271,8 @@ function confirmDelete(raceId, raceName) {
                         </button>
                     </div>
                 </div>
-                    </div>
-                `;
+            </div>
+        `;
         container.insertAdjacentHTML('beforeend', zoneHtml);
     }
 }
@@ -299,6 +307,6 @@ function removeQuestion(button) {
     // Get the parent question-pair div and remove it
     const questionPair = button.closest('.question-pair');
     questionPair.remove();
-        }
-    </script>
+}
+</script>
 {% endblock %}
