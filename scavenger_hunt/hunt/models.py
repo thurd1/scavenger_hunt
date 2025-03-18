@@ -6,7 +6,7 @@ import string
 from django.utils import timezone
 
 def generate_lobby_code():
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return str(random.randint(100000, 999999))
 
 class Lobby(models.Model):
     name = models.CharField(max_length=100)
@@ -20,7 +20,7 @@ class Lobby(models.Model):
     def save(self, *args, **kwargs):
         if not self.code:
             while True:
-                code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                code = str(random.randint(100000, 999999))
                 if not Lobby.objects.filter(code=code).exists():
                     self.code = code
                     break

@@ -23,13 +23,13 @@
                 <label for="game_code" class="form-label">Game Code</label>
                 <div class="input-group">
                     <input type="text" class="form-control" id="game_code" name="game_code" 
-                          placeholder="4-digit code for players to join" required
-                          pattern="[0-9]{4}" maxlength="4" minlength="4">
+                          placeholder="6-digit code for players to join" required
+                          pattern="[0-9]{6}" maxlength="6" minlength="6">
                     <button type="button" class="btn btn-secondary" id="generateCodeBtn">
                         <i class="fas fa-random"></i> Generate
                     </button>
                 </div>
-                <div class="form-text">4-digit code that players will use to join your game</div>
+                <div class="form-text">6-digit code that players will use to join your game</div>
             </div>
             
             <div class="form-group mb-4">
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const gameCodeInput = document.getElementById('game_code');
     
     generateCodeBtn.addEventListener('click', function() {
-        const randomCode = Math.floor(1000 + Math.random() * 9000);
+        const randomCode = Math.floor(100000 + Math.random() * 900000);
         gameCodeInput.value = randomCode;
     });
     
@@ -186,8 +186,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        if (gameCode.length !== 4 || isNaN(gameCode)) {
-            alert('Game code must be a 4-digit number');
+        if (gameCode.length !== 6 || isNaN(gameCode)) {
+            alert('Game code must be a 6-digit number');
             event.preventDefault();
             return;
         }

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Team Options{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="dashboard-box">
+        <h1 style="color: #90C83C">Welcome to {{ lobby.name }}</h1>
+        
+        <div class="options-container">
+            <div class="option-box">
+                <h2>Join Existing Team</h2>
+                <p>Have a team code? Enter it below to join your team.</p>
+                <a href="{% url 'join_existing_team' lobby_id=lobby.id %}" class="btn btn-primary">
+                    <i class="fas fa-users"></i> Join Team
+                </a>
+            </div>
+
+            <div class="option-box">
+                <h2>Create New Team</h2>
+                <p>Start a new team and invite others to join.</p>
+                <a href="{% url 'create_team' lobby_id=lobby.id %}" class="btn btn-success">
+                    <i class="fas fa-plus-circle"></i> Create Team
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1rem;
+}
+
+.dashboard-box {
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 10px;
+    padding: 2rem;
+    text-align: center;
+}
+
+.options-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.option-box {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 1.5rem;
+    border-radius: 8px;
+    transition: transform 0.3s ease;
+}
+
+.option-box:hover {
+    transform: translateY(-5px);
+}
+
+.option-box h2 {
+    color: #90C83C;
+    margin-bottom: 1rem;
+}
+
+.option-box p {
+    color: #fff;
+    margin-bottom: 1.5rem;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.8rem 1.5rem;
+    border-radius: 25px;
+    font-weight: bold;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #FFA500, #FF7F00);
+    color: white;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+}
+
+.btn:hover {
+    transform: scale(1.05);
+    text-decoration: none;
+    color: white;
+}
+
+.btn i {
+    margin-right: 0.5rem;
+}
+</style>
+
+<!-- Add Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% endblock %} 
