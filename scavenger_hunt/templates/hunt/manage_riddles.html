@@ -29,7 +29,8 @@
 
     <div class="container">
         <div class="row">
-            <!-- Existing Races -->
+            <!-- Existing Races - Only show if races exist -->
+            {% if races %}
             <div class="col-12 mb-4">
                 <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px;">
                     <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
@@ -72,12 +73,11 @@
                             </tbody>
                         </table>
                     </div>
-                    {% if not races %}
-                    <p class="text-center text-muted mb-4">You haven't created any races yet. Use the form below to create your first race.</p>
-                    {% endif %}
                 </div>
             </div>
             <br><br>
+            {% endif %}
+            
             <!-- Create New Race Section -->
             <div class="col-12">
                 <div class="dashboard-box">
@@ -263,7 +263,9 @@ function generateZones() {
                                            placeholder="Enter the answer" required>
                                 </div>
                                 <div class="col-md-2 d-flex align-items-end justify-content-center">
-                                    <button type="button" class="btn btn-sm btn-outline-danger" style="width: 100%;" onclick="removeQuestion(this)" 
+                                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                                            style="width: 120px; border-radius: 25px;" 
+                                            onclick="removeQuestion(this)" 
                                             title="Delete Question" aria-label="Delete Question">
                                         <i class="fas fa-trash me-1"></i> Delete
                                     </button>
@@ -273,7 +275,9 @@ function generateZones() {
                     </div>
                     <hr class="my-4">
                     <div class="text-center">
-                        <button type="button" class="btn btn-sm btn-primary" onclick="addQuestionToZone(${i})">
+                        <button type="button" class="btn btn-sm btn-primary" 
+                                style="width: 120px; border-radius: 25px;"
+                                onclick="addQuestionToZone(${i})">
                             <i class="fas fa-plus me-1"></i>Add Question
                         </button>
                     </div>
@@ -300,7 +304,9 @@ function addQuestionToZone(zoneNumber) {
                            placeholder="Enter the answer" required>
                 </div>
                 <div class="col-md-2 d-flex align-items-end justify-content-center">
-                    <button type="button" class="btn btn-sm btn-outline-danger" style="width: 100%;" onclick="removeQuestion(this)"
+                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                            style="width: 120px; border-radius: 25px;"
+                            onclick="removeQuestion(this)"
                             title="Delete Question" aria-label="Delete Question">
                         <i class="fas fa-trash me-1"></i> Delete
                     </button>
