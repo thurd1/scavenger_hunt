@@ -119,11 +119,13 @@ class UserProfile(models.Model):
 
 class Race(models.Model):
     name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    time_limit_minutes = models.IntegerField(default=60)
     start_location = models.CharField(max_length=200)
     time_limit = models.IntegerField(default=60)  # in minutes
-    created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey('CustomUser', on_delete=models.CASCADE)
-    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name

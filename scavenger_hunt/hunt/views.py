@@ -401,6 +401,16 @@ def check_hunt_status(request, lobby_id):
 
 @login_required
 def manage_riddles(request):
+    if request.method == 'POST':
+        # Make sure you're only passing fields that exist in the Race model
+        race = Race.objects.create(
+            name=request.POST.get('race_name'),
+            description=request.POST.get('description'),
+            created_by=request.user,
+            time_limit_minutes=request.POST.get('time_limit_minutes', 60),  # Add default value
+            is_active=False  # Set default value for is_active
+        )
+        # ... rest of your view code ...
     races = Race.objects.all().order_by('-created_at')
     
     if request.method == 'POST':
