@@ -228,6 +228,99 @@
 </style>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize toasts
+    var toastElList = document.querySelectorAll('.toast');
+    toastElList.forEach(function(toastEl) {
+        var toast = new bootstrap.Toast(toastEl, {
+            autohide: true,
+            delay: 3000
+        });
+        toast.show();
+    });
+
+    // Add Zone functionality
+    document.getElementById('addZone').addEventListener('click', function() {
+        const zonesContainer = document.getElementById('zonesContainer');
+        const zoneCount = zonesContainer.getElementsByClassName('zone-item').length;
+        const newZoneNumber = zoneCount + 1;
+
+        const newZoneHtml = `
+            <div class="zone-item mb-4" data-zone-id="new_${newZoneNumber}">
+                <div class="zone-header bg-success bg-opacity-25 p-3 rounded">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Zone ${newZoneNumber}</h5>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-success add-question me-2" 
+                                    data-zone-id="new_${newZoneNumber}">
+                                <i class="fas fa-plus"></i> Add Question
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger delete-zone">
+                                <i class="fas fa-trash"></i> Delete Zone
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="questions-list p-3">
+                    <!-- Questions will be added here -->
+                </div>
+            </div>
+        `;
+        zonesContainer.insertAdjacentHTML('beforeend', newZoneHtml);
+    });
+
+    // Add Question functionality
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.add-question')) {
+            const button = e.target.closest('.add-question');
+            const zoneId = button.dataset.zoneId;
+            const questionsList = button.closest('.zone-item').querySelector('.questions-list');
+            
+            const newQuestionHtml = `
+                <div class="question-row mb-3">
+                    <div class="input-group">
+                        <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
+                               name="new_question_${zoneId}[]" 
+                               placeholder="Question" required>
+                        <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
+                               name="new_answer_${zoneId}[]" 
+                               placeholder="Answer" required>
+                        <button type="button" class="btn btn-danger delete-question">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            questionsList.insertAdjacentHTML('beforeend', newQuestionHtml);
+        }
+    });
+
+    // Delete Question functionality
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.delete-question')) {
+            const questionRow = e.target.closest('.question-row');
+            if (confirm('Are you sure you want to delete this question?')) {
+                questionRow.remove();
+            }
+        }
+    });
+
+    // Delete Zone functionality
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.delete-zone')) {
+            const zoneItem = e.target.closest('.zone-item');
+            if (confirm('Are you sure you want to delete this zone and all its questions?')) {
+                zoneItem.remove();
+                // Renumber remaining zones
+                const zones = document.getElementsByClassName('zone-item');
+                Array.from(zones).forEach((zone, index) => {
+                    zone.querySelector('h5').textContent = `Zone ${index + 1}`;
+                });
+            }
+        }
+    });
+});
+
 function toggleEditView() {
     const normalView = document.getElementById('normalView');
     const editView = document.getElementById('editView');
@@ -240,80 +333,5 @@ function toggleEditView() {
         editView.style.display = 'none';
     }
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Toast initialization
-    var toastElList = document.querySelectorAll('.toast');
-    toastElList.forEach(function(toastEl) {
-        var toast = new bootstrap.Toast(toastEl, {
-            autohide: true,
-            delay: 3000
-        });
-        toast.show();
-    });
-
-    // Fix modal scrolling
-    const editModal = document.getElementById('editRaceModal');
-    editModal.addEventListener('shown.bs.modal', function () {
-        document.body.style.overflow = 'hidden';
-    });
-    editModal.addEventListener('hidden.bs.modal', function () {
-        document.body.style.overflow = 'auto';
-    });
-
-    // Add new question functionality
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.add-question')) {
-            const button = e.target.closest('.add-question');
-            const zoneId = button.dataset.zoneId;
-            const questionsList = button.closest('.zone-item').querySelector('.questions-list');
-            
-            const newQuestionHtml = `
-                <div class="question-row mb-2">
-                    <div class="input-group">
-                        <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
-                               name="new_question_${zoneId}[]" placeholder="Question">
-                        <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
-                               name="new_answer_${zoneId}[]" placeholder="Answer">
-                        <button type="button" class="btn btn-danger delete-question">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-            questionsList.insertAdjacentHTML('beforeend', newQuestionHtml);
-        }
-    });
-
-    // Delete question functionality
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.delete-question')) {
-            e.target.closest('.question-row').remove();
-        }
-    });
-
-    // Add new zone functionality
-    let newZoneCounter = {{ race.zones.all|length }} + 1;
-    document.getElementById('addZone').addEventListener('click', function() {
-        const zonesContainer = document.getElementById('zonesContainer');
-        const newZoneHtml = `
-            <div class="zone-item mb-3" data-zone-id="new_${newZoneCounter}">
-                <div class="zone-header bg-success bg-opacity-25 p-2 rounded">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span>Zone ${newZoneCounter}</span>
-                        <button type="button" class="btn btn-sm btn-success add-question" 
-                                data-zone-id="new_${newZoneCounter}">
-                            <i class="fas fa-plus"></i> Add Question
-                        </button>
-                    </div>
-                </div>
-                <div class="questions-list p-2">
-                </div>
-            </div>
-        `;
-        zonesContainer.insertAdjacentHTML('beforeend', newZoneHtml);
-        newZoneCounter++;
-    });
-});
 </script>
 {% endblock %} 
