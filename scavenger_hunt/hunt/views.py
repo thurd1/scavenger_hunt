@@ -459,7 +459,18 @@ def manage_riddles(request):
 
 @login_required
 def race_detail(request, race_id):
-    race = get_object_or_404(Race, id=race_id)
+    race = get_object_or_404(Race.objects.prefetch_related('zones__questions'), id=race_id)
+    
+    if request.method == 'POST':
+        if 'activate' in request.POST:
+            race.is_active = True
+            race.save()
+            messages.success(request, f'Race "{race.name}" has been activated.')
+        elif 'deactivate' in request.POST:
+            race.is_active = False
+            race.save()
+            messages.success(request, f'Race "{race.name}" has been deactivated.')
+            
     return render(request, 'hunt/race_detail.html', {'race': race})
 
 @login_required
