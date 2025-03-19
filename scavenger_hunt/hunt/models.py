@@ -131,7 +131,7 @@ class Race(models.Model):
 class Zone(models.Model):
     race = models.ForeignKey(Race, on_delete=models.CASCADE, related_name='zones')
     name = models.CharField(max_length=100)
-    location = models.CharField(max_length=200)
+    location = models.CharField(max_length=200, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
