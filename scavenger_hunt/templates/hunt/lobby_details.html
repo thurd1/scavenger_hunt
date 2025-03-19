@@ -41,17 +41,19 @@
                     <h4 style="color: #90C83C">Teams</h4>
                     <div id="teamsList">
                         {% for team_data in teams_data %}
-                            <div class="team-box mb-4">
+                            <div class="team-container" data-team-id="{{ team_data.team.id }}">
                                 <h3>{{ team_data.team.name }}</h3>
-                                {% if team_data.members %}
-                                    <ul class="list-unstyled">
-                                        {% for member in team_data.members %}
-                                            <li>{{ member.role }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                {% else %}
-                                    <p>No members in this team yet.</p>
-                                {% endif %}
+                                {% with members=team_data.team.teammember_set.all %}
+                                    {% if members %}
+                                        <ul class="member-list">
+                                            {% for member in members %}
+                                                <li>{{ member.role }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% else %}
+                                        <p>No members in this team yet.</p>
+                                    {% endif %}
+                                {% endwith %}
                             </div>
                         {% endfor %}
                     </div>
