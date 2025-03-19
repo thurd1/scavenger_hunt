@@ -107,8 +107,8 @@
 </div>
 
 <!-- Edit Race Modal -->
-<div class="modal fade" id="editRaceModal" tabindex="-1" aria-labelledby="editRaceModalLabel" aria-hidden="true" style="display: none;">
-    <div class="modal-dialog modal-dialog-centered">
+<div class="modal fade" id="editRaceModal" tabindex="-1" aria-labelledby="editRaceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content bg-dark text-light">
             <div class="modal-header border-0">
                 <h5 class="modal-title" id="editRaceModalLabel">Edit Race</h5>
@@ -118,25 +118,70 @@
                 {% csrf_token %}
                 <input type="hidden" name="edit" value="true">
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="raceName" class="form-label">Race Name</label>
-                        <input type="text" class="form-control bg-success text-white" 
-                               id="raceName" name="name" value="{{ race.name }}" required>
+                    <!-- Race Details Section -->
+                    <div class="mb-4">
+                        <h6 class="text-success mb-3">Race Details</h6>
+                        <div class="mb-3">
+                            <label for="raceName" class="form-label">Race Name</label>
+                            <input type="text" class="form-control bg-success text-white" 
+                                   id="raceName" name="name" value="{{ race.name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="startLocation" class="form-label">Start Location</label>
+                            <input type="text" class="form-control bg-success text-white" 
+                                   id="startLocation" name="start_location" value="{{ race.start_location }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="timeLimit" class="form-label">Time Limit (minutes)</label>
+                            <input type="number" class="form-control bg-success text-white" 
+                                   id="timeLimit" name="time_limit_minutes" value="{{ race.time_limit_minutes }}" required>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="startLocation" class="form-label">Start Location</label>
-                        <input type="text" class="form-control bg-success text-white" 
-                               id="startLocation" name="start_location" value="{{ race.start_location }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="timeLimit" class="form-label">Time Limit (minutes)</label>
-                        <input type="number" class="form-control bg-success text-white" 
-                               id="timeLimit" name="time_limit_minutes" value="{{ race.time_limit_minutes }}" required>
+
+                    <!-- Zones and Questions Section -->
+                    <div class="zones-section">
+                        <h6 class="text-success mb-3">Zones and Questions</h6>
+                        {% for zone in race.zones.all %}
+                        <div class="zone-container mb-4" data-zone-id="{{ zone.id }}">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">Zone {{ zone.number }}</h6>
+                                <button type="button" class="btn btn-sm btn-success add-question" data-zone-id="{{ zone.id }}">
+                                    <i class="fas fa-plus"></i> Add Question
+                                </button>
+                            </div>
+                            <div class="questions-container">
+                                {% for question in zone.questions.all %}
+                                <div class="question-item mb-3" data-question-id="{{ question.id }}">
+                                    <div class="row g-2">
+                                        <div class="col-5">
+                                            <input type="text" class="form-control bg-success text-white" 
+                                                   name="question_{{ question.id }}" 
+                                                   value="{{ question.question_text }}" placeholder="Question">
+                                        </div>
+                                        <div class="col-5">
+                                            <input type="text" class="form-control bg-success text-white" 
+                                                   name="answer_{{ question.id }}" 
+                                                   value="{{ question.answer }}" placeholder="Answer">
+                                        </div>
+                                        <div class="col-2">
+                                            <button type="button" class="btn btn-danger btn-sm delete-question">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <button type="button" class="btn btn-success" id="addZone">
+                            <i class="fas fa-plus"></i> Add New Zone
+                        </button>
                     </div>
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-warning" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-success">Save changes</button>
+                    <button type="submit" class="btn btn-success">Save All Changes</button>
                 </div>
             </form>
         </div>
@@ -154,6 +199,72 @@ document.addEventListener('DOMContentLoaded', function() {
             delay: 3000
         });
         toast.show();
+    });
+
+    // Fix modal scrolling
+    const editModal = document.getElementById('editRaceModal');
+    editModal.addEventListener('shown.bs.modal', function () {
+        document.body.style.overflow = 'hidden';
+    });
+    editModal.addEventListener('hidden.bs.modal', function () {
+        document.body.style.overflow = 'auto';
+    });
+
+    // Add new question functionality
+    document.querySelectorAll('.add-question').forEach(button => {
+        button.addEventListener('click', function() {
+            const zoneId = this.dataset.zoneId;
+            const questionsContainer = this.closest('.zone-container').querySelector('.questions-container');
+            const newQuestionHtml = `
+                <div class="question-item mb-3" data-question-id="new">
+                    <div class="row g-2">
+                        <div class="col-5">
+                            <input type="text" class="form-control bg-success text-white" 
+                                   name="new_question_${zoneId}[]" placeholder="Question">
+                        </div>
+                        <div class="col-5">
+                            <input type="text" class="form-control bg-success text-white" 
+                                   name="new_answer_${zoneId}[]" placeholder="Answer">
+                        </div>
+                        <div class="col-2">
+                            <button type="button" class="btn btn-danger btn-sm delete-question">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            questionsContainer.insertAdjacentHTML('beforeend', newQuestionHtml);
+        });
+    });
+
+    // Delete question functionality
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.delete-question')) {
+            e.target.closest('.question-item').remove();
+        }
+    });
+
+    // Add new zone functionality
+    let newZoneCounter = {{ race.zones.all|length }} + 1;
+    document.getElementById('addZone').addEventListener('click', function() {
+        const zonesSection = document.querySelector('.zones-section');
+        const newZoneHtml = `
+            <div class="zone-container mb-4" data-zone-id="new_${newZoneCounter}">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Zone ${newZoneCounter}</h6>
+                    <button type="button" class="btn btn-sm btn-success add-question" data-zone-id="new_${newZoneCounter}">
+                        <i class="fas fa-plus"></i> Add Question
+                    </button>
+                </div>
+                <div class="questions-container"></div>
+            </div>
+        `;
+        zonesSection.insertBefore(
+            new DOMParser().parseFromString(newZoneHtml, 'text/html').body.firstChild,
+            this
+        );
+        newZoneCounter++;
     });
 });
 </script>
@@ -208,6 +319,20 @@ document.addEventListener('DOMContentLoaded', function() {
 .form-label {
     color: #90C83C;
     font-weight: 500;
+}
+
+.modal-dialog {
+    max-height: 90vh;
+}
+
+.modal-content {
+    border-radius: 15px;
+    max-height: 90vh;
+}
+
+.modal-body {
+    overflow-y: auto;
+    max-height: calc(90vh - 120px);
 }
 </style>
 

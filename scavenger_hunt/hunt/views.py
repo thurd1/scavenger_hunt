@@ -471,17 +471,51 @@ def race_detail(request, race_id):
             race.save()
             messages.success(request, f'Race "{race.name}" has been deactivated.')
         elif 'edit' in request.POST:
-            # Get the values from the form
-            name = request.POST.get('name')
-            start_location = request.POST.get('start_location')
-            time_limit_minutes = request.POST.get('time_limit_minutes')
-            
-            # Update the race object
-            race.name = name
-            race.start_location = start_location
-            race.time_limit_minutes = time_limit_minutes
+            # Update race details
+            race.name = request.POST.get('name')
+            race.start_location = request.POST.get('start_location')
+            race.time_limit_minutes = request.POST.get('time_limit_minutes')
             race.save()
-            
+
+            # Update existing questions
+            for key, value in request.POST.items():
+                if key.startswith('question_'):
+                    question_id = key.split('_')[1]
+                    question = Question.objects.get(id=question_id)
+                    question.question_text = value
+                    question.answer = request.POST.get(f'answer_{question_id}')
+                    question.save()
+
+            # Handle new questions for existing zones
+            for zone in race.zones.all():
+                new_questions = request.POST.getlist(f'new_question_{zone.id}[]')
+                new_answers = request.POST.getlist(f'new_answer_{zone.id}[]')
+                for q, a in zip(new_questions, new_answers):
+                    if q.strip() and a.strip():
+                        Question.objects.create(
+                            zone=zone,
+                            question_text=q,
+                            answer=a
+                        )
+
+            # Handle new zones and their questions
+            for key in request.POST:
+                if key.startswith('new_question_new_'):
+                    zone_num = key.split('_')[3]
+                    zone = Zone.objects.create(
+                        race=race,
+                        number=zone_num
+                    )
+                    new_questions = request.POST.getlist(f'new_question_new_{zone_num}[]')
+                    new_answers = request.POST.getlist(f'new_answer_new_{zone_num}[]')
+                    for q, a in zip(new_questions, new_answers):
+                        if q.strip() and a.strip():
+                            Question.objects.create(
+                                zone=zone,
+                                question_text=q,
+                                answer=a
+                            )
+
             messages.success(request, f'Race "{race.name}" has been updated successfully.')
         
         return redirect('race_detail', race_id=race.id)
