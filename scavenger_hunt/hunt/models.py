@@ -35,6 +35,7 @@ class Lobby(models.Model):
 class Team(models.Model):
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=6, unique=True)
+    lobbies = models.ManyToManyField(Lobby, related_name='teams')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
@@ -90,9 +91,9 @@ class CustomUser(AbstractUser):
         return self.username
 
 class TeamMember(models.Model):
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='team_members')
-    role = models.CharField(max_length=100)
-    
+    team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='members')
+    role = models.CharField(max_length=100)  # This stores the player name
+
     def __str__(self):
         return f"{self.role} - {self.team.name}"
 

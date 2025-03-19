@@ -40,10 +40,10 @@
                 <div class="teams-section" id="teamsContainer">
                     <h4 style="color: #90C83C">Teams</h4>
                     <div id="teamsList">
-                        {% for team_data in teams_data %}
-                            <div class="team-container" data-team-id="{{ team_data.team.id }}">
-                                <h3>{{ team_data.team.name }}</h3>
-                                {% with members=team_data.team.teammember_set.all %}
+                        {% for team in teams %}
+                            <div class="team-container" data-team-id="{{ team.id }}">
+                                <h3>{{ team.name }}</h3>
+                                {% with members=team.members.all %}
                                     {% if members %}
                                         <ul class="member-list">
                                             {% for member in members %}
@@ -127,8 +127,8 @@
 
     // Connect to all teams when page loads
     document.addEventListener('DOMContentLoaded', function() {
-        {% for team_data in teams_data %}
-            connectToTeam({{ team_data.team.id }});
+        {% for team in teams %}
+            connectToTeam({{ team.id }});
         {% endfor %}
     });
 </script>

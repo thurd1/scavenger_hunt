@@ -47,18 +47,18 @@ def create_lobby(request):
 @login_required
 def lobby_details(request, lobby_id):
     lobby = get_object_or_404(Lobby, id=lobby_id)
-    teams = Team.objects.filter(lobbies=lobby).prefetch_related('teammember_set')
+    teams = Team.objects.filter(lobbies=lobby).prefetch_related('members')
     
     # Debug prints
     for team in teams:
-        members = team.teammember_set.all()
+        members = team.members.all()
         print(f"Team {team.name} (ID: {team.id}) members:")
         for member in members:
             print(f"- {member.role}")
     
     context = {
         'lobby': lobby,
-        'teams': teams,  # Pass teams directly
+        'teams': teams,
     }
     return render(request, 'hunt/lobby_details.html', context)
 
