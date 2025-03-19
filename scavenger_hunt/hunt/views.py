@@ -194,8 +194,7 @@ def join_existing_team(request, lobby_id):
             team = Team.objects.get(code=team_code, lobbies=lobby_id)
             player_name = request.session.get('player_name')
             
-            print(f"Attempting to join team: {team.name}")  # Debug print
-            print(f"Player name: {player_name}")  # Debug print
+            print(f"Join team attempt - Team: {team.name}, Player: {player_name}")
             
             if player_name:
                 # Check if member already exists
@@ -209,19 +208,16 @@ def join_existing_team(request, lobby_id):
                         team=team,
                         role=player_name
                     )
-                    print(f"Created new team member: {member}")  # Debug print
+                    print(f"Created new team member - ID: {member.id}, Role: {member.role}")
                     messages.success(request, f'Successfully joined team {team.name}!')
-                    
-                    # Broadcast the update
-                    broadcast_team_update(team.id)
                 else:
-                    print(f"Member already exists: {existing_member}")  # Debug print
+                    print(f"Member already exists - Role: {existing_member.role}")
                     messages.info(request, 'You are already a member of this team!')
                 
             return redirect('team_dashboard', team_id=team.id)
         except Team.DoesNotExist:
             messages.error(request, 'Invalid team code. Please try again.')
-    
+            
     lobby = get_object_or_404(Lobby, id=lobby_id)
     return render(request, 'hunt/join_team.html', {'lobby': lobby})
 
@@ -390,10 +386,8 @@ def view_team(request, team_id):
     # Debug prints
     print(f"Team ID: {team.id}")
     print(f"Team Name: {team.name}")
-    print(f"Raw members query: {members.query}")
     print(f"Members count: {members.count()}")
-    for member in members:
-        print(f"Member: {member.role}")
+    print("Members:", [f"{m.id}: {m.role}" for m in members])
     
     context = {
         'team': team,

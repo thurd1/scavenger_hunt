@@ -92,8 +92,7 @@ class CustomUser(AbstractUser):
 class TeamMember(models.Model):
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='team_members')
     role = models.CharField(max_length=100)
-    joined_at = models.DateTimeField(auto_now_add=True)
-
+    
     def __str__(self):
         return f"{self.role} - {self.team.name}"
 

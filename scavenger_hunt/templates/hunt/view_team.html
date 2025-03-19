@@ -30,20 +30,12 @@
             <div class="col-md-6">
                 <div class="members-section">
                     <h4 style="color: #90C83C">Team Members</h4>
-                    <!-- Debug info (remove in production) -->
-                    <div class="debug-info text-muted mb-2">
-                        <small>Members count: {{ members.count }}</small>
-                    </div>
-                    
                     <div class="members-list">
                         {% if members %}
                             {% for member in members %}
                             <div class="member-item mb-2 p-2 bg-dark rounded">
                                 <i class="fas fa-user me-2"></i>
                                 {{ member.role }}
-                                <small class="text-muted ms-2">
-                                    (Joined: {{ member.joined_at|date:"M j, Y" }})
-                                </small>
                             </div>
                             {% endfor %}
                         {% else %}
