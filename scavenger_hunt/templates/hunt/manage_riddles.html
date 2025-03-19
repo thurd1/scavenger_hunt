@@ -13,12 +13,6 @@
         <h1>Manage Races</h1>
     </div>
 
-    <div class="navigation-buttons">
-        <a href="{% url 'leader_dashboard' %}" class="back-btn">
-            <i class="fas fa-arrow-left"></i> Back to Dashboard
-        </a>
-    </div>
-
     <div class="races-section">
         <div class="section-header">
             <h2>Active Races</h2>
@@ -82,6 +76,12 @@
             </div>
         </form>
     </div>
+</div>
+
+<div class="back-button-container">
+    <a href="{% url 'leader_dashboard' %}" class="back-btn">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
 </div>
 
 <style>
@@ -325,9 +325,10 @@
     color: #ffffff;
 }
 
-.navigation-buttons {
+.back-button-container {
     text-align: center;
-    margin-bottom: 30px;
+    margin-top: 40px;
+    margin-bottom: 20px;
 }
 
 .back-btn {

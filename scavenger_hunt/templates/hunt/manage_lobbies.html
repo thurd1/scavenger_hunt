@@ -42,6 +42,12 @@
             <i class="fas fa-plus"></i> Create New Lobby
         </button>
     </div>
+
+    <div class="back-button-container">
+        <a href="{% url 'leader_dashboard' %}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
 </div>
 
 <style>
@@ -191,6 +197,29 @@
     .lobbies-grid {
         grid-template-columns: 1fr;
     }
+}
+
+.back-button-container {
+    text-align: center;
+    margin-top: 40px;
+    margin-bottom: 20px;
+}
+
+.back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(144, 200, 60, 0.1);
+    color: #90C83C;
+    padding: 12px 24px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.back-btn:hover {
+    background: rgba(144, 200, 60, 0.2);
+    transform: translateY(-2px);
 }
 </style>
 
