@@ -629,3 +629,43 @@ def create_race(request):
         return redirect('race_detail', race_id=race.id)
     
     return render(request, 'hunt/create_race.html')
+
+def add_zone(request, race_id):
+    if request.method == 'POST':
+        race = get_object_or_404(Race, id=race_id)
+        name = request.POST.get('name')
+        location = request.POST.get('location')
+        
+        try:
+            Zone.objects.create(
+                race=race,
+                name=name,
+                location=location
+            )
+            messages.success(request, f'Zone "{name}" added successfully!')
+        except Exception as e:
+            messages.error(request, f'Error adding zone: {str(e)}')
+            
+    return redirect('race_detail', race_id=race_id)
+
+def add_question(request, race_id):
+    if request.method == 'POST':
+        race = get_object_or_404(Race, id=race_id)
+        text = request.POST.get('text')
+        answer = request.POST.get('answer')
+        zone_id = request.POST.get('zone')
+        
+        try:
+            zone = Zone.objects.get(id=zone_id, race=race)
+            Question.objects.create(
+                zone=zone,
+                text=text,
+                answer=answer
+            )
+            messages.success(request, 'Question added successfully!')
+        except Zone.DoesNotExist:
+            messages.error(request, 'Selected zone does not exist.')
+        except Exception as e:
+            messages.error(request, f'Error adding question: {str(e)}')
+            
+    return redirect('race_detail', race_id=race_id)

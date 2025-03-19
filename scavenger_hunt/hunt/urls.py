@@ -38,4 +38,6 @@ urlpatterns = [
     path('delete-race/<int:race_id>/', views.delete_race, name='delete_race'),
     path('race/<int:race_id>/edit/', views.edit_race, name='edit_race'),
     path('race/create/', views.create_race, name='create_race'),
+    path('race/<int:race_id>/add-zone/', views.add_zone, name='add_zone'),
+    path('race/<int:race_id>/add-question/', views.add_question, name='add_question'),
 ]
