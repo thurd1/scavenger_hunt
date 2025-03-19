@@ -107,7 +107,7 @@
 </div>
 
 <!-- Edit Race Modal -->
-<div class="modal fade" id="editRaceModal" tabindex="-1" aria-labelledby="editRaceModalLabel" aria-hidden="true">
+<div class="modal fade" id="editRaceModal" tabindex="-1" aria-labelledby="editRaceModalLabel" aria-hidden="true" style="display: none;">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark text-light">
             <div class="modal-header border-0">
@@ -159,6 +159,20 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+/* Add these rules at the top of your existing style block */
+.modal {
+    display: none;
+}
+
+.modal.fade {
+    display: none;
+}
+
+.modal.show {
+    display: block;
+}
+
+/* Keep your existing styles below */
 .modal-content {
     border-radius: 15px;
 }
