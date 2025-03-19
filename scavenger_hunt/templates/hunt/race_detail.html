@@ -8,6 +8,17 @@
 {% endblock %}
 
 {% block content %}
+<!-- Add this at the very top of your content block -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    {% for message in messages %}
+        <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
+            <div class="toast-body" style="background-color: #90C83C; color: white;">
+                {{ message }}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
 <div class="container-fluid py-4">
     <!-- Alert for messages -->
     {% if messages %}
@@ -100,18 +111,7 @@
     </div>
 </div>
 
-<!-- Add this right after {% block content %} -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-    {% for message in messages %}
-        <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
-            <div class="toast-body" style="background-color: #90C83C; color: white;">
-                {{ message }}
-            </div>
-        </div>
-    {% endfor %}
-</div>
-
-<!-- Add this JavaScript at the bottom of your template, before {% endblock %} -->
+<!-- Add this JavaScript before the end of the content block -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Edit Race Button
