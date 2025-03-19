@@ -401,15 +401,12 @@ def check_hunt_status(request, lobby_id):
 
 def manage_riddles(request):
     if request.method == 'POST':
-        print("POST data received:", request.POST) # debug
-        print("start_location value:", request.POST.get('start_location')) # debug
         race = Race.objects.create(
             name=request.POST.get('race_name'),
             created_by=request.user,
-            start_location=request.POST.get('start_location'),
-            time_limit_minutes=int(request.POST.get('time_limit_minutes', 60))
+            start_location=request.POST.get('start_location', 'Default Location'),
+            # Temporarily remove time_limit_minutes
         )
-
         # Handle zones and questions
         zone_count = int(request.POST.get('zoneCount', 0))
         for i in range(1, zone_count + 1):
@@ -433,8 +430,8 @@ def manage_riddles(request):
 
         return redirect('manage_riddles')
     
-    # GET request - display the form with existing races
-    races = Race.objects.all().order_by('-created_at')
+    # Modify the query to only select existing fields
+    races = Race.objects.all().values('id', 'name', 'is_active')
     return render(request, 'hunt/manage_riddles.html', {'races': races})
 
 @login_required
