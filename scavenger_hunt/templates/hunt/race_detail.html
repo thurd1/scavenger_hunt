@@ -44,7 +44,7 @@
                     {% endif %}
                     
                     <!-- Edit button that opens modal -->
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editRaceModal">
+                    <button type="button" class="btn btn-primary" onclick="openEditModal()">
                         <i class="fas fa-edit"></i> Edit
                     </button>
                 </div>
@@ -114,8 +114,9 @@
                 <h5 class="modal-title" id="editRaceModalLabel">Edit Race</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="POST">
+            <form method="POST" id="editRaceForm">
                 {% csrf_token %}
+                <input type="hidden" name="edit" value="true">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="raceName" class="form-label">Race Name</label>
@@ -135,7 +136,7 @@
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-warning" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" name="edit" class="btn btn-success">Save changes</button>
+                    <button type="submit" class="btn btn-success">Save changes</button>
                 </div>
             </form>
         </div>
@@ -145,6 +146,9 @@
 <!-- JavaScript -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap modal
+    var editModal = new bootstrap.Modal(document.getElementById('editRaceModal'));
+    
     // Initialize toasts
     var toastElList = [].slice.call(document.querySelectorAll('.toast'));
     var toastList = toastElList.map(function(toastEl) {
@@ -154,9 +158,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Show all toasts
+    // Show toasts
     toastList.forEach(toast => toast.show());
+    
+    // Handle form submission
+    document.getElementById('editRaceForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        this.submit();
+        editModal.hide();
+    });
 });
+
+function openEditModal() {
+    var modal = new bootstrap.Modal(document.getElementById('editRaceModal'));
+    modal.show();
+}
 </script>
 
 <style>
