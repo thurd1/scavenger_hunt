@@ -373,14 +373,11 @@ def toggle_lobby(request, lobby_id):
         messages.success(request, f'Lobby "{lobby.name}" has been {"activated" if lobby.is_active else "deactivated"}.')
     return redirect('manage_lobbies')
 
-@login_required
+@require_POST
 def delete_lobby(request, lobby_id):
-    if request.method == 'POST':
-        lobby = get_object_or_404(Lobby, id=lobby_id)
-        lobby_name = lobby.name
-        lobby.delete()
-        messages.success(request, f'Lobby "{lobby_name}" has been deleted.')
-    return redirect('manage_lobbies')
+    lobby = get_object_or_404(Lobby, id=lobby_id)
+    lobby.delete()
+    return JsonResponse({'status': 'success'})
 
 @require_POST
 def delete_team(request, team_id):

@@ -271,34 +271,33 @@
 
     function updateTeamsDisplay(teams) {
         const teamsGrid = document.getElementById('teamsGrid');
-        const template = document.getElementById('teamCardTemplate');
         teamsGrid.innerHTML = '';
 
         teams.forEach(team => {
-            const teamCard = template.content.cloneNode(true);
-            
-            // Set team name and code
-            teamCard.querySelector('h3').textContent = team.name;
-            teamCard.querySelector('.team-code').textContent = `Code: ${team.code}`;
-            
-            // Set members
-            const membersContainer = teamCard.querySelector('.members-container');
-            if (team.members && team.members.length > 0) {
-                const ul = document.createElement('ul');
-                ul.className = 'member-list';
-                team.members.forEach(member => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `
-                        <i class="fas fa-user"></i>
-                        <span>${member.role}</span>
-                    `;
-                    ul.appendChild(li);
-                });
-                membersContainer.appendChild(ul);
-            } else {
-                membersContainer.innerHTML = '<p class="no-members">No members in this team yet</p>';
-            }
-
+            const teamCard = document.createElement('div');
+            teamCard.className = 'team-card';
+            teamCard.innerHTML = `
+                <button class="delete-team-btn" onclick="deleteTeam(${team.id})">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="team-header">
+                    <h3>${team.name}</h3>
+                    <span class="team-code">Code: ${team.code}</span>
+                </div>
+                <div class="team-members">
+                    <h4>Members</h4>
+                    ${team.members && team.members.length > 0 ? `
+                        <ul class="member-list">
+                            ${team.members.map(member => `
+                                <li>
+                                    <i class="fas fa-user"></i>
+                                    <span>${member.role}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    ` : '<p class="no-members">No members in this team yet</p>'}
+                </div>
+            `;
             teamsGrid.appendChild(teamCard);
         });
     }
@@ -317,7 +316,13 @@
             .then(response => {
                 if (response.ok) {
                     // The WebSocket will handle the update
+                } else {
+                    alert('Failed to delete team');
                 }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to delete team');
             });
         }
     }
