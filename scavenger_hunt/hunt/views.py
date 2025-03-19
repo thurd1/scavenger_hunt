@@ -465,11 +465,15 @@ def race_detail(request, race_id):
         if 'activate' in request.POST:
             race.is_active = True
             race.save()
-            messages.success(request, f'Race "{race.name}" has been activated.')
         elif 'deactivate' in request.POST:
             race.is_active = False
             race.save()
-            messages.success(request, f'Race "{race.name}" has been deactivated.')
+        elif 'edit' in request.POST:
+            # Handle edit form submission
+            race.name = request.POST.get('name', race.name)
+            race.start_location = request.POST.get('start_location', race.start_location)
+            race.time_limit_minutes = request.POST.get('time_limit_minutes', race.time_limit_minutes)
+            race.save()
             
     return render(request, 'hunt/race_detail.html', {'race': race})
 

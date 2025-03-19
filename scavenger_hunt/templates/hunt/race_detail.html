@@ -100,83 +100,18 @@
     </div>
 </div>
 
-<!-- Add this toast container -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-    <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header" style="background-color: #90C83C; color: white;">
-            <strong class="me-auto">Notification</strong>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+<!-- Add this right after {% block content %} -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    {% for message in messages %}
+        <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
+            <div class="toast-body" style="background-color: #90C83C; color: white;">
+                {{ message }}
+            </div>
         </div>
-        <div class="toast-body" style="background-color: #002a3f; color: white;">
-            {{ message }}
-        </div>
-    </div>
+    {% endfor %}
 </div>
 
-<!-- Add Question Modal -->
-<div id="addQuestionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-    <div style="background-color: #003148; color: white; border-radius: 10px; width: 90%; max-width: 500px; padding: 20px;">
-        <h3 style="color: #90C83C; text-align: center; margin-bottom: 20px;">Add New Question</h3>
-        
-        <form id="addQuestionForm" method="POST" action="{% url 'race_detail' race.id %}">
-            {% csrf_token %}
-            <input type="hidden" name="add_question" value="true">
-            <input type="hidden" name="zone_id" id="zoneIdInput">
-            
-            <div class="mb-3">
-                <label for="question_text" class="form-label" style="color: #90C83C;">Question</label>
-                <input type="text" class="form-control" id="question_text" name="question_text" required>
-            </div>
-            
-            <div class="mb-3">
-                <label for="question_answer" class="form-label" style="color: #90C83C;">Answer</label>
-                <input type="text" class="form-control" id="question_answer" name="question_answer" required>
-            </div>
-            
-            <div class="text-center mt-4">
-                <button type="submit" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
-                    Save Question
-                </button>
-                <button type="button" id="cancelQuestionBtn" class="btn" style="background-color: #6c757d; color: white; border-radius: 25px; margin-left: 10px;">
-                    Cancel
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Add Zone Modal -->
-<div id="addZoneModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-    <div style="background-color: #003148; color: white; border-radius: 10px; width: 90%; max-width: 500px; padding: 20px;">
-        <h3 style="color: #90C83C; text-align: center; margin-bottom: 20px;">Add New Zone</h3>
-        
-        <form id="addZoneForm" method="POST" action="{% url 'race_detail' race.id %}">
-            {% csrf_token %}
-            <input type="hidden" name="add_zone" value="true">
-            
-            <div class="mb-3">
-                <label for="initial_question" class="form-label" style="color: #90C83C;">First Question</label>
-                <input type="text" class="form-control" id="initial_question" name="initial_question" required>
-                <div class="form-text text-light">Each zone needs at least one question to start.</div>
-            </div>
-            
-            <div class="mb-3">
-                <label for="initial_answer" class="form-label" style="color: #90C83C;">Answer</label>
-                <input type="text" class="form-control" id="initial_answer" name="initial_answer" required>
-            </div>
-            
-            <div class="text-center mt-4">
-                <button type="submit" class="btn" style="background-color: #FF9900; color: white; border-radius: 25px;">
-                    Add New Zone
-                </button>
-                <button type="button" id="cancelZoneBtn" class="btn" style="background-color: #6c757d; color: white; border-radius: 25px; margin-left: 10px;">
-                    Cancel
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
+<!-- Add this JavaScript at the bottom of your template, before {% endblock %} -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Edit Race Button
@@ -233,18 +168,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    {% if messages %}
-        {% for message in messages %}
-            showToast("{{ message }}");
-        {% endfor %}
-    {% endif %}
+    var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+    var toastList = toastElList.map(function(toastEl) {
+        var toast = new bootstrap.Toast(toastEl);
+        toast.show();
+    });
 });
-
-function showToast(message) {
-    const toastEl = document.getElementById('liveToast');
-    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
-    toastEl.querySelector('.toast-body').textContent = message;
-    toast.show();
-}
 </script>
 {% endblock %} 
