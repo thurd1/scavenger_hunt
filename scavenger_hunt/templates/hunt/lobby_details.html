@@ -40,24 +40,30 @@
                 <div class="teams-section" id="teamsContainer">
                     <h4 style="color: #90C83C">Teams</h4>
                     <div id="teamsList">
-                        {% for team in teams %}
-                        <div class="team-card mb-3" data-team-id="{{ team.id }}">
-                            <div class="team-header bg-success bg-opacity-25 p-3 rounded-top">
-                                <h5 class="mb-0">{{ team.name }}</h5>
-                            </div>
-                            <div class="team-members p-3 border border-success border-opacity-25 rounded-bottom">
-                                <div class="members-list" id="team-{{ team.id }}-members">
-                                    {% for member in team.team_members.all %}
-                                    <div class="member-item mb-2">
-                                        <i class="fas fa-user me-2"></i>{{ member.role }}
+                        {% if teams %}
+                            {% for team_data in teams %}
+                            <div class="team-card mb-3" data-team-id="{{ team_data.team.id }}">
+                                <div class="team-header bg-success bg-opacity-25 p-3 rounded-top">
+                                    <h5 class="mb-0">{{ team_data.team.name }}</h5>
+                                </div>
+                                <div class="team-members p-3 border border-success border-opacity-25 rounded-bottom">
+                                    <div class="members-list" id="team-{{ team_data.team.id }}-members">
+                                        {% if team_data.members %}
+                                            {% for member in team_data.members %}
+                                            <div class="member-item mb-2">
+                                                <i class="fas fa-user me-2"></i>{{ member.role }}
+                                            </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <p class="text-muted mb-0">No members in this team yet.</p>
+                                        {% endif %}
                                     </div>
-                                    {% endfor %}
                                 </div>
                             </div>
-                        </div>
-                        {% empty %}
-                        <p class="text-muted">No teams have joined this lobby yet.</p>
-                        {% endfor %}
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">No teams have joined this lobby yet.</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>

@@ -100,16 +100,9 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         # Handle received messages if needed
         pass
 
-    async def lobby_update(self, event):
-        # Send lobby update to WebSocket
-        await self.send(text_data=json.dumps({
-            'type': 'lobby_update',
-            'teams': event['teams']
-        }))
-
     @database_sync_to_async
     def get_lobby_data(self):
-        lobby = Lobby.objects.get(id=self.lobby_id)
+        lobby = Lobby.objects.prefetch_related('teams__team_members').get(id=self.lobby_id)
         teams = []
         for team in lobby.teams.all():
             members = list(team.team_members.values_list('role', flat=True))
@@ -118,4 +111,10 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 'name': team.name,
                 'members': members
             })
-        return teams 
+        return teams
+
+    async def lobby_update(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'lobby_update',
+            'teams': event['teams']
+        })) 

@@ -46,13 +46,29 @@ def create_lobby(request):
 
 @login_required
 def lobby_details(request, lobby_id):
-    lobby = get_object_or_404(Lobby.objects.prefetch_related('teams__team_members'), id=lobby_id)
-    teams = lobby.teams.all()
+    lobby = get_object_or_404(Lobby.objects.prefetch_related(
+        'teams',
+        'teams__team_members'
+    ), id=lobby_id)
+    
+    # Get teams with their members
+    teams = []
+    for team in lobby.teams.all():
+        team_data = {
+            'team': team,
+            'members': team.team_members.all()  # Get all team members
+        }
+        teams.append(team_data)
     
     context = {
         'lobby': lobby,
         'teams': teams,
     }
+    
+    print("Teams data:", teams)  # Debug print
+    for team_data in teams:
+        print(f"Team {team_data['team'].name} members:", list(team_data['members']))  # Debug print
+        
     return render(request, 'hunt/lobby_details.html', context)
 
 class LobbyDetailsView(DetailView):
