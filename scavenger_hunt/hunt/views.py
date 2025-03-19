@@ -210,13 +210,13 @@ def join_existing_team(request, lobby_id):
                     role=player_name
                 )
                 
-                # Broadcast team update
+                # Broadcast update to lobby
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
-                    f'team_{team.id}',
+                    f'lobby_{lobby_id}',
                     {
-                        'type': 'team_update',
-                        'members': list(TeamMember.objects.filter(team=team).values_list('role', flat=True))
+                        'type': 'lobby_update',
+                        'message': 'team_updated'
                     }
                 )
                 

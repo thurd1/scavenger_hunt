@@ -39,38 +39,27 @@
             <div class="col-md-8">
                 <div class="teams-section">
                     <h2 class="section-title">Teams</h2>
-                    <div class="teams-grid">
-                        {% for team in teams %}
-                            <div class="team-card" data-team-id="{{ team.id }}">
-                                <div class="team-header">
-                                    <h3>{{ team.name }}</h3>
-                                    <span class="team-code">Code: {{ team.code }}</span>
-                                </div>
-                                <div class="team-members">
-                                    <h4>Members</h4>
-                                    {% with members=team.members.all %}
-                                        {% if members %}
-                                            <ul class="member-list">
-                                                {% for member in members %}
-                                                    <li>
-                                                        <i class="fas fa-user"></i>
-                                                        <span>{{ member.role }}</span>
-                                                    </li>
-                                                {% endfor %}
-                                            </ul>
-                                        {% else %}
-                                            <p class="no-members">No members in this team yet</p>
-                                        {% endif %}
-                                    {% endwith %}
-                                </div>
-                            </div>
-                        {% endfor %}
+                    <div class="teams-grid" id="teamsGrid">
+                        <!-- Teams will be dynamically inserted here -->
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<template id="teamCardTemplate">
+    <div class="team-card">
+        <div class="team-header">
+            <h3></h3>
+            <span class="team-code"></span>
+        </div>
+        <div class="team-members">
+            <h4>Members</h4>
+            <div class="members-container"></div>
+        </div>
+    </div>
+</template>
 
 <style>
 .dashboard-box {
@@ -219,42 +208,63 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <script>
-    const teamSockets = {};
-    
-    function connectToTeam(teamId) {
-        const socket = new WebSocket(
-            `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/team/${teamId}/`
+    const lobbyId = {{ lobby.id }};
+    let socket;
+
+    function connectWebSocket() {
+        const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        socket = new WebSocket(
+            `${wsScheme}://${window.location.host}/ws/lobby/${lobbyId}/`
         );
 
         socket.onmessage = function(e) {
             const data = JSON.parse(e.data);
-            if (data.type === 'team_members') {
-                updateTeamMembers(teamId, data.members);
+            if (data.type === 'lobby_state') {
+                updateTeamsDisplay(data.teams);
             }
         };
 
-        teamSockets[teamId] = socket;
+        socket.onclose = function(e) {
+            console.log('Socket closed, attempting to reconnect...');
+            setTimeout(connectWebSocket, 1000);
+        };
     }
 
-    function updateTeamMembers(teamId, members) {
-        const teamBox = document.querySelector(`[data-team-id="${teamId}"]`);
-        if (teamBox) {
-            const membersList = teamBox.querySelector('.members-list');
-            if (members && members.length > 0) {
-                membersList.innerHTML = members.map(member => 
-                    `<li>${member}</li>`
-                ).join('');
+    function updateTeamsDisplay(teams) {
+        const teamsGrid = document.getElementById('teamsGrid');
+        const template = document.getElementById('teamCardTemplate');
+        teamsGrid.innerHTML = '';
+
+        teams.forEach(team => {
+            const teamCard = template.content.cloneNode(true);
+            
+            // Set team name and code
+            teamCard.querySelector('h3').textContent = team.name;
+            teamCard.querySelector('.team-code').textContent = `Code: ${team.code}`;
+            
+            // Set members
+            const membersContainer = teamCard.querySelector('.members-container');
+            if (team.members && team.members.length > 0) {
+                const ul = document.createElement('ul');
+                ul.className = 'member-list';
+                team.members.forEach(member => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <i class="fas fa-user"></i>
+                        <span>${member.role}</span>
+                    `;
+                    ul.appendChild(li);
+                });
+                membersContainer.appendChild(ul);
             } else {
-                membersList.innerHTML = '<p>No members in this team yet.</p>';
+                membersContainer.innerHTML = '<p class="no-members">No members in this team yet</p>';
             }
-        }
+
+            teamsGrid.appendChild(teamCard);
+        });
     }
 
-    // Connect to all teams when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        {% for team in teams %}
-            connectToTeam({{ team.id }});
-        {% endfor %}
-    });
+    // Connect when page loads
+    document.addEventListener('DOMContentLoaded', connectWebSocket);
 </script>
 {% endblock %}

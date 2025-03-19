@@ -101,15 +101,39 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             self.lobby_group_name,
             self.channel_name
         )
-
         await self.accept()
+        
+        # Send initial state
+        await self.send_lobby_state()
 
     async def disconnect(self, close_code):
-        # Leave lobby group
         await self.channel_layer.group_discard(
             self.lobby_group_name,
             self.channel_name
         )
+
+    @database_sync_to_async
+    def get_lobby_state(self):
+        lobby = Lobby.objects.get(id=self.lobby_id)
+        teams_data = []
+        for team in lobby.teams.all().prefetch_related('members'):
+            teams_data.append({
+                'id': team.id,
+                'name': team.name,
+                'code': team.code,
+                'members': [{'id': m.id, 'role': m.role} for m in team.members.all()]
+            })
+        return teams_data
+
+    async def send_lobby_state(self):
+        teams_data = await self.get_lobby_state()
+        await self.send(text_data=json.dumps({
+            'type': 'lobby_state',
+            'teams': teams_data
+        }))
+
+    async def lobby_update(self, event):
+        await self.send_lobby_state()
 
     async def receive(self, text_data):
         # Handle received messages if needed
@@ -126,10 +150,4 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 'name': team.name,
                 'members': members
             })
-        return teams
-
-    async def lobby_update(self, event):
-        await self.send(text_data=json.dumps({
-            'type': 'lobby_update',
-            'teams': event['teams']
-        })) 
+        return teams 
