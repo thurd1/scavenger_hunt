@@ -37,23 +37,32 @@
 
             <!-- Teams and Members -->
             <div class="col-md-8">
-                <div class="teams-section" id="teamsContainer">
-                    <h4 style="color: #90C83C">Teams</h4>
-                    <div id="teamsList">
+                <div class="teams-section">
+                    <h2 class="section-title">Teams</h2>
+                    <div class="teams-grid">
                         {% for team in teams %}
-                            <div class="team-container" data-team-id="{{ team.id }}">
-                                <h3>{{ team.name }}</h3>
-                                {% with members=team.members.all %}
-                                    {% if members %}
-                                        <ul class="member-list">
-                                            {% for member in members %}
-                                                <li>{{ member.role }}</li>
-                                            {% endfor %}
-                                        </ul>
-                                    {% else %}
-                                        <p>No members in this team yet.</p>
-                                    {% endif %}
-                                {% endwith %}
+                            <div class="team-card" data-team-id="{{ team.id }}">
+                                <div class="team-header">
+                                    <h3>{{ team.name }}</h3>
+                                    <span class="team-code">Code: {{ team.code }}</span>
+                                </div>
+                                <div class="team-members">
+                                    <h4>Members</h4>
+                                    {% with members=team.members.all %}
+                                        {% if members %}
+                                            <ul class="member-list">
+                                                {% for member in members %}
+                                                    <li>
+                                                        <i class="fas fa-user"></i>
+                                                        <span>{{ member.role }}</span>
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <p class="no-members">No members in this team yet</p>
+                                        {% endif %}
+                                    {% endwith %}
+                                </div>
                             </div>
                         {% endfor %}
                     </div>
@@ -91,7 +100,123 @@
 .team-header {
     border-bottom: 1px solid rgba(144, 200, 60, 0.2);
 }
+
+.teams-section {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.section-title {
+    color: #90C83C;
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 10px;
+}
+
+.team-card {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.team-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(144, 200, 60, 0.2);
+}
+
+.team-header {
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.team-header h3 {
+    color: #90C83C;
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.team-code {
+    display: inline-block;
+    background: rgba(144, 200, 60, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: #90C83C;
+    margin-top: 5px;
+}
+
+.team-members h4 {
+    color: #ffffff;
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+}
+
+.member-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.member-list li {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    margin-bottom: 5px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.member-list li:hover {
+    background: rgba(144, 200, 60, 0.1);
+}
+
+.member-list li i {
+    color: #90C83C;
+    margin-right: 10px;
+}
+
+.member-list li span {
+    color: #ffffff;
+}
+
+.no-members {
+    color: #6c757d;
+    font-style: italic;
+    text-align: center;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .teams-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .team-card {
+        margin-bottom: 15px;
+    }
+}
 </style>
+
+<!-- Add Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <script>
     const teamSockets = {};
