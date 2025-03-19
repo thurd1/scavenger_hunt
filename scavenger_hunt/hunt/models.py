@@ -128,7 +128,7 @@ class Race(models.Model):
     def __str__(self):
         return self.name
 
-class RaceZone(models.Model):  # New name to avoid conflicts
+class Zone(models.Model):
     race = models.ForeignKey(Race, on_delete=models.CASCADE, related_name='zones')
     name = models.CharField(max_length=100)
     location = models.CharField(max_length=200)
@@ -141,10 +141,13 @@ class RaceZone(models.Model):  # New name to avoid conflicts
         ordering = ['created_at']
 
 class Question(models.Model):
-    zone = models.ForeignKey(RaceZone, on_delete=models.CASCADE, related_name='questions')
-    question_text = models.TextField()
+    zone = models.ForeignKey(Zone, on_delete=models.CASCADE, related_name='questions')
+    text = models.TextField()
     answer = models.CharField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Question for {self.zone}: {self.question_text[:50]}"
+        return f"Question for {self.zone.name}"
+
+    class Meta:
+        ordering = ['created_at']
