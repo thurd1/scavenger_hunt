@@ -637,16 +637,27 @@ def add_zone(request, race_id):
         location = request.POST.get('location')
         
         try:
-            Zone.objects.create(
+            zone = Zone.objects.create(
                 race=race,
                 name=name,
                 location=location
             )
-            messages.success(request, f'Zone "{name}" added successfully!')
+            return JsonResponse({
+                'success': True,
+                'message': f'Zone "{name}" added successfully!',
+                'zone': {
+                    'id': zone.id,
+                    'name': zone.name,
+                    'location': zone.location
+                }
+            })
         except Exception as e:
-            messages.error(request, f'Error adding zone: {str(e)}')
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
             
-    return redirect('race_detail', race_id=race_id)
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 def add_question(request, race_id):
     if request.method == 'POST':

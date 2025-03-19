@@ -130,14 +130,12 @@ class Race(models.Model):
 
 class Zone(models.Model):
     race = models.ForeignKey(Race, on_delete=models.CASCADE, related_name='zones')
-    number = models.IntegerField()
+    name = models.CharField(max_length=100)
+    location = models.CharField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        ordering = ['number']
-
     def __str__(self):
-        return f"Zone {self.number} - {self.race.name}"
+        return f"{self.name} - {self.race.name}"
 
 class Question(models.Model):
     zone = models.ForeignKey(Zone, on_delete=models.CASCADE, related_name='questions')
