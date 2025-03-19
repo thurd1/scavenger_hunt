@@ -46,7 +46,7 @@ def create_lobby(request):
 
 @login_required
 def lobby_details(request, lobby_id):
-    lobby = get_object_or_404(Lobby, id=lobby_id)
+    lobby = get_object_or_404(Lobby.objects.prefetch_related('teams__team_members'), id=lobby_id)
     teams = lobby.teams.all()
     
     context = {
@@ -164,36 +164,17 @@ def join_existing_team(request, lobby_id):
         try:
             team = Team.objects.get(code=team_code, lobbies=lobby_id)
             player_name = request.session.get('player_name')
-            logger.info(f"Player {player_name} attempting to join team {team.id}")
             
             if player_name:
-                existing_member = TeamMember.objects.filter(
+                team_member = TeamMember.objects.create(
                     team=team,
                     role=player_name
-                ).first()
+                )
+                messages.success(request, f'Successfully joined team {team.name}!')
                 
-                if not existing_member:
-                    team_member = TeamMember.objects.create(
-                        team=team,
-                        role=player_name
-                    )
-                    messages.success(request, f'Successfully joined team {team.name}!')
-                    
-                    # Get updated list of team members
-                    members = list(team.team_members.values_list('role', flat=True))
-                    logger.info(f"Broadcasting team update for team {team.id}: {members}")
-                    
-                    # Broadcast team update
-                    channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f'team_{team.id}',
-                        {
-                            'type': 'team_update',
-                            'members': members
-                        }
-                    )
-                else:
-                    messages.info(request, 'You are already a member of this team!')
+                # Broadcast the update
+                broadcast_lobby_update(lobby_id)
+                
             return redirect('team_dashboard', team_id=team.id)
         except Team.DoesNotExist:
             messages.error(request, 'Invalid team code. Please try again.')
@@ -358,11 +339,13 @@ def edit_team(request, team_id):
         return redirect('team_list')
     return render(request, 'hunt/edit_team.html', {'team': team})
 
+@login_required
 def view_team(request, team_id):
     team = get_object_or_404(Team, id=team_id)
+    members = team.team_members.all()
     return render(request, 'hunt/view_team.html', {
         'team': team,
-        'members': team.team_members.all()
+        'members': members
     })
 
 @require_POST
@@ -566,3 +549,25 @@ def edit_race(request, race_id):
         return redirect('race_detail', race_id=race.id)
         
     return render(request, 'hunt/edit_race.html', {'race': race})
+
+# Update this function to broadcast team changes
+def broadcast_lobby_update(lobby_id):
+    channel_layer = get_channel_layer()
+    lobby = Lobby.objects.prefetch_related('teams__team_members').get(id=lobby_id)
+    
+    teams_data = []
+    for team in lobby.teams.all():
+        members = list(team.team_members.values_list('role', flat=True))
+        teams_data.append({
+            'id': team.id,
+            'name': team.name,
+            'members': members
+        })
+
+    async_to_sync(channel_layer.group_send)(
+        f'lobby_{lobby_id}',
+        {
+            'type': 'lobby_update',
+            'teams': teams_data
+        }
+    )

@@ -1,7 +1,7 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import Team, TeamMember
+from .models import Team, TeamMember, Lobby
 import logging
 
 logger = logging.getLogger(__name__)
@@ -74,4 +74,48 @@ class TeamConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'team_members',
             'members': event['members']
-        })) 
+        }))
+
+class LobbyConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.lobby_id = self.scope['url_route']['kwargs']['lobby_id']
+        self.lobby_group_name = f'lobby_{self.lobby_id}'
+
+        # Join lobby group
+        await self.channel_layer.group_add(
+            self.lobby_group_name,
+            self.channel_name
+        )
+
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        # Leave lobby group
+        await self.channel_layer.group_discard(
+            self.lobby_group_name,
+            self.channel_name
+        )
+
+    async def receive(self, text_data):
+        # Handle received messages if needed
+        pass
+
+    async def lobby_update(self, event):
+        # Send lobby update to WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'lobby_update',
+            'teams': event['teams']
+        }))
+
+    @database_sync_to_async
+    def get_lobby_data(self):
+        lobby = Lobby.objects.get(id=self.lobby_id)
+        teams = []
+        for team in lobby.teams.all():
+            members = list(team.team_members.values_list('role', flat=True))
+            teams.append({
+                'id': team.id,
+                'name': team.name,
+                'members': members
+            })
+        return teams 
