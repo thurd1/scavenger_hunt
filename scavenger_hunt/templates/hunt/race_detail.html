@@ -107,13 +107,31 @@
 </div>
 
 <style>
-/* Add your existing container and header styles */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.page-header h1 {
+    color: #90C83C;
+    margin: 0;
+}
 
 .race-content {
     margin-top: 30px;
 }
 
-.info-card {
+.info-card, .section-card {
     background: rgba(33, 37, 41, 0.95);
     border: 2px solid rgba(144, 200, 60, 0.3);
     border-radius: 12px;
@@ -183,13 +201,6 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 20px;
-    margin-bottom: 30px;
-}
-
-.section-card {
-    background: rgba(33, 37, 41, 0.95);
-    border: 2px solid rgba(144, 200, 60, 0.3);
-    border-radius: 12px;
 }
 
 .add-btn {
@@ -278,319 +289,33 @@
 }
 </style>
 
-<!-- Add your modal templates and JavaScript here -->
-{% endblock %} 
-<div class="container-fluid py-4">
-    <!-- Normal View -->
-    <div id="normalView" class="container">
-        <div class="dashboard-box p-4">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="text-center mb-4" style="color: #90C83C">{{ race.name }}</h2>
-                <div>
-                    {% if race.is_active %}
-                        <form method="POST" style="display: inline;">
-                            {% csrf_token %}
-                            <button type="submit" name="deactivate" class="btn btn-danger">
-                                <i class="fas fa-times-circle"></i> Deactivate
-                            </button>
-                        </form>
-                    {% else %}
-                        <form method="POST" style="display: inline;">
-                            {% csrf_token %}
-                            <button type="submit" name="activate" class="btn btn-success">
-                                <i class="fas fa-check-circle"></i> Activate
-                            </button>
-                        </form>
-                    {% endif %}
-                    
-                    <button type="button" class="btn btn-primary" onclick="toggleEditView()">
-                        <i class="fas fa-edit"></i> Edit
-                    </button>
-                </div>
-            </div>
-            
-            <div class="race-info mb-4">
-                <p><strong style="color: #90C83C">Start Location:</strong> {{ race.start_location }}</p>
-                <p><strong style="color: #90C83C">Time Limit:</strong> {{ race.time_limit_minutes }} minutes</p>
-                <p><strong style="color: #90C83C">Status:</strong> 
-                    {% if race.is_active %}
-                        <span class="badge bg-success">Active</span>
-                    {% else %}
-                        <span class="badge bg-secondary">Inactive</span>
-                    {% endif %}
-                </p>
-                <p><strong style="color: #90C83C">Created:</strong> {{ race.created_at|date:"F j, Y" }}</p>
-            </div>
-
-            <h3 class="text-center mb-4" style="color: #90C83C">Zones and Questions</h3>
-            
-            {% if race.zones.all %}
-                {% for zone in race.zones.all %}
-                    <div class="dashboard-box mb-4">
-                        <h4 class="mb-3" style="color: #90C83C">Zone {{ zone.number }}</h4>
-                        {% if zone.questions.all %}
-                            <div class="table-responsive">
-                                <table class="table" style="color: white;">
-                                    <thead>
-                                        <tr>
-                                            <th>Question</th>
-                                            <th>Answer</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for question in zone.questions.all %}
-                                            <tr>
-                                                <td>{{ question.question_text }}</td>
-                                                <td>{{ question.answer }}</td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <p class="text-muted">No questions added for this zone.</p>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p class="text-center text-muted">No zones have been created for this race yet.</p>
-            {% endif %}
-
-            <div class="text-center mt-4">
-                <a href="{% url 'manage_riddles' %}" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left me-2"></i>Back to Races
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit View -->
-    <div id="editView" class="container-fluid" style="display: none;">
-        <form method="POST" id="editRaceForm">
-            {% csrf_token %}
-            <input type="hidden" name="edit" value="true">
-            <div class="row">
-                <!-- Race Details Section - Left Side -->
-                <div class="col-md-6 pe-4">
-                    <div class="dashboard-box p-4">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h2 style="color: #90C83C">Race Details</h2>
-                            <div>
-                                <button type="button" class="btn btn-secondary me-2" onclick="toggleEditView()">
-                                    <i class="fas fa-times"></i> Cancel
-                                </button>
-                                <button type="submit" class="btn btn-success">
-                                    <i class="fas fa-save"></i> Save Changes
-                                </button>
-                            </div>
-                        </div>
-                        <div class="mb-4">
-                            <label for="raceName" class="form-label">Race Name</label>
-                            <input type="text" class="form-control bg-success text-white" 
-                                   id="raceName" name="name" value="{{ race.name }}" required>
-                        </div>
-                        <div class="mb-4">
-                            <label for="startLocation" class="form-label">Start Location</label>
-                            <input type="text" class="form-control bg-success text-white" 
-                                   id="startLocation" name="start_location" value="{{ race.start_location }}" required>
-                        </div>
-                        <div class="mb-4">
-                            <label for="timeLimit" class="form-label">Time Limit (minutes)</label>
-                            <input type="number" class="form-control bg-success text-white" 
-                                   id="timeLimit" name="time_limit_minutes" value="{{ race.time_limit_minutes }}" required>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Zones Section - Right Side -->
-                <div class="col-md-6 ps-4">
-                    <div class="dashboard-box p-4">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h2 style="color: #90C83C">Zones</h2>
-                            <button type="button" class="btn btn-success" id="addZone">
-                                <i class="fas fa-plus"></i> Add Zone
-                            </button>
-                        </div>
-                        <div id="zonesContainer">
-                            {% for zone in race.zones.all %}
-                            <div class="zone-item mb-4" data-zone-id="{{ zone.id }}">
-                                <div class="zone-header bg-success bg-opacity-25 p-3 rounded">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h5 class="mb-0">Zone {{ zone.number }}</h5>
-                                        <button type="button" class="btn btn-sm btn-success add-question" 
-                                                data-zone-id="{{ zone.id }}">
-                                            <i class="fas fa-plus"></i> Add Question
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="questions-list p-3">
-                                    {% for question in zone.questions.all %}
-                                    <div class="question-row mb-3">
-                                        <div class="input-group">
-                                            <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
-                                                   name="question_{{ question.id }}" 
-                                                   value="{{ question.question_text }}" 
-                                                   placeholder="Question">
-                                            <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
-                                                   name="answer_{{ question.id }}" 
-                                                   value="{{ question.answer }}" 
-                                                   placeholder="Answer">
-                                            <button type="button" class="btn btn-danger delete-question">
-                                                <i class="fas fa-trash me-1"></i> Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<style>
-.dashboard-box {
-    background-color: rgba(33, 37, 41, 0.9);
-    border-radius: 15px;
-    border: 1px solid rgba(144, 200, 60, 0.2);
-}
-
-.form-control {
-    border: 1px solid rgba(144, 200, 60, 0.2);
-    border-radius: 8px;
-}
-
-.form-control:focus {
-    box-shadow: 0 0 0 0.25rem rgba(144, 200, 60, 0.25);
-    border-color: #90C83C;
-}
-
-.zone-item {
-    background-color: rgba(33, 37, 41, 0.5);
-    border-radius: 8px;
-    border: 1px solid rgba(144, 200, 60, 0.2);
-}
-
-.question-row .input-group {
-    gap: 0.5rem;
-}
-
-.form-label {
-    color: #90C83C;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
-}
-</style>
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize toasts
-    var toastElList = document.querySelectorAll('.toast');
-    toastElList.forEach(function(toastEl) {
-        var toast = new bootstrap.Toast(toastEl, {
-            autohide: true,
-            delay: 3000
-        });
-        toast.show();
-    });
+function showAddZoneModal() {
+    // Add your zone modal logic here
+}
 
-    // Add Zone functionality
-    document.getElementById('addZone').addEventListener('click', function() {
-        const zonesContainer = document.getElementById('zonesContainer');
-        const zoneCount = zonesContainer.getElementsByClassName('zone-item').length;
-        const newZoneNumber = zoneCount + 1;
+function showAddQuestionModal() {
+    // Add your question modal logic here
+}
 
-        const newZoneHtml = `
-            <div class="zone-item mb-4" data-zone-id="new_${newZoneNumber}">
-                <div class="zone-header bg-success bg-opacity-25 p-3 rounded">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Zone ${newZoneNumber}</h5>
-                        <div>
-                            <button type="button" class="btn btn-sm btn-success add-question me-2" 
-                                    data-zone-id="new_${newZoneNumber}">
-                                <i class="fas fa-plus"></i> Add Question
-                            </button>
-                            <button type="button" class="btn btn-sm btn-danger delete-zone">
-                                <i class="fas fa-trash"></i> Delete Zone
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="questions-list p-3">
-                    <!-- Questions will be added here -->
-                </div>
-            </div>
-        `;
-        zonesContainer.insertAdjacentHTML('beforeend', newZoneHtml);
-    });
+function editZone(zoneId) {
+    // Add your zone edit logic here
+}
 
-    // Add Question functionality
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.add-question')) {
-            const button = e.target.closest('.add-question');
-            const zoneId = button.dataset.zoneId;
-            const questionsList = button.closest('.zone-item').querySelector('.questions-list');
-            
-            const newQuestionHtml = `
-                <div class="question-row mb-3">
-                    <div class="input-group">
-                        <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
-                               name="new_question_${zoneId}[]" 
-                               placeholder="Question" required>
-                        <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
-                               name="new_answer_${zoneId}[]" 
-                               placeholder="Answer" required>
-                        <button type="button" class="btn btn-danger delete-question">
-                            <i class="fas fa-trash me-1"></i> Delete
-                        </button>
-                    </div>
-                </div>
-            `;
-            questionsList.insertAdjacentHTML('beforeend', newQuestionHtml);
-        }
-    });
+function editQuestion(questionId) {
+    // Add your question edit logic here
+}
 
-    // Delete Question functionality
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.delete-question')) {
-            const questionRow = e.target.closest('.question-row');
+function deleteZone(zoneId) {
+    if (confirm('Are you sure you want to delete this zone?')) {
+        // Add your zone delete logic here
+    }
+}
+
+function deleteQuestion(questionId) {
             if (confirm('Are you sure you want to delete this question?')) {
-                questionRow.remove();
-            }
-        }
-    });
-
-    // Delete Zone functionality
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.delete-zone')) {
-            const zoneItem = e.target.closest('.zone-item');
-            if (confirm('Are you sure you want to delete this zone and all its questions?')) {
-                zoneItem.remove();
-                // Renumber remaining zones
-                const zones = document.getElementsByClassName('zone-item');
-                Array.from(zones).forEach((zone, index) => {
-                    zone.querySelector('h5').textContent = `Zone ${index + 1}`;
-                });
-            }
-        }
-    });
-});
-
-function toggleEditView() {
-    const normalView = document.getElementById('normalView');
-    const editView = document.getElementById('editView');
-    
-    if (normalView.style.display !== 'none') {
-        normalView.style.display = 'none';
-        editView.style.display = 'block';
-    } else {
-        normalView.style.display = 'block';
-        editView.style.display = 'none';
+        // Add your question delete logic here
     }
 }
 </script>
-{% endblock %} 
+{% endblock %}
