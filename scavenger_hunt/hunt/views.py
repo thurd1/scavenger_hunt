@@ -642,3 +642,20 @@ def edit_race(request, race_id):
 
 def generate_lobby_code():
     return ''.join(random.choices(string.digits, k=6))
+
+def create_race(request):
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        start_location = request.POST.get('start_location')
+        time_limit_minutes = request.POST.get('time_limit_minutes')
+        
+        race = Race.objects.create(
+            name=name,
+            start_location=start_location,
+            time_limit_minutes=time_limit_minutes,
+            created_by=request.user,
+            is_active=True
+        )
+        return redirect('race_detail', race_id=race.id)
+    
+    return render(request, 'hunt/create_race.html')
