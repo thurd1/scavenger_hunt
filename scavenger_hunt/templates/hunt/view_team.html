@@ -30,12 +30,25 @@
             <div class="col-md-6">
                 <div class="members-section">
                     <h4 style="color: #90C83C">Team Members</h4>
+                    <!-- Debug info (remove in production) -->
+                    <div class="debug-info text-muted mb-2">
+                        <small>Members count: {{ members.count }}</small>
+                    </div>
+                    
                     <div class="members-list">
-                        {% for member in members %}
-                        <div class="member-item mb-2">
-                            <i class="fas fa-user me-2"></i>{{ member.role }}
-                        </div>
-                        {% endfor %}
+                        {% if members %}
+                            {% for member in members %}
+                            <div class="member-item mb-2 p-2 bg-dark rounded">
+                                <i class="fas fa-user me-2"></i>
+                                {{ member.role }}
+                                <small class="text-muted ms-2">
+                                    (Joined: {{ member.joined_at|date:"M j, Y" }})
+                                </small>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">No members in this team yet.</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -50,21 +63,25 @@
     border: 1px solid rgba(144, 200, 60, 0.2);
 }
 
-.list-group-item {
-    background-color: rgba(33, 37, 41, 0.5) !important;
-    border: 1px solid rgba(144, 200, 60, 0.2);
-    margin-bottom: 0.5rem;
-    border-radius: 8px !important;
-}
-
 .info-section, .members-section {
     background-color: rgba(33, 37, 41, 0.5);
     border-radius: 10px;
     padding: 1.5rem;
     border: 1px solid rgba(144, 200, 60, 0.2);
 }
+
+.member-item {
+    border: 1px solid rgba(144, 200, 60, 0.2);
+    transition: transform 0.2s;
+}
+
+.member-item:hover {
+    transform: translateX(5px);
+    background-color: rgba(144, 200, 60, 0.1) !important;
+}
 </style>
 
+<!-- WebSocket connection -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
@@ -74,10 +91,20 @@ document.addEventListener('DOMContentLoaded', function() {
     );
 
     teamSocket.onmessage = function(e) {
+        console.log('WebSocket message received:', e.data);  // Debug log
         const data = JSON.parse(e.data);
         if (data.type === 'team_update') {
+            console.log('Updating members with:', data.members);  // Debug log
             updateMembers(data.members);
         }
+    };
+
+    teamSocket.onopen = function(e) {
+        console.log('WebSocket connection established');  // Debug log
+    };
+
+    teamSocket.onerror = function(e) {
+        console.error('WebSocket error:', e);  // Debug log
     };
 
     function updateMembers(members) {
@@ -86,10 +113,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         membersList.innerHTML = '';
         
-        if (members.length > 0) {
+        if (members && members.length > 0) {
             members.forEach(member => {
                 const memberHtml = `
-                    <div class="member-item mb-2">
+                    <div class="member-item mb-2 p-2 bg-dark rounded">
                         <i class="fas fa-user me-2"></i>${member}
                     </div>
                 `;

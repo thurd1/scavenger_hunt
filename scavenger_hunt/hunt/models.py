@@ -90,12 +90,12 @@ class CustomUser(AbstractUser):
         return self.username
 
 class TeamMember(models.Model):
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="team_members")
-    user = models.ForeignKey(CustomUser, null=True, on_delete=models.CASCADE)
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='team_members')
     role = models.CharField(max_length=100)
+    joined_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.role}" if self.user else "Unassigned Member"
+        return f"{self.role} - {self.team.name}"
 
 class Submission(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="submissions")

@@ -194,15 +194,29 @@ def join_existing_team(request, lobby_id):
             team = Team.objects.get(code=team_code, lobbies=lobby_id)
             player_name = request.session.get('player_name')
             
+            print(f"Attempting to join team: {team.name}")  # Debug print
+            print(f"Player name: {player_name}")  # Debug print
+            
             if player_name:
-                TeamMember.objects.create(
+                # Check if member already exists
+                existing_member = TeamMember.objects.filter(
                     team=team,
                     role=player_name
-                )
-                messages.success(request, f'Successfully joined team {team.name}!')
+                ).first()
                 
-                # Broadcast the update
-                broadcast_team_update(team.id)
+                if not existing_member:
+                    member = TeamMember.objects.create(
+                        team=team,
+                        role=player_name
+                    )
+                    print(f"Created new team member: {member}")  # Debug print
+                    messages.success(request, f'Successfully joined team {team.name}!')
+                    
+                    # Broadcast the update
+                    broadcast_team_update(team.id)
+                else:
+                    print(f"Member already exists: {existing_member}")  # Debug print
+                    messages.info(request, 'You are already a member of this team!')
                 
             return redirect('team_dashboard', team_id=team.id)
         except Team.DoesNotExist:
@@ -370,12 +384,22 @@ def edit_team(request, team_id):
 
 @login_required
 def view_team(request, team_id):
-    team = get_object_or_404(Team, id=team_id)
+    team = get_object_or_404(Team.objects.prefetch_related('team_members'), id=team_id)
     members = team.team_members.all()
-    return render(request, 'hunt/view_team.html', {
+    
+    # Debug prints
+    print(f"Team ID: {team.id}")
+    print(f"Team Name: {team.name}")
+    print(f"Raw members query: {members.query}")
+    print(f"Members count: {members.count()}")
+    for member in members:
+        print(f"Member: {member.role}")
+    
+    context = {
         'team': team,
         'members': members
-    })
+    }
+    return render(request, 'hunt/view_team.html', context)
 
 @require_POST
 def start_hunt(request, lobby_id):
