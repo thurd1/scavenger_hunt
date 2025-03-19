@@ -10,13 +10,13 @@ def generate_lobby_code():
 
 class Lobby(models.Model):
     name = models.CharField(max_length=100)
-    code = models.CharField(max_length=6, unique=True, blank=True)
+    code = models.CharField(max_length=6, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    teams = models.ManyToManyField('Team', related_name='lobbies', blank=True)
+    teams = models.ManyToManyField('Team', related_name='participating_lobbies')
     is_active = models.BooleanField(default=True)
     hunt_started = models.BooleanField(default=False)
     start_time = models.DateTimeField(null=True, blank=True)
-    race = models.ForeignKey('Race', on_delete=models.SET_NULL, null=True, blank=True)
+    race = models.ForeignKey('Race', on_delete=models.CASCADE)
 
     def save(self, *args, **kwargs):
         if not self.code:
@@ -30,12 +30,11 @@ class Lobby(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.name} ({self.code})"
+        return f"Lobby {self.code}"
     
 class Team(models.Model):
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=6, unique=True)
-    lobbies = models.ManyToManyField(Lobby, related_name='teams')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
@@ -91,8 +90,8 @@ class CustomUser(AbstractUser):
         return self.username
 
 class TeamMember(models.Model):
-    team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='members')
-    role = models.CharField(max_length=100)  # This stores the player name
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='members')
+    role = models.CharField(max_length=100)
 
     def __str__(self):
         return f"{self.role} - {self.team.name}"

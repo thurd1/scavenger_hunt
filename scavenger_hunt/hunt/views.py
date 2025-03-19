@@ -47,7 +47,7 @@ def create_lobby(request):
 @login_required
 def lobby_details(request, lobby_id):
     lobby = get_object_or_404(Lobby, id=lobby_id)
-    teams = Team.objects.filter(lobbies=lobby).prefetch_related('members')
+    teams = lobby.teams.all().prefetch_related('members')
     
     # Debug prints
     for team in teams:
@@ -195,7 +195,7 @@ def join_existing_team(request, lobby_id):
             return redirect('join_existing_team', lobby_id=lobby_id)
             
         try:
-            team = Team.objects.get(code=team_code, lobbies=lobby_id)
+            team = Team.objects.get(code=team_code, participating_lobbies=lobby_id)
             print(f"Found team: {team.name}")  # Debug print
             
             # Check if member already exists
