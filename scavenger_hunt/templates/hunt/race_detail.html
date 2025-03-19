@@ -120,31 +120,34 @@
 
 <!-- Edit Race Modal -->
 <div class="modal fade" id="editRaceModal" tabindex="-1" aria-labelledby="editRaceModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-0">
                 <h5 class="modal-title" id="editRaceModalLabel">Edit Race</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST">
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="raceName" class="form-label">Race Name</label>
-                        <input type="text" class="form-control" id="raceName" name="name" value="{{ race.name }}" required>
+                        <input type="text" class="form-control bg-success text-white" 
+                               id="raceName" name="name" value="{{ race.name }}" required>
                     </div>
                     <div class="mb-3">
                         <label for="startLocation" class="form-label">Start Location</label>
-                        <input type="text" class="form-control" id="startLocation" name="start_location" value="{{ race.start_location }}" required>
+                        <input type="text" class="form-control bg-success text-white" 
+                               id="startLocation" name="start_location" value="{{ race.start_location }}" required>
                     </div>
                     <div class="mb-3">
                         <label for="timeLimit" class="form-label">Time Limit (minutes)</label>
-                        <input type="number" class="form-control" id="timeLimit" name="time_limit_minutes" value="{{ race.time_limit_minutes }}" required>
+                        <input type="number" class="form-control bg-success text-white" 
+                               id="timeLimit" name="time_limit_minutes" value="{{ race.time_limit_minutes }}" required>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" name="edit" class="btn btn-primary">Save changes</button>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-warning" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" name="edit" class="btn btn-success">Save changes</button>
                 </div>
             </form>
         </div>
@@ -167,4 +170,43 @@ document.addEventListener('DOMContentLoaded', function() {
     toastList.forEach(toast => toast.show());
 });
 </script>
+
+<style>
+.modal-content {
+    border-radius: 15px;
+}
+
+.form-control {
+    border: none;
+    border-radius: 10px;
+}
+
+.form-control:focus {
+    box-shadow: 0 0 0 0.25rem rgba(144, 200, 60, 0.25);
+}
+
+.btn-warning {
+    background-color: #FFA500;
+    border: none;
+    color: white;
+}
+
+.btn-success {
+    background-color: #90C83C;
+    border: none;
+}
+
+.modal-header, .modal-footer {
+    padding: 1rem 1.5rem;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.form-label {
+    color: #90C83C;
+    font-weight: 500;
+}
+</style>
 {% endblock %} 
