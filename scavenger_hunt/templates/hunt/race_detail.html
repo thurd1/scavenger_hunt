@@ -119,71 +119,64 @@
                 <input type="hidden" name="edit" value="true">
                 <div class="modal-body">
                     <div class="row">
-                        <!-- Race Details Section - Left Side -->
-                        <div class="col-md-4 border-end border-secondary">
-                            <div class="p-3">
-                                <h6 class="text-success mb-4">Race Details</h6>
-                                <div class="mb-4">
+                        <!-- Race Details Section -->
+                        <div class="col-md-6">
+                            <div class="edit-section p-3">
+                                <h6 class="text-success mb-3">Race Details</h6>
+                                <div class="mb-3">
                                     <label for="raceName" class="form-label">Race Name</label>
                                     <input type="text" class="form-control bg-success text-white" 
                                            id="raceName" name="name" value="{{ race.name }}" required>
                                 </div>
-                                <div class="mb-4">
+                                <div class="mb-3">
                                     <label for="startLocation" class="form-label">Start Location</label>
                                     <input type="text" class="form-control bg-success text-white" 
                                            id="startLocation" name="start_location" value="{{ race.start_location }}" required>
                                 </div>
-                                <div class="mb-4">
+                                <div class="mb-3">
                                     <label for="timeLimit" class="form-label">Time Limit (minutes)</label>
                                     <input type="number" class="form-control bg-success text-white" 
                                            id="timeLimit" name="time_limit_minutes" value="{{ race.time_limit_minutes }}" required>
                                 </div>
-                                <button type="submit" class="btn btn-success w-100">
-                                    <i class="fas fa-save me-2"></i>Save All Changes
-                                </button>
                             </div>
                         </div>
 
-                        <!-- Zones and Questions Section - Right Side -->
-                        <div class="col-md-8">
-                            <div class="p-3">
-                                <div class="d-flex justify-content-between align-items-center mb-4">
-                                    <h6 class="text-success mb-0">Zones and Questions</h6>
+                        <!-- Zones Section -->
+                        <div class="col-md-6">
+                            <div class="edit-section p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="text-success mb-0">Zones</h6>
                                     <button type="button" class="btn btn-sm btn-success" id="addZone">
-                                        <i class="fas fa-plus me-2"></i>Add New Zone
+                                        <i class="fas fa-plus"></i> Add Zone
                                     </button>
                                 </div>
-                                
-                                <div class="zones-container">
+                                <div id="zonesContainer">
                                     {% for zone in race.zones.all %}
-                                    <div class="zone-card mb-4" data-zone-id="{{ zone.id }}">
-                                        <div class="zone-header d-flex justify-content-between align-items-center bg-success bg-opacity-25 p-3 rounded-top">
-                                            <h6 class="mb-0">Zone {{ zone.number }}</h6>
-                                            <button type="button" class="btn btn-sm btn-success add-question" data-zone-id="{{ zone.id }}">
-                                                <i class="fas fa-plus me-1"></i>Add Question
-                                            </button>
+                                    <div class="zone-item mb-3" data-zone-id="{{ zone.id }}">
+                                        <div class="zone-header bg-success bg-opacity-25 p-2 rounded">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span>Zone {{ zone.number }}</span>
+                                                <button type="button" class="btn btn-sm btn-success add-question" 
+                                                        data-zone-id="{{ zone.id }}">
+                                                    <i class="fas fa-plus"></i> Add Question
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div class="zone-body p-3 border border-success border-opacity-25 rounded-bottom">
+                                        <div class="questions-list p-2">
                                             {% for question in zone.questions.all %}
-                                            <div class="question-item mb-3" data-question-id="{{ question.id }}">
-                                                <div class="row g-2">
-                                                    <div class="col">
-                                                        <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
-                                                               name="question_{{ question.id }}" 
-                                                               value="{{ question.question_text }}" 
-                                                               placeholder="Question">
-                                                    </div>
-                                                    <div class="col">
-                                                        <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
-                                                               name="answer_{{ question.id }}" 
-                                                               value="{{ question.answer }}" 
-                                                               placeholder="Answer">
-                                                    </div>
-                                                    <div class="col-auto">
-                                                        <button type="button" class="btn btn-danger btn-sm delete-question">
-                                                            <i class="fas fa-trash"></i>
-                                                        </button>
-                                                    </div>
+                                            <div class="question-row mb-2">
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
+                                                           name="question_{{ question.id }}" 
+                                                           value="{{ question.question_text }}" 
+                                                           placeholder="Question">
+                                                    <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
+                                                           name="answer_{{ question.id }}" 
+                                                           value="{{ question.answer }}" 
+                                                           placeholder="Answer">
+                                                    <button type="button" class="btn btn-danger delete-question">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
                                                 </div>
                                             </div>
                                             {% endfor %}
@@ -194,6 +187,10 @@
                             </div>
                         </div>
                     </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-warning" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-success">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -223,53 +220,52 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Add new question functionality
-    document.querySelectorAll('.add-question').forEach(button => {
-        button.addEventListener('click', function() {
-            const zoneId = this.dataset.zoneId;
-            const questionsContainer = this.closest('.zone-card').querySelector('.zone-body');
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.add-question')) {
+            const button = e.target.closest('.add-question');
+            const zoneId = button.dataset.zoneId;
+            const questionsList = button.closest('.zone-item').querySelector('.questions-list');
+            
             const newQuestionHtml = `
-                <div class="question-item mb-3" data-question-id="new">
-                    <div class="row g-2">
-                        <div class="col">
-                            <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
-                                   name="new_question_${zoneId}[]" placeholder="Question">
-                        </div>
-                        <div class="col">
-                            <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
-                                   name="new_answer_${zoneId}[]" placeholder="Answer">
-                        </div>
-                        <div class="col-auto">
-                            <button type="button" class="btn btn-danger btn-sm delete-question">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
+                <div class="question-row mb-2">
+                    <div class="input-group">
+                        <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
+                               name="new_question_${zoneId}[]" placeholder="Question">
+                        <input type="text" class="form-control bg-success bg-opacity-25 text-white" 
+                               name="new_answer_${zoneId}[]" placeholder="Answer">
+                        <button type="button" class="btn btn-danger delete-question">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </div>
                 </div>
             `;
-            questionsContainer.insertAdjacentHTML('beforeend', newQuestionHtml);
-        });
+            questionsList.insertAdjacentHTML('beforeend', newQuestionHtml);
+        }
     });
 
     // Delete question functionality
     document.addEventListener('click', function(e) {
         if (e.target.closest('.delete-question')) {
-            e.target.closest('.question-item').remove();
+            e.target.closest('.question-row').remove();
         }
     });
 
     // Add new zone functionality
     let newZoneCounter = {{ race.zones.all|length }} + 1;
     document.getElementById('addZone').addEventListener('click', function() {
-        const zonesContainer = document.querySelector('.zones-container');
+        const zonesContainer = document.getElementById('zonesContainer');
         const newZoneHtml = `
-            <div class="zone-card mb-4" data-zone-id="new_${newZoneCounter}">
-                <div class="zone-header d-flex justify-content-between align-items-center bg-success bg-opacity-25 p-3 rounded-top">
-                    <h6 class="mb-0">Zone ${newZoneCounter}</h6>
-                    <button type="button" class="btn btn-sm btn-success add-question" data-zone-id="new_${newZoneCounter}">
-                        <i class="fas fa-plus me-1"></i>Add Question
-                    </button>
+            <div class="zone-item mb-3" data-zone-id="new_${newZoneCounter}">
+                <div class="zone-header bg-success bg-opacity-25 p-2 rounded">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Zone ${newZoneCounter}</span>
+                        <button type="button" class="btn btn-sm btn-success add-question" 
+                                data-zone-id="new_${newZoneCounter}">
+                            <i class="fas fa-plus"></i> Add Question
+                        </button>
+                    </div>
                 </div>
-                <div class="zone-body p-3 border border-success border-opacity-25 rounded-bottom">
+                <div class="questions-list p-2">
                 </div>
             </div>
         `;
@@ -339,7 +335,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .modal-dialog {
-    max-height: 90vh;
+    max-width: 90% !important;
 }
 
 .modal-content {
@@ -379,6 +375,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .btn-danger:hover {
     background-color: #bb2d3b;
+}
+
+.zone-item {
+    background-color: rgba(33, 37, 41, 0.5);
+    border-radius: 8px;
+    border: 1px solid rgba(144, 200, 60, 0.2);
+}
+
+.question-row .input-group {
+    gap: 0.5rem;
+}
+
+.question-row .form-control {
+    background-color: rgba(144, 200, 60, 0.1) !important;
+}
+
+.edit-section {
+    height: 100%;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.btn-warning {
+    background-color: #FFA500;
+    border: none;
+    color: white;
 }
 </style>
 
