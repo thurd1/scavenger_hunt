@@ -26,24 +26,34 @@ logger = logging.getLogger(__name__)
 @login_required
 def create_lobby(request):
     if request.method == 'POST':
-        form = LobbyForm(request.POST)
-        if form.is_valid():
-            lobby = form.save(commit=False)
-            lobby.host = request.user
-            race_id = request.POST.get('race')
-            if race_id:
-                race = Race.objects.get(id=race_id)
-                lobby.race = race
-            lobby.save()
-            return render(request, 'hunt/lobby_code_display.html', {'lobby': lobby})
-    else:
-        form = LobbyForm()
+        race_id = request.POST.get('race')
+        
+        # Generate a unique code
+        while True:
+            code = generate_lobby_code()
+            if not Lobby.objects.filter(code=code).exists():
+                break
+        
+        try:
+            race = Race.objects.get(id=race_id)
+            lobby = Lobby.objects.create(
+                code=code,
+                race=race,
+                is_active=True
+            )
+            return redirect('lobby_details', lobby_id=lobby.id)
+        except Race.DoesNotExist:
+            messages.error(request, 'Selected race does not exist.')
     
-    # Get active races
-    active_races = Race.objects.filter(is_active=True)
+    # Get all active races
+    races = Race.objects.filter(is_active=True)
+    
+    # Generate a code for the form
+    generated_code = generate_lobby_code()
+    
     return render(request, 'hunt/create_lobby.html', {
-        'form': form,
-        'active_races': active_races
+        'races': races,
+        'generated_code': generated_code
     })
 
 @login_required
@@ -629,3 +639,6 @@ def edit_race(request, race_id):
         return redirect('race_detail', race_id=race.id)
         
     return render(request, 'hunt/edit_race.html', {'race': race})
+
+def generate_lobby_code():
+    return ''.join(random.choices(string.digits, k=6))

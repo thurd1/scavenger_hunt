@@ -12,25 +12,49 @@
     <div class="dashboard-grid">
         <div class="dashboard-card">
             <div class="card-header">
-                <h2><i class="fas fa-flag"></i> Manage Races</h2>
+                <h2><i class="fas fa-flag"></i> Races</h2>
             </div>
             <div class="card-content">
-                <p>Create and manage scavenger hunt races</p>
-                <a href="{% url 'manage_riddles' %}" class="action-btn">
-                    <i class="fas fa-cog"></i> Manage Races
-                </a>
+                <div class="button-group">
+                    <a href="{% url 'manage_riddles' %}" class="action-btn">
+                        <i class="fas fa-cog"></i> Manage Races
+                    </a>
+                    <a href="{% url 'create_race' %}" class="action-btn secondary">
+                        <i class="fas fa-plus"></i> Create Race
+                    </a>
+                </div>
             </div>
         </div>
 
         <div class="dashboard-card">
             <div class="card-header">
-                <h2><i class="fas fa-users"></i> Manage Lobbies</h2>
+                <h2><i class="fas fa-users"></i> Lobbies</h2>
             </div>
             <div class="card-content">
-                <p>Create and manage game lobbies</p>
-                <a href="{% url 'manage_lobbies' %}" class="action-btn">
-                    <i class="fas fa-door-open"></i> Manage Lobbies
-                </a>
+                <div class="button-group">
+                    <a href="{% url 'manage_lobbies' %}" class="action-btn">
+                        <i class="fas fa-door-open"></i> Manage Lobbies
+                    </a>
+                    <a href="{% url 'create_lobby' %}" class="action-btn secondary">
+                        <i class="fas fa-plus"></i> Create Lobby
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-gamepad"></i> Game Session</h2>
+            </div>
+            <div class="card-content">
+                <div class="button-group">
+                    <a href="{% url 'join_game_session' %}" class="action-btn">
+                        <i class="fas fa-play"></i> Join Game
+                    </a>
+                    <a href="{% url 'home' %}" class="action-btn secondary">
+                        <i class="fas fa-home"></i> Home
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -118,6 +142,21 @@
     background: #7ab32f;
     transform: translateY(-2px);
     color: #ffffff;
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.action-btn.secondary {
+    background: rgba(144, 200, 60, 0.1);
+    border: 1px solid #90C83C;
+}
+
+.action-btn.secondary:hover {
+    background: rgba(144, 200, 60, 0.2);
 }
 
 @media (max-width: 768px) {
