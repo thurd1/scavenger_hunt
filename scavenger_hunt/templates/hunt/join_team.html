@@ -4,65 +4,184 @@
 {% block title %}Join Team{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-    <div class="dashboard-box p-4">
-        <h2 class="text-center mb-4" style="color: #90C83C">Join Team</h2>
-        
-        <!-- Add player name form if not already set -->
-        {% if not request.session.player_name %}
-        <form method="POST" action="{% url 'save_player_name' %}" class="mb-4">
-            {% csrf_token %}
-            <div class="mb-3">
-                <label for="playerName" class="form-label" style="color: #90C83C">Your Name</label>
-                <input type="text" class="form-control bg-dark text-white" 
-                       id="playerName" name="player_name" required>
-            </div>
-            <button type="submit" class="btn btn-success w-100">Save Name</button>
-        </form>
-        {% endif %}
+<div class="container">
+    <div class="join-header">
+        <h1>Join a Team</h1>
+        <p class="lobby-code">Lobby Code: {{ lobby.code }}</p>
+    </div>
 
-        <!-- Team code form -->
-        <form method="POST" action="{% url 'join_existing_team' lobby.id %}">
-            {% csrf_token %}
-            <div class="mb-3">
-                <label for="teamCode" class="form-label" style="color: #90C83C">Team Code</label>
-                <input type="text" class="form-control bg-dark text-white" 
-                       id="teamCode" name="team_code" required>
+    <div class="teams-section">
+        <h2 class="section-title">Available Teams</h2>
+        <div class="teams-grid" id="teamsGrid">
+            {% for team in teams %}
+            <div class="team-card">
+                <div class="team-header">
+                    <h3>{{ team.name }}</h3>
+                    <span class="member-count">
+                        {{ team.members.count }} member{{ team.members.count|pluralize }}
+                    </span>
+                </div>
+                <div class="team-members">
+                    <ul class="member-list">
+                        {% for member in team.members.all %}
+                            <li>
+                                <i class="fas fa-user"></i>
+                                <span>{{ member.role }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <form method="POST" action="{% url 'join_existing_team' lobby.id %}" class="join-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="team_code" value="{{ team.code }}">
+                        <button type="submit" class="join-team-btn">Join Team</button>
+                    </form>
+                </div>
             </div>
-            <button type="submit" class="btn btn-success w-100" 
-                    {% if not request.session.player_name %}disabled{% endif %}>
-                Join Team
-            </button>
-        </form>
-
-        <div class="text-center mt-3">
-            <a href="{% url 'create_team' lobby.id %}" class="btn btn-secondary">
-                Create New Team Instead
-            </a>
+            {% endfor %}
         </div>
+    </div>
+
+    <div class="create-team-section">
+        <a href="{% url 'create_team' lobby.id %}" class="create-team-btn">
+            <i class="fas fa-plus"></i> Create New Team
+        </a>
     </div>
 </div>
 
 <style>
-.dashboard-box {
-    background-color: rgba(33, 37, 41, 0.9);
-    border-radius: 15px;
-    border: 1px solid rgba(144, 200, 60, 0.2);
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
 }
 
-.form-control {
-    border: 1px solid rgba(144, 200, 60, 0.2);
-    border-radius: 8px;
+.join-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
 }
 
-.form-control:focus {
-    border-color: #90C83C;
-    box-shadow: 0 0 0 0.25rem rgba(144, 200, 60, 0.25);
+.join-header h1 {
+    color: #90C83C;
+    margin-bottom: 10px;
 }
 
-.btn-success {
-    background-color: #90C83C;
+.lobby-code {
+    display: inline-block;
+    background: rgba(144, 200, 60, 0.1);
+    padding: 8px 16px;
+    border-radius: 6px;
+    color: #90C83C;
+}
+
+.teams-section {
+    margin-bottom: 40px;
+}
+
+.section-title {
+    color: #90C83C;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.team-card {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.2s;
+}
+
+.team-card:hover {
+    transform: translateY(-5px);
+}
+
+.team-header {
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.team-header h3 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.member-count {
+    color: #ffffff;
+    font-size: 0.9rem;
+    opacity: 0.7;
+}
+
+.member-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 15px 0;
+}
+
+.member-list li {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    margin-bottom: 5px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+}
+
+.member-list li i {
+    color: #90C83C;
+    margin-right: 10px;
+}
+
+.member-list li span {
+    color: #ffffff;
+}
+
+.join-form {
+    text-align: center;
+}
+
+.join-team-btn {
+    background: #90C83C;
+    color: #ffffff;
     border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    width: 100%;
+}
+
+.join-team-btn:hover {
+    background: #7ab32f;
+}
+
+.create-team-section {
+    text-align: center;
+    margin-top: 30px;
+}
+
+.create-team-btn {
+    display: inline-block;
+    background: rgba(144, 200, 60, 0.1);
+    color: #90C83C;
+    padding: 15px 30px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.create-team-btn:hover {
+    background: rgba(144, 200, 60, 0.2);
 }
 </style>
 {% endblock %} 

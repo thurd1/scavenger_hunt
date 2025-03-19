@@ -186,6 +186,9 @@ def broadcast_team_update(team_id):
     )
 
 def join_existing_team(request, lobby_id):
+    lobby = get_object_or_404(Lobby, id=lobby_id)
+    teams = Team.objects.filter(participating_lobbies=lobby).prefetch_related('members')
+    
     if request.method == 'POST':
         team_code = request.POST.get('team_code')
         player_name = request.session.get('player_name')
@@ -243,8 +246,10 @@ def join_existing_team(request, lobby_id):
         except Team.DoesNotExist:
             messages.error(request, 'Invalid team code. Please try again.')
     
-    lobby = get_object_or_404(Lobby, id=lobby_id)
-    return render(request, 'hunt/join_team.html', {'lobby': lobby})
+    return render(request, 'hunt/join_team.html', {
+        'lobby': lobby,
+        'teams': teams
+    })
 
 def register(request):
     if request.method == 'POST':
@@ -377,13 +382,23 @@ def delete_lobby(request, lobby_id):
         messages.success(request, f'Lobby "{lobby_name}" has been deleted.')
     return redirect('manage_lobbies')
 
+@require_POST
 def delete_team(request, team_id):
-    if request.method == 'POST':
-        team = get_object_or_404(Team, id=team_id)
-        team_name = team.name
-        team.delete()
-        messages.success(request, f'Team "{team_name}" has been deleted.')
-    return redirect('team_list')
+    team = get_object_or_404(Team, id=team_id)
+    lobby_id = team.participating_lobbies.first().id
+    team.delete()
+    
+    # Broadcast update
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'lobby_{lobby_id}',
+        {
+            'type': 'lobby_update',
+            'message': 'team_deleted'
+        }
+    )
+    
+    return JsonResponse({'status': 'success'})
 
 def edit_team(request, team_id):
     team = get_object_or_404(Team, id=team_id)
