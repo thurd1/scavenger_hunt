@@ -137,6 +137,9 @@ class Zone(models.Model):
     def __str__(self):
         return f"{self.name} - {self.race.name}"
 
+    class Meta:
+        ordering = ['created_at']
+
 class Question(models.Model):
     zone = models.ForeignKey(Zone, on_delete=models.CASCADE, related_name='questions')
     question_text = models.TextField()

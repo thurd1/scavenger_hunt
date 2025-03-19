@@ -514,68 +514,16 @@ def manage_riddles(request):
 
 @login_required
 def race_detail(request, race_id):
-    race = get_object_or_404(Race.objects.prefetch_related('zones__questions'), id=race_id)
+    race = get_object_or_404(Race, id=race_id)
+    zones = Zone.objects.filter(race=race).order_by('created_at')
+    questions = Question.objects.filter(zone__race=race).order_by('zone__created_at')
     
-    if request.method == 'POST':
-        if 'activate' in request.POST:
-            race.is_active = True
-            race.save()
-            messages.success(request, f'Race "{race.name}" has been activated.')
-        elif 'deactivate' in request.POST:
-            race.is_active = False
-            race.save()
-            messages.success(request, f'Race "{race.name}" has been deactivated.')
-        elif 'edit' in request.POST:
-            # Update race details
-            race.name = request.POST.get('name')
-            race.start_location = request.POST.get('start_location')
-            race.time_limit_minutes = request.POST.get('time_limit_minutes')
-            race.save()
-
-            # Update existing questions
-            for key, value in request.POST.items():
-                if key.startswith('question_'):
-                    question_id = key.split('_')[1]
-                    question = Question.objects.get(id=question_id)
-                    question.question_text = value
-                    question.answer = request.POST.get(f'answer_{question_id}')
-                    question.save()
-
-            # Handle new questions for existing zones
-            for zone in race.zones.all():
-                new_questions = request.POST.getlist(f'new_question_{zone.id}[]')
-                new_answers = request.POST.getlist(f'new_answer_{zone.id}[]')
-                for q, a in zip(new_questions, new_answers):
-                    if q.strip() and a.strip():
-                        Question.objects.create(
-                            zone=zone,
-                            question_text=q,
-                            answer=a
-                        )
-
-            # Handle new zones and their questions
-            for key in request.POST:
-                if key.startswith('new_question_new_'):
-                    zone_num = key.split('_')[3]
-                    zone = Zone.objects.create(
-                        race=race,
-                        number=zone_num
-                    )
-                    new_questions = request.POST.getlist(f'new_question_new_{zone_num}[]')
-                    new_answers = request.POST.getlist(f'new_answer_new_{zone_num}[]')
-                    for q, a in zip(new_questions, new_answers):
-                        if q.strip() and a.strip():
-                            Question.objects.create(
-                                zone=zone,
-                                question_text=q,
-                                answer=a
-                            )
-
-            messages.success(request, f'Race "{race.name}" has been updated successfully.')
-        
-        return redirect('race_detail', race_id=race.id)
-            
-    return render(request, 'hunt/race_detail.html', {'race': race})
+    context = {
+        'race': race,
+        'zones': zones,
+        'questions': questions,
+    }
+    return render(request, 'hunt/race_detail.html', context)
 
 @login_required
 def delete_race(request, race_id):
