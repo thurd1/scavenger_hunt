@@ -401,11 +401,13 @@ def check_hunt_status(request, lobby_id):
 
 def manage_riddles(request):
     if request.method == 'POST':
+        print("POST data received:", request.POST) # debug
+        print("start_location value:", request.POST.get('start_location')) # debug
         race = Race.objects.create(
-            name=request.POST.get('race_name'),  # Changed from 'name' to 'race_name'
+            name=request.POST.get('race_name'),
             created_by=request.user,
             start_location=request.POST.get('start_location'),
-            time_limit_minutes=request.POST.get('time_limit_minutes')
+            time_limit_minutes=int(request.POST.get('time_limit_minutes', 60))
         )
 
         # Handle zones and questions
@@ -416,20 +418,22 @@ def manage_riddles(request):
                 number=i
             )
             
-            # Get all questions and answers for this zone
+            # Get questions and answers arrays for this zone
             questions = request.POST.getlist(f'zone-{i}-questions[]')
             answers = request.POST.getlist(f'zone-{i}-answers[]')
             
             # Create questions for this zone
             for q, a in zip(questions, answers):
-                Question.objects.create(
-                    zone=zone,
-                    question_text=q,
-                    answer=a
-                )
+                if q.strip() and a.strip():  # Only create if both question and answer are provided and not empty
+                    Question.objects.create(
+                        zone=zone,
+                        question_text=q.strip(),
+                        answer=a.strip()
+                    )
 
         return redirect('manage_riddles')
     
+    # GET request - display the form with existing races
     races = Race.objects.all().order_by('-created_at')
     return render(request, 'hunt/manage_riddles.html', {'races': races})
 
