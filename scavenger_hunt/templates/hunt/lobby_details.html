@@ -40,30 +40,20 @@
                 <div class="teams-section" id="teamsContainer">
                     <h4 style="color: #90C83C">Teams</h4>
                     <div id="teamsList">
-                        {% if teams %}
-                            {% for team_data in teams %}
-                            <div class="team-card mb-3" data-team-id="{{ team_data.team.id }}">
-                                <div class="team-header bg-success bg-opacity-25 p-3 rounded-top">
-                                    <h5 class="mb-0">{{ team_data.team.name }}</h5>
-                                </div>
-                                <div class="team-members p-3 border border-success border-opacity-25 rounded-bottom">
-                                    <div class="members-list" id="team-{{ team_data.team.id }}-members">
-                                        {% if team_data.members %}
-                                            {% for member in team_data.members %}
-                                            <div class="member-item mb-2">
-                                                <i class="fas fa-user me-2"></i>{{ member.role }}
-                                            </div>
-                                            {% endfor %}
-                                        {% else %}
-                                            <p class="text-muted mb-0">No members in this team yet.</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
+                        {% for team_data in teams_data %}
+                            <div class="team-box mb-4">
+                                <h3>{{ team_data.team.name }}</h3>
+                                {% if team_data.members %}
+                                    <ul class="list-unstyled">
+                                        {% for member in team_data.members %}
+                                            <li>{{ member.role }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p>No members in this team yet.</p>
+                                {% endif %}
                             </div>
-                            {% endfor %}
-                        {% else %}
-                            <p class="text-muted">No teams have joined this lobby yet.</p>
-                        {% endif %}
+                        {% endfor %}
                     </div>
                 </div>
             </div>
@@ -102,49 +92,42 @@
 </style>
 
 <script>
-// WebSocket connection
-document.addEventListener('DOMContentLoaded', function() {
-    const lobbyId = '{{ lobby.id }}';
-    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const lobbySocket = new WebSocket(
-        ws_scheme + '://' + window.location.host + '/ws/lobby/' + lobbyId + '/'
-    );
+    const teamSockets = {};
+    
+    function connectToTeam(teamId) {
+        const socket = new WebSocket(
+            `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/team/${teamId}/`
+        );
 
-    lobbySocket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        if (data.type === 'lobby_update') {
-            updateTeams(data.teams);
-        }
-    };
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if (data.type === 'team_members') {
+                updateTeamMembers(teamId, data.members);
+            }
+        };
 
-    function updateTeams(teams) {
-        const teamsList = document.getElementById('teamsList');
-        teamsList.innerHTML = '';
+        teamSockets[teamId] = socket;
+    }
 
-        teams.forEach(team => {
-            const teamHtml = `
-                <div class="team-card mb-3" data-team-id="${team.id}">
-                    <div class="team-header bg-success bg-opacity-25 p-3 rounded-top">
-                        <h5 class="mb-0">${team.name}</h5>
-                    </div>
-                    <div class="team-members p-3 border border-success border-opacity-25 rounded-bottom">
-                        <div class="members-list" id="team-${team.id}-members">
-                            ${team.members.map(member => `
-                                <div class="member-item mb-2">
-                                    <i class="fas fa-user me-2"></i>${member}
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-            teamsList.insertAdjacentHTML('beforeend', teamHtml);
-        });
-
-        if (teams.length === 0) {
-            teamsList.innerHTML = '<p class="text-muted">No teams have joined this lobby yet.</p>';
+    function updateTeamMembers(teamId, members) {
+        const teamBox = document.querySelector(`[data-team-id="${teamId}"]`);
+        if (teamBox) {
+            const membersList = teamBox.querySelector('.members-list');
+            if (members && members.length > 0) {
+                membersList.innerHTML = members.map(member => 
+                    `<li>${member}</li>`
+                ).join('');
+            } else {
+                membersList.innerHTML = '<p>No members in this team yet.</p>';
+            }
         }
     }
-});
+
+    // Connect to all teams when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        {% for team_data in teams_data %}
+            connectToTeam({{ team_data.team.id }});
+        {% endfor %}
+    });
 </script>
 {% endblock %}

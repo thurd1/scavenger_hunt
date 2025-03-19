@@ -19,12 +19,8 @@ class TeamConsumer(AsyncWebsocketConsumer):
         )
         await self.accept()
         
-        # Send initial team data
-        team_data = await self.get_team_data()
-        await self.send(text_data=json.dumps({
-            'type': 'team_update',
-            'members': team_data['members']
-        }))
+        # Send initial team members
+        await self.send_team_members()
 
     async def disconnect(self, close_code):
         logger.info(f"WebSocket disconnected for team {self.team_id} with player {self.player_name}")
@@ -69,12 +65,22 @@ class TeamConsumer(AsyncWebsocketConsumer):
         logger.info(f"Retrieved team members for team {self.team_id}: {members}")
         return members
 
+    async def send_team_members(self):
+        # Get team members from database
+        @database_sync_to_async
+        def get_members():
+            members = TeamMember.objects.filter(team_id=self.team_id)
+            return [member.role for member in members]
+
+        members = await get_members()
+        await self.send(text_data=json.dumps({
+            'type': 'team_members',
+            'members': members
+        }))
+
     async def team_update(self, event):
         logger.info(f"Sending team update for team {self.team_id}: {event}")
-        await self.send(text_data=json.dumps({
-            'type': 'team_update',
-            'members': event['members']
-        }))
+        await self.send(text_data=json.dumps(event))
 
     @database_sync_to_async
     def get_team_data(self):

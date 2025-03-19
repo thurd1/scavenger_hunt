@@ -46,29 +46,22 @@ def create_lobby(request):
 
 @login_required
 def lobby_details(request, lobby_id):
-    lobby = get_object_or_404(Lobby.objects.prefetch_related(
-        'teams',
-        'teams__team_members'
-    ), id=lobby_id)
+    lobby = get_object_or_404(Lobby, id=lobby_id)
+    teams = Team.objects.filter(lobbies=lobby)
     
-    # Get teams with their members
-    teams = []
-    for team in lobby.teams.all():
-        team_data = {
+    teams_data = []
+    for team in teams:
+        members = TeamMember.objects.filter(team=team)
+        print(f"Team {team.name} has {len(members)} members: {[m.role for m in members]}")  # Debug print
+        teams_data.append({
             'team': team,
-            'members': team.team_members.all()  # Get all team members
-        }
-        teams.append(team_data)
-    
+            'members': list(members)  # Convert QuerySet to list
+        })
+
     context = {
         'lobby': lobby,
-        'teams': teams,
+        'teams_data': teams_data,
     }
-    
-    print("Teams data:", teams)  # Debug print
-    for team_data in teams:
-        print(f"Team {team_data['team'].name} members:", list(team_data['members']))  # Debug print
-        
     return render(request, 'hunt/lobby_details.html', context)
 
 class LobbyDetailsView(DetailView):
@@ -218,7 +211,17 @@ def join_existing_team(request, lobby_id):
                     team=team,
                     role=player_name
                 )
-                print(f"Created new team member: {member.role}")  # Debug print
+                
+                # Broadcast team update
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f'team_{team.id}',
+                    {
+                        'type': 'team_update',
+                        'members': list(TeamMember.objects.filter(team=team).values_list('role', flat=True))
+                    }
+                )
+                
                 messages.success(request, f'Successfully joined team {team.name}!')
             else:
                 print(f"Member already exists: {existing_member.role}")  # Debug print
