@@ -8,279 +8,365 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="container mb-4">
-        <div class="row justify-content-center">
-            <div class="col-12">
-                <h2 class="display-5 mb-0 text-center" style="color: #90C83C">Manage Races</h2>
-                <hr class="my-4">
-            </div>
-        </div>
+<div class="container">
+    <div class="page-header">
+        <h1>Manage Races</h1>
     </div>
 
-    <!-- Error Alert - Hidden until needed -->
-    <div id="errorAlert" class="container" style="display: none;">
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <span id="errorMessage"></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+    <div class="races-section">
+        <div class="section-header">
+            <h2>Active Races</h2>
+            <button class="create-btn" onclick="showCreateForm()">
+                <i class="fas fa-plus"></i> Create New Race
+            </button>
     </div>
 
-    <div class="container">
-        <div class="row">
-            <!-- Existing Races - Only show if races exist -->
-            {% if races %}
-            <div class="col-12 mb-4">
-                <div class="dashboard-box" style="background-color: #002a3f; color: white; border-radius: 10px;">
-                    <h3 class="text-center mb-4" style="color: #90C83C">Your Races</h3>
-                    <div class="table-responsive">
-                        <table class="table" style="color: white;">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+        <div class="races-grid">
                                 {% for race in races %}
-                                <tr>
-                                    <td>{{ race.name }}</td>
-                                    <td>
-                                        {% if race.is_active %}
-                                            <span class="badge bg-success">Active</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">Inactive</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-primary">
-                                                <i class="fas fa-eye"></i> View
-                                            </a>
-                                            <form method="POST" style="display: inline;">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="race_id" value="{{ race.id }}">
-                                                {% if race.is_active %}
-                                                    <button type="submit" name="deactivate" class="btn btn-sm btn-warning">
-                                                        <i class="fas fa-pause"></i> Deactivate
+            <div class="race-card">
+                <button class="delete-race-btn" onclick="deleteRace({{ race.id }})">
+                    <i class="fas fa-times"></i>
                                                     </button>
-                                                {% else %}
-                                                    <button type="submit" name="activate" class="btn btn-sm btn-success">
-                                                        <i class="fas fa-play"></i> Activate
-                                                    </button>
-                                                {% endif %}
-                                            </form>
-                                            <form method="POST" style="display: inline;">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="race_id" value="{{ race.id }}">
-                                                <button type="submit" name="delete" class="btn btn-sm btn-danger" 
-                                                        onclick="return confirm('Are you sure you want to delete this race?')">
-                                                    <i class="fas fa-trash"></i> Delete
-                                                </button>
-                                            </form>
+                <div class="race-header">
+                    <h3>{{ race.name }}</h3>
+                    <span class="race-status {% if race.is_active %}active{% else %}inactive{% endif %}">
+                        {{ race.is_active|yesno:"Active,Inactive" }}
+                    </span>
                                         </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                <div class="race-info">
+                    <p><i class="fas fa-clock"></i> Time Limit: {{ race.time_limit_minutes }} minutes</p>
+                    <p><i class="fas fa-map-marker-alt"></i> Start: {{ race.start_location }}</p>
                     </div>
+                <div class="race-actions">
+                    <a href="{% url 'race_detail' race.id %}" class="view-btn">
+                        <i class="fas fa-eye"></i> View Details
+                    </a>
                 </div>
             </div>
-            <br><br>
-            {% endif %}
-            
-            <!-- Create New Race Section -->
-            <div class="col-12">
-                <div class="dashboard-box">
-                    <h3 class="text-center mb-4" style="color: #90C83C">Create New Race</h3>
-                    
-                    <form method="POST" id="raceForm" onsubmit="return validateForm()">
-                        {% csrf_token %}
-                        <div class="container-fluid p-0">
-                            <div class="row g-4">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label for="race_name" class="form-label">Race Name</label>
-                                        <input type="text" class="form-control" id="race_name" name="race_name" 
-                                               placeholder="Enter race name" required>
+            {% empty %}
+            <div class="no-races">
+                <p>No races created yet</p>
                                     </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label for="time_limit_minutes" class="form-label">Time Limit (minutes)</label>
-                                        <input type="number" class="form-control" id="time_limit_minutes" name="time_limit_minutes" 
-                                               value="60" min="1" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-8">
-                                    <div class="form-group">
-                                        <label for="start_location" class="form-label">Starting Location</label>
-                                        <input type="text" class="form-control" id="start_location" name="start_location" 
-                                               placeholder="Enter the physical starting point" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label for="zoneCount" class="form-label">Number of Zones</label>
-                                        <input type="number" class="form-control" id="zoneCount" name="zoneCount" 
-                                               min="1" max="10" placeholder="1-10" required>
-                                    </div>
+            {% endfor %}
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Zone Container -->
-                        <div class="container-fluid p-0 mt-4">
-                            <div id="zonesContainer" class="row"></div>
+<!-- Create Race Modal -->
+<div id="createRaceModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>Create New Race</h3>
+        <form method="POST" class="create-race-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="name">Race Name</label>
+                <input type="text" id="name" name="name" required class="form-control">
                         </div>
-
-                        <!-- Buttons -->
-                        <div class="container-fluid p-0 mt-4">
-                            <div class="row justify-content-center">
-                                <div class="col-12 d-flex justify-content-center gap-2">
-                                    <button type="button" class="btn btn-primary" onclick="generateZones()">
-                                        <i class="fas fa-plus-circle me-2"></i>Generate Zones
-                                    </button>
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-flag-checkered me-2"></i>Create Race
-                                    </button>
-                                    <a href="{% url 'leader_dashboard' %}" class="btn btn-secondary">
-                                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                                    </a>
+            <div class="form-group">
+                <label for="start_location">Start Location</label>
+                <input type="text" id="start_location" name="start_location" required class="form-control">
                                 </div>
+            <div class="form-group">
+                <label for="time_limit_minutes">Time Limit (minutes)</label>
+                <input type="number" id="time_limit_minutes" name="time_limit_minutes" required class="form-control">
                             </div>
+            <div class="modal-buttons">
+                <button type="submit" class="submit-btn">Create Race</button>
+                <button type="button" class="cancel-btn" onclick="closeModal()">Cancel</button>
                         </div>
                     </form>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
+
+<style>
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.page-header h1 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.section-header h2 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.create-btn {
+    background: #90C83C;
+    color: #ffffff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.create-btn:hover {
+    background: #7ab32f;
+    transform: translateY(-2px);
+}
+
+.races-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.race-card {
+    position: relative;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.2s;
+}
+
+.race-card:hover {
+    transform: translateY(-5px);
+}
+
+.delete-race-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #ff4444;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 5px;
+    transition: transform 0.2s;
+    z-index: 1;
+}
+
+.delete-race-btn:hover {
+    transform: scale(1.2);
+    color: #ff0000;
+}
+
+.race-header {
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+
+.race-header h3 {
+    color: #90C83C;
+    margin: 0 0 10px 0;
+}
+
+.race-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.race-status.active {
+    background: rgba(144, 200, 60, 0.1);
+    color: #90C83C;
+}
+
+.race-status.inactive {
+    background: rgba(255, 68, 68, 0.1);
+    color: #ff4444;
+}
+
+.race-info {
+    margin-bottom: 20px;
+}
+
+.race-info p {
+    color: #ffffff;
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.race-info i {
+    color: #90C83C;
+}
+
+.race-actions {
+    text-align: center;
+}
+
+.view-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #90C83C;
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.view-btn:hover {
+    background: #7ab32f;
+    transform: translateY(-2px);
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 30px;
+    width: 90%;
+    max-width: 500px;
+}
+
+.modal-content h3 {
+    color: #90C83C;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    color: #90C83C;
+    margin-bottom: 8px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 6px;
+    color: #ffffff;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 25px;
+}
+
+.submit-btn, .cancel-btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.submit-btn {
+    background: #90C83C;
+    color: #ffffff;
+    border: none;
+}
+
+.cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.submit-btn:hover, .cancel-btn:hover {
+    transform: translateY(-2px);
+}
+
+.no-races {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    color: #ffffff;
+}
+</style>
 
 <script>
-function validateForm() {
-    const timeLimit = document.getElementById('time_limit_minutes').value.trim();
-    
-    if (timeLimit < 1) {
-        showError("Time limit must be at least 1 minute");
-        return false;
-    }
-    
-    // Check if zones have been generated
-    const zonesContainer = document.getElementById('zonesContainer');
-    if (zonesContainer.children.length === 0) {
-        showError("Please generate zones before submitting");
-        return false;
-    }
-    
-    return true;
+function showCreateForm() {
+    document.getElementById('createRaceModal').style.display = 'flex';
 }
 
-function showError(message) {
-    const errorAlert = document.getElementById('errorAlert');
-    const errorMessage = document.getElementById('errorMessage');
-    
-    errorMessage.textContent = message;
-    errorAlert.style.display = 'block';
-    
-    // Scroll to the error message
-    errorAlert.scrollIntoView({ behavior: 'smooth' });
-    
-    // Hide after 5 seconds
-    setTimeout(function() {
-        errorAlert.style.display = 'none';
-    }, 5000);
+function closeModal() {
+    document.getElementById('createRaceModal').style.display = 'none';
 }
 
-function generateZones() {
-    const zoneCount = parseInt(document.getElementById('zoneCount').value);
-    if (zoneCount < 1 || zoneCount > 10) {
-        showError('Please enter a number between 1 and 10');
-        return;
-    }
-    
-    const container = document.getElementById('zonesContainer');
-    container.innerHTML = '';
-
-    for (let i = 1; i <= zoneCount; i++) {
-        const zoneHtml = `
-            <div class="col-md-6 mb-4">
-                <div class="dashboard-box p-3">
-                    <h4 class="mb-3 text-center" style="color: #90C83C">Zone ${i}</h4>
-                    <div class="questions-container" id="zone-${i}-questions">
-                        <div class="question-pair mb-4">
-                            <div class="row g-3">
-                                <div class="col-md-5">
-                                    <label class="form-label">Question</label>
-                                    <input type="text" class="form-control" name="zone-${i}-questions[]" 
-                                           placeholder="Enter your question" required>
-                                </div>
-                                <div class="col-md-5">
-                                    <label class="form-label">Answer</label>
-                                    <input type="text" class="form-control" name="zone-${i}-answers[]" 
-                                           placeholder="Enter the answer" required>
-                                </div>
-                                <div class="col-md-2 d-flex align-items-end justify-content-center">
-                                    <button type="button" class="btn btn-sm btn-outline-danger" 
-                                            style="width: 120px; border-radius: 25px;" 
-                                            onclick="removeQuestion(this)" 
-                                            title="Delete Question" aria-label="Delete Question">
-                                        <i class="fas fa-trash me-1"></i> Delete
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <hr class="my-4">
-                    <div class="text-center">
-                        <button type="button" class="btn btn-sm btn-primary" 
-                                style="width: 120px; border-radius: 25px;"
-                                onclick="addQuestionToZone(${i})">
-                            <i class="fas fa-plus me-1"></i>Add Question
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        container.insertAdjacentHTML('beforeend', zoneHtml);
+function deleteRace(raceId) {
+    if (confirm('Are you sure you want to delete this race?')) {
+        fetch(`/race/${raceId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Failed to delete race');
+            }
+        });
     }
 }
 
-function addQuestionToZone(zoneNumber) {
-    const container = document.getElementById(`zone-${zoneNumber}-questions`);
-    const questionHtml = `
-        <div class="question-pair mb-4">
-            <div class="row g-3">
-                <div class="col-md-5">
-                    <label class="form-label">Question</label>
-                    <input type="text" class="form-control" name="zone-${zoneNumber}-questions[]" 
-                           placeholder="Enter your question" required>
-                </div>
-                <div class="col-md-5">
-                    <label class="form-label">Answer</label>
-                    <input type="text" class="form-control" name="zone-${zoneNumber}-answers[]" 
-                           placeholder="Enter the answer" required>
-                </div>
-                <div class="col-md-2 d-flex align-items-end justify-content-center">
-                    <button type="button" class="btn btn-sm btn-outline-danger" 
-                            style="width: 120px; border-radius: 25px;"
-                            onclick="removeQuestion(this)"
-                            title="Delete Question" aria-label="Delete Question">
-                        <i class="fas fa-trash me-1"></i> Delete
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    container.insertAdjacentHTML('beforeend', questionHtml);
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 
-function removeQuestion(button) {
-    // Get the parent question-pair div and remove it
-    const questionPair = button.closest('.question-pair');
-    questionPair.remove();
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target == document.getElementById('createRaceModal')) {
+        closeModal();
+    }
 }
 </script>
 {% endblock %}

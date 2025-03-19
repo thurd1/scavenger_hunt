@@ -1,41 +1,35 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Leader Dashboard{% endblock %}
 
 {% block content %}
 <div class="container">
-    <h1 style="color: #90C83C">Leader Dashboard</h1>
-    
+    <div class="page-header">
+        <h1>Leader Dashboard</h1>
+    </div>
+
     <div class="dashboard-grid">
-        <div class="dashboard-box">
-            <h2 style="color: #90C83C">Game Management</h2>
-            <div class="button-group">
-                <a href="{% url 'create_lobby' %}" class="btn">
-                    <i class="fas fa-plus-circle"></i> Create New Lobby
-                </a>
-                <a href="{% url 'manage_lobbies' %}" class="btn">
-                    <i class="fas fa-tasks"></i> Manage Lobbies
-                </a>
-                <a href="{% url 'assign_riddles' %}" class="btn">
-                    <i class="fas fa-puzzle-piece"></i> Assign Riddles
-                </a>
-                <a href="{% url 'leaderboard' %}" class="btn">
-                    <i class="fas fa-trophy"></i> View Leaderboard
-                </a>
-                <a href="{% url 'manage_riddles' %}" class="btn">
-                    <i class="fas fa-cog"></i> Manage Riddles
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-flag"></i> Manage Races</h2>
+            </div>
+            <div class="card-content">
+                <p>Create and manage scavenger hunt races</p>
+                <a href="{% url 'manage_riddles' %}" class="action-btn">
+                    <i class="fas fa-cog"></i> Manage Races
                 </a>
             </div>
         </div>
 
-        <div class="dashboard-box">
-            <h2 style="color: #90C83C">Teams Overview</h2>
-            <div class="button-group">
-                <a href="{% url 'team_list' %}" class="btn">
-                    <i class="fas fa-users"></i> View All Teams
-                </a>
-                <a href="{% url 'register_team' %}" class="btn">
-                    <i class="fas fa-user-plus"></i> Register New Team
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-users"></i> Manage Lobbies</h2>
+            </div>
+            <div class="card-content">
+                <p>Create and manage game lobbies</p>
+                <a href="{% url 'manage_lobbies' %}" class="action-btn">
+                    <i class="fas fa-door-open"></i> Manage Lobbies
                 </a>
             </div>
         </div>
@@ -45,64 +39,85 @@
 <style>
 .container {
     max-width: 1200px;
-    margin: 2rem auto;
-    padding: 1rem;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.page-header h1 {
+    color: #90C83C;
+    margin: 0;
+    font-size: 2.5rem;
 }
 
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.5rem;
-    margin-top: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    margin-top: 30px;
 }
 
-.dashboard-box {
-    background: rgba(0, 0, 0, 0.7);
-    border-radius: 10px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+.dashboard-card {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.2s;
 }
 
-.button-group {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.8rem;
-    margin-top: 1.2rem;
+.dashboard-card:hover {
+    transform: translateY(-5px);
 }
 
-.btn {
+.card-header {
+    background: rgba(144, 200, 60, 0.1);
+    padding: 20px;
+    border-bottom: 1px solid rgba(144, 200, 60, 0.3);
+}
+
+.card-header h2 {
+    color: #90C83C;
+    margin: 0;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.card-content {
+    padding: 20px;
+    text-align: center;
+}
+
+.card-content p {
+    color: #ffffff;
+    margin-bottom: 20px;
+}
+
+.action-btn {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    padding: 0.6rem 1.2rem;
-    text-align: center;
+    gap: 8px;
+    background: #90C83C;
+    color: #ffffff;
+    padding: 12px 24px;
+    border-radius: 6px;
     text-decoration: none;
-    border-radius: 20px;
-    font-weight: bold;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-    background: linear-gradient(135deg, #FFA500, #FF7F00);
-    color: white;
+    transition: all 0.2s;
 }
 
-.btn:hover {
-    transform: scale(1.02);
-    background: linear-gradient(135deg, #FF7F00, #FF4500);
-    text-decoration: none;
-    color: white;
-}
-
-.btn i {
-    margin-right: 0.5rem;
-}
-
-h1 {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-h2 {
-    margin-bottom: 0.5rem;
+.action-btn:hover {
+    background: #7ab32f;
+    transform: translateY(-2px);
+    color: #ffffff;
 }
 
 @media (max-width: 768px) {

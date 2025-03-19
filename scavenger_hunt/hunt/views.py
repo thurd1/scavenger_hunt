@@ -381,21 +381,24 @@ def delete_lobby(request, lobby_id):
 
 @require_POST
 def delete_team(request, team_id):
-    team = get_object_or_404(Team, id=team_id)
-    lobby_id = team.participating_lobbies.first().id
-    team.delete()
-    
-    # Broadcast update
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f'lobby_{lobby_id}',
-        {
-            'type': 'lobby_update',
-            'message': 'team_deleted'
-        }
-    )
-    
-    return JsonResponse({'status': 'success'})
+    try:
+        team = get_object_or_404(Team, id=team_id)
+        lobby_id = team.participating_lobbies.first().id
+        team.delete()
+        
+        # Broadcast update
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'lobby_{lobby_id}',
+            {
+                'type': 'lobby_update',
+                'message': 'team_deleted'
+            }
+        )
+        
+        return JsonResponse({'status': 'success'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 def edit_team(request, team_id):
     team = get_object_or_404(Team, id=team_id)
