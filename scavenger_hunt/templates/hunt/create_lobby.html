@@ -8,198 +8,114 @@
 {% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="dashboard-box">
-        <form method="POST" action="{% url 'create_lobby' %}" id="createLobbyForm">
+<div class="container py-4">
+    <div class="dashboard-box p-4">
+        <h2 class="text-center mb-4" style="color: #90C83C">Create New Lobby</h2>
+        
+        <form method="POST" class="needs-validation" novalidate>
             {% csrf_token %}
             
-            <div class="form-group mb-3">
-                <label for="lobby_name" class="form-label">Lobby Name</label>
-                <input type="text" class="form-control" id="lobby_name" name="lobby_name" 
-                      placeholder="Enter a name for your game lobby" required>
+            <div class="mb-4">
+                <label for="lobbyName" class="form-label" style="color: #90C83C">Lobby Name</label>
+                <input type="text" class="form-control bg-dark text-white" 
+                       id="lobbyName" name="name" required>
             </div>
-            
-            <div class="form-group mb-3">
-                <label for="game_code" class="form-label">Game Code</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="game_code" name="game_code" 
-                          placeholder="6-digit code for players to join" required
-                          pattern="[0-9]{6}" maxlength="6" minlength="6">
-                    <button type="button" class="btn btn-secondary" id="generateCodeBtn">
-                        <i class="fas fa-random"></i> Generate
-                    </button>
-                </div>
-                <div class="form-text">6-digit code that players will use to join your game</div>
+
+            <div class="mb-4">
+                <label for="gameCode" class="form-label" style="color: #90C83C">Game Code</label>
+                <input type="text" class="form-control bg-dark text-white" 
+                       id="gameCode" name="code" maxlength="6" required>
+                <button type="button" class="btn btn-success mt-2" onclick="generateCode()">
+                    Generate Code
+                </button>
             </div>
-            
-            <div class="form-group mb-4">
-                <label for="race_selection" class="form-label">Select Race</label>
-                <select class="form-select" id="race_selection" name="race_id" required>
-                    <option value="" selected disabled>Choose a race for this lobby</option>
+
+            <div class="mb-4">
+                <label for="raceSelect" class="form-label" style="color: #90C83C">Select Race</label>
+                <select class="form-select bg-dark text-white" id="raceSelect" name="race" required>
+                    <option value="">Choose a race...</option>
                     {% for race in active_races %}
-                    <option value="{{ race.id }}">{{ race.name }} ({{ race.time_limit }} min)</option>
+                    <div class="race-option">
+                        <option value="{{ race.id }}">
+                            {{ race.name }} - {{ race.time_limit_minutes }} minutes
+                        </option>
+                    </div>
                     {% empty %}
-                    <option value="" disabled>No active races available. Please create a race first.</option>
+                    <option value="" disabled>No active races available</option>
                     {% endfor %}
                 </select>
-                <div class="form-text">Select a race to use for this game lobby</div>
+                <div class="mt-2">
+                    <a href="{% url 'manage_riddles' %}" class="btn btn-success">
+                        <i class="fas fa-plus"></i> Create New Race
+                    </a>
+                </div>
             </div>
-            
-            <div class="button-group">
-                <button type="submit" class="btn btn-create">
-                    <i class="fas fa-plus-circle"></i> Create Lobby
-                </button>
-                <a href="{% url 'leader_dashboard' %}" class="btn btn-back">
-                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'leader_dashboard' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back
                 </a>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check"></i> Create Lobby
+                </button>
             </div>
         </form>
     </div>
 </div>
 
+<script>
+function generateCode() {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    document.getElementById('gameCode').value = code;
+}
+
+// Form validation
+(function () {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms)
+        .forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                form.classList.add('was-validated')
+            }, false)
+        })
+})()
+</script>
+
 <style>
-.container {
-    max-width: 600px;
-    margin: 2rem auto;
-    padding: 1rem;
+.form-control, .form-select {
+    border: 1px solid rgba(144, 200, 60, 0.2);
+    border-radius: 8px;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #90C83C;
+    box-shadow: 0 0 0 0.25rem rgba(144, 200, 60, 0.25);
+}
+
+.btn-success {
+    background-color: #90C83C;
+    border: none;
+}
+
+.btn-success:hover {
+    background-color: #7ab32f;
 }
 
 .dashboard-box {
-    background: rgba(0, 0, 0, 0.7);
-    border-radius: 10px;
-    padding: 2rem;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-label {
-    display: block;
-    margin-bottom: 0.5rem;
-    color: #90C83C;
-    font-weight: bold;
-}
-
-.form-control, .form-select {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    background-color: rgba(255, 255, 255, 0.9);
-}
-
-.form-text {
-    margin-top: 0.25rem;
-    color: #aaa;
-    font-size: 0.875rem;
-}
-
-.input-group {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.button-group {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    margin-top: 2rem;
-}
-
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.6rem 1.2rem;
-    border-radius: 20px;
-    font-weight: bold;
-    transition: all 0.3s ease;
-    border: none;
-    cursor: pointer;
-    text-decoration: none;
-    color: white;
-}
-
-.btn i {
-    margin-right: 0.5rem;
-}
-
-.btn-create {
-    background: linear-gradient(135deg, #FFA500, #FF7F00);
-}
-
-.btn-create:hover {
-    background: linear-gradient(135deg, #FF7F00, #FF4500);
-    transform: scale(1.02);
-}
-
-.btn-back {
-    background: linear-gradient(135deg, #6c757d, #495057);
-}
-
-.btn-back:hover {
-    background: linear-gradient(135deg, #495057, #343a40);
-    transform: scale(1.02);
-}
-
-.btn-secondary {
-    background: linear-gradient(135deg, #6c757d, #495057);
-}
-
-.btn-secondary:hover {
-    background: linear-gradient(135deg, #495057, #343a40);
-}
-
-@media (max-width: 576px) {
-    .button-group {
-        flex-direction: column;
-    }
-    
-    .btn {
-        width: 100%;
-    }
+    background-color: rgba(33, 37, 41, 0.9);
+    border-radius: 15px;
+    border: 1px solid rgba(144, 200, 60, 0.2);
 }
 </style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const generateCodeBtn = document.getElementById('generateCodeBtn');
-    const gameCodeInput = document.getElementById('game_code');
-    
-    generateCodeBtn.addEventListener('click', function() {
-        const randomCode = Math.floor(100000 + Math.random() * 900000);
-        gameCodeInput.value = randomCode;
-    });
-    
-    const createLobbyForm = document.getElementById('createLobbyForm');
-    
-    createLobbyForm.addEventListener('submit', function(event) {
-        const lobbyName = document.getElementById('lobby_name').value.trim();
-        const gameCode = document.getElementById('game_code').value.trim();
-        const raceSelection = document.getElementById('race_selection').value;
-        
-        if (!lobbyName) {
-            alert('Please enter a lobby name');
-            event.preventDefault();
-            return;
-        }
-        
-        if (gameCode.length !== 6 || isNaN(gameCode)) {
-            alert('Game code must be a 6-digit number');
-            event.preventDefault();
-            return;
-        }
-        
-        if (!raceSelection) {
-            alert('Please select a race');
-            event.preventDefault();
-            return;
-        }
-    });
-});
-</script>
 
 <!-- Add Font Awesome for icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">

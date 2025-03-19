@@ -26,11 +26,23 @@ def create_lobby(request):
     if request.method == 'POST':
         form = LobbyForm(request.POST)
         if form.is_valid():
-            lobby = form.save()
+            lobby = form.save(commit=False)
+            lobby.host = request.user
+            race_id = request.POST.get('race')
+            if race_id:
+                race = Race.objects.get(id=race_id)
+                lobby.race = race
+            lobby.save()
             return render(request, 'hunt/lobby_code_display.html', {'lobby': lobby})
     else:
         form = LobbyForm()
-    return render(request, 'hunt/create_lobby.html', {'form': form})
+    
+    # Get active races
+    active_races = Race.objects.filter(is_active=True)
+    return render(request, 'hunt/create_lobby.html', {
+        'form': form,
+        'active_races': active_races
+    })
 
 @login_required
 def lobby_details(request, lobby_id):
