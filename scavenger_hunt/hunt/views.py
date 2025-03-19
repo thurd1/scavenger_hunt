@@ -324,24 +324,15 @@ def create_team(request, lobby_id):
     })
 
 def team_dashboard(request, team_id):
-    team = get_object_or_404(Team, id=team_id)
-    team_members = TeamMember.objects.filter(team=team)
+    team = get_object_or_404(Team.objects.prefetch_related('participating_lobbies', 'members'), id=team_id)
     
-    print(f"Team ID: {team_id}")
-    print(f"Team name: {team.name}")
-    print(f"Raw SQL query: {str(team_members.query)}")  # Print the SQL query
-    print(f"Number of team members: {team_members.count()}")
-    print(f"Team members found: {[m.role for m in team_members]}")
-    
-    # Try to get all TeamMember objects for debugging
-    all_members = TeamMember.objects.all()
-    print(f"All TeamMembers in database: {[m.role for m in all_members]}")
+    # Debug print
+    print(f"Team {team.name} lobbies: {[lobby.id for lobby in team.participating_lobbies.all()]}")
     
     context = {
         'team': team,
-        'team_members': team_members
+        'members': team.members.all(),
     }
-    
     return render(request, 'hunt/team_dashboard.html', context)
 
 @login_required
