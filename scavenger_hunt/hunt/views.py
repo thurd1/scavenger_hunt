@@ -162,16 +162,21 @@ def join_game_session(request):
 def save_player_name(request):
     if request.method == 'POST':
         player_name = request.POST.get('player_name')
-        print(f"Saving player name to session: {player_name}")  # Debug print
-        request.session['player_name'] = player_name
-        request.session.modified = True  # Force session save
-        print(f"Player name in session after save: {request.session.get('player_name')}")  # Verify save
+        print(f"Attempting to save player name: {player_name}")  # Debug print
         
-        lobby_code = request.session.get('lobby_code')
-        print(f"Lobby code in session: {lobby_code}")  # Debug print
-        
-        lobby = get_object_or_404(Lobby, code=lobby_code)
-        return render(request, 'hunt/team_options.html', {'lobby': lobby})
+        if player_name:
+            request.session['player_name'] = player_name
+            request.session.modified = True
+            print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
+            
+            lobby_code = request.session.get('lobby_code')
+            print(f"Lobby code in session: {lobby_code}")  # Debug print
+            
+            if lobby_code:
+                lobby = get_object_or_404(Lobby, code=lobby_code)
+                return render(request, 'hunt/team_options.html', {'lobby': lobby})
+            
+        print("No player name provided or lobby code missing")  # Debug print
     return redirect('join_game_session')
 
 def broadcast_team_update(team_id):
@@ -190,34 +195,40 @@ def broadcast_team_update(team_id):
 def join_existing_team(request, lobby_id):
     if request.method == 'POST':
         team_code = request.POST.get('team_code')
+        player_name = request.session.get('player_name')
+        
+        print(f"Join attempt - Team code: {team_code}, Player: {player_name}")  # Debug print
+        
+        if not player_name:
+            messages.error(request, 'Please enter your name first.')
+            return redirect('join_existing_team', lobby_id=lobby_id)
+            
         try:
             team = Team.objects.get(code=team_code, lobbies=lobby_id)
-            player_name = request.session.get('player_name')
+            print(f"Found team: {team.name}")  # Debug print
             
-            print(f"Join team attempt - Team: {team.name}, Player: {player_name}")
+            # Check if member already exists
+            existing_member = TeamMember.objects.filter(
+                team=team,
+                role=player_name
+            ).first()
             
-            if player_name:
-                # Check if member already exists
-                existing_member = TeamMember.objects.filter(
+            if not existing_member:
+                member = TeamMember.objects.create(
                     team=team,
                     role=player_name
-                ).first()
-                
-                if not existing_member:
-                    member = TeamMember.objects.create(
-                        team=team,
-                        role=player_name
-                    )
-                    print(f"Created new team member - ID: {member.id}, Role: {member.role}")
-                    messages.success(request, f'Successfully joined team {team.name}!')
-                else:
-                    print(f"Member already exists - Role: {existing_member.role}")
-                    messages.info(request, 'You are already a member of this team!')
-                
+                )
+                print(f"Created new team member: {member.role}")  # Debug print
+                messages.success(request, f'Successfully joined team {team.name}!')
+            else:
+                print(f"Member already exists: {existing_member.role}")  # Debug print
+                messages.info(request, 'You are already a member of this team!')
+            
             return redirect('team_dashboard', team_id=team.id)
+            
         except Team.DoesNotExist:
             messages.error(request, 'Invalid team code. Please try again.')
-            
+    
     lobby = get_object_or_404(Lobby, id=lobby_id)
     return render(request, 'hunt/join_team.html', {'lobby': lobby})
 
