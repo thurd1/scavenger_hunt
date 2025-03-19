@@ -18,6 +18,8 @@ from django.views.decorators.http import require_POST
 from django.utils import timezone
 import random
 import string
+import json
+from django.core.serializers.json import DjangoJSONEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -210,13 +212,24 @@ def join_existing_team(request, lobby_id):
                     role=player_name
                 )
                 
-                # Broadcast update to lobby
+                # Get channel layer
                 channel_layer = get_channel_layer()
+                
+                # Broadcast to lobby
                 async_to_sync(channel_layer.group_send)(
                     f'lobby_{lobby_id}',
                     {
                         'type': 'lobby_update',
                         'message': 'team_updated'
+                    }
+                )
+                
+                # Broadcast to team
+                async_to_sync(channel_layer.group_send)(
+                    f'team_{team.id}',
+                    {
+                        'type': 'team_update',
+                        'message': 'members_updated'
                     }
                 )
                 
@@ -325,13 +338,15 @@ def create_team(request, lobby_id):
 
 def team_dashboard(request, team_id):
     team = get_object_or_404(Team.objects.prefetch_related('participating_lobbies', 'members'), id=team_id)
+    members = list(team.members.all())
     
-    # Debug print
-    print(f"Team {team.name} lobbies: {[lobby.id for lobby in team.participating_lobbies.all()]}")
+    # Prepare members data for JSON
+    members_data = [{'id': member.id, 'role': member.role} for member in members]
     
     context = {
         'team': team,
-        'members': team.members.all(),
+        'members': members,
+        'members_json': json.dumps(members_data, cls=DjangoJSONEncoder)
     }
     return render(request, 'hunt/team_dashboard.html', context)
 
