@@ -13,7 +13,6 @@
         <div class="row justify-content-center">
             <div class="col-12">
                 <h2 class="display-5 mb-0 text-center" style="color: #90C83C">Manage Races</h2>
-                <p class="text-center" style="color: #90C83C">Create and manage your scavenger hunt races</p>
                 <hr class="my-4">
             </div>
         </div>
@@ -55,7 +54,32 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-primary">View</a>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'race_detail' race.id %}" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                            <form method="POST" style="display: inline;">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="race_id" value="{{ race.id }}">
+                                                {% if race.is_active %}
+                                                    <button type="submit" name="deactivate" class="btn btn-sm btn-warning">
+                                                        <i class="fas fa-pause"></i> Deactivate
+                                                    </button>
+                                                {% else %}
+                                                    <button type="submit" name="activate" class="btn btn-sm btn-success">
+                                                        <i class="fas fa-play"></i> Activate
+                                                    </button>
+                                                {% endif %}
+                                            </form>
+                                            <form method="POST" style="display: inline;">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="race_id" value="{{ race.id }}">
+                                                <button type="submit" name="delete" class="btn btn-sm btn-danger" 
+                                                        onclick="return confirm('Are you sure you want to delete this race?')">
+                                                    <i class="fas fa-trash"></i> Delete
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -95,7 +119,6 @@
                                         <label for="start_location" class="form-label">Starting Location</label>
                                         <input type="text" class="form-control" id="start_location" name="start_location" 
                                                placeholder="Enter the physical starting point" required>
-                                        <div class="form-text">Specify where teams will begin their hunt</div>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
@@ -136,29 +159,6 @@
     </div>
 </div>
 
-<!-- Delete Modal -->
-<div id="deleteModalOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-    <div id="deleteModalContent" style="background-color: #003148; color: white; border-radius: 10px; width: 90%; max-width: 500px; padding: 20px; text-align: center;">
-        <h3 style="color: #90C83C; margin-bottom: 20px;">Confirm Delete</h3>
-        
-        <p>Are you sure you want to delete the race "<span id="raceNameToDelete"></span>"?</p>
-        <p>This action cannot be undone.</p>
-        
-        <div style="display: flex; justify-content: center; gap: 15px; margin-top: 25px;">
-            <button id="cancelDeleteBtn" style="background-color: #FF9900; color: white; border: none; border-radius: 25px; padding: 10px 25px; cursor: pointer;">
-                Cancel
-            </button>
-            <form id="deleteForm" method="POST" action="">
-                {% csrf_token %}
-                <input type="hidden" name="delete_race" value="true">
-                <button type="submit" style="background-color: #FF9900; color: white; border: none; border-radius: 25px; padding: 10px 25px; cursor: pointer;">
-                    Delete
-                </button>
-            </form>
-        </div>
-    </div>
-</div>
-
 <script>
 function validateForm() {
     const timeLimit = document.getElementById('time_limit_minutes').value.trim();
@@ -192,28 +192,6 @@ function showError(message) {
     setTimeout(function() {
         errorAlert.style.display = 'none';
     }, 5000);
-}
-
-function showDeleteModal(raceId, raceName) {
-    // Set the race name and form action
-    document.getElementById('raceNameToDelete').textContent = raceName;
-    document.getElementById('deleteForm').action = "{% url 'delete_race' 0 %}".replace('0', raceId);
-    
-    // Show the modal
-    const modal = document.getElementById('deleteModalOverlay');
-    modal.style.display = 'flex';
-    
-    // Set up the cancel button
-    document.getElementById('cancelDeleteBtn').onclick = function() {
-        modal.style.display = 'none';
-    };
-    
-    // Close modal when clicking outside
-    modal.onclick = function(event) {
-        if (event.target === modal) {
-            modal.style.display = 'none';
-        }
-    };
 }
 
 function generateZones() {

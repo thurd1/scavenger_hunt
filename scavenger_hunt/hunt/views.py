@@ -401,12 +401,37 @@ def check_hunt_status(request, lobby_id):
 
 def manage_riddles(request):
     if request.method == 'POST':
+        race_id = request.POST.get('race_id')
+        
+        if race_id:
+            race = get_object_or_404(Race, id=race_id)
+            
+            # Handle activation/deactivation
+            if 'activate' in request.POST:
+                race.is_active = True
+                race.save()
+                messages.success(request, f'Race "{race.name}" has been activated.')
+            
+            elif 'deactivate' in request.POST:
+                race.is_active = False
+                race.save()
+                messages.success(request, f'Race "{race.name}" has been deactivated.')
+            
+            # Handle deletion
+            elif 'delete' in request.POST:
+                race.delete()
+                messages.success(request, f'Race "{race.name}" has been deleted.')
+            
+            return redirect('manage_riddles')
+        
+        # Handle new race creation
         race = Race.objects.create(
             name=request.POST.get('race_name'),
             created_by=request.user,
-            start_location=request.POST.get('start_location', 'Default Location'),
-            # Temporarily remove time_limit_minutes
+            start_location=request.POST.get('start_location'),
+            time_limit_minutes=int(request.POST.get('time_limit_minutes', 60))
         )
+
         # Handle zones and questions
         zone_count = int(request.POST.get('zoneCount', 0))
         for i in range(1, zone_count + 1):
@@ -415,23 +440,21 @@ def manage_riddles(request):
                 number=i
             )
             
-            # Get questions and answers arrays for this zone
             questions = request.POST.getlist(f'zone-{i}-questions[]')
             answers = request.POST.getlist(f'zone-{i}-answers[]')
             
-            # Create questions for this zone
             for q, a in zip(questions, answers):
-                if q.strip() and a.strip():  # Only create if both question and answer are provided and not empty
+                if q.strip() and a.strip():
                     Question.objects.create(
                         zone=zone,
                         question_text=q.strip(),
                         answer=a.strip()
                     )
 
+        messages.success(request, f'Race "{race.name}" has been created.')
         return redirect('manage_riddles')
-    
-    # Modify the query to only select existing fields
-    races = Race.objects.all().values('id', 'name', 'is_active')
+
+    races = Race.objects.all().order_by('-created_at')
     return render(request, 'hunt/manage_riddles.html', {'races': races})
 
 @login_required
