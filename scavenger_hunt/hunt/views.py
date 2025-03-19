@@ -174,6 +174,19 @@ def save_player_name(request):
         return render(request, 'hunt/team_options.html', {'lobby': lobby})
     return redirect('join_game_session')
 
+def broadcast_team_update(team_id):
+    channel_layer = get_channel_layer()
+    team = Team.objects.prefetch_related('team_members').get(id=team_id)
+    members = list(team.team_members.values_list('role', flat=True))
+    
+    async_to_sync(channel_layer.group_send)(
+        f'team_{team_id}',
+        {
+            'type': 'team_update',
+            'members': members
+        }
+    )
+
 def join_existing_team(request, lobby_id):
     if request.method == 'POST':
         team_code = request.POST.get('team_code')
@@ -182,14 +195,14 @@ def join_existing_team(request, lobby_id):
             player_name = request.session.get('player_name')
             
             if player_name:
-                team_member = TeamMember.objects.create(
+                TeamMember.objects.create(
                     team=team,
                     role=player_name
                 )
                 messages.success(request, f'Successfully joined team {team.name}!')
                 
                 # Broadcast the update
-                broadcast_lobby_update(lobby_id)
+                broadcast_team_update(team.id)
                 
             return redirect('team_dashboard', team_id=team.id)
         except Team.DoesNotExist:
@@ -565,25 +578,3 @@ def edit_race(request, race_id):
         return redirect('race_detail', race_id=race.id)
         
     return render(request, 'hunt/edit_race.html', {'race': race})
-
-# Update this function to broadcast team changes
-def broadcast_lobby_update(lobby_id):
-    channel_layer = get_channel_layer()
-    lobby = Lobby.objects.prefetch_related('teams__team_members').get(id=lobby_id)
-    
-    teams_data = []
-    for team in lobby.teams.all():
-        members = list(team.team_members.values_list('role', flat=True))
-        teams_data.append({
-            'id': team.id,
-            'name': team.name,
-            'members': members
-        })
-
-    async_to_sync(channel_layer.group_send)(
-        f'lobby_{lobby_id}',
-        {
-            'type': 'lobby_update',
-            'teams': teams_data
-        }
-    )

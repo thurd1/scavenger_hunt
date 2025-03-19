@@ -30,17 +30,13 @@
             <div class="col-md-6">
                 <div class="members-section">
                     <h4 style="color: #90C83C">Team Members</h4>
-                    {% if members %}
-                        <div class="list-group">
-                            {% for member in members %}
-                            <div class="list-group-item bg-dark text-white border-success">
-                                <i class="fas fa-user me-2"></i> {{ member.role }}
-                            </div>
-                            {% endfor %}
+                    <div class="members-list">
+                        {% for member in members %}
+                        <div class="member-item mb-2">
+                            <i class="fas fa-user me-2"></i>{{ member.role }}
                         </div>
-                    {% else %}
-                        <p class="text-muted">No members in this team yet.</p>
-                    {% endif %}
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -68,4 +64,41 @@
     border: 1px solid rgba(144, 200, 60, 0.2);
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const teamId = '{{ team.id }}';
+    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const teamSocket = new WebSocket(
+        ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
+    );
+
+    teamSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'team_update') {
+            updateMembers(data.members);
+        }
+    };
+
+    function updateMembers(members) {
+        const membersList = document.querySelector('.members-list');
+        if (!membersList) return;
+
+        membersList.innerHTML = '';
+        
+        if (members.length > 0) {
+            members.forEach(member => {
+                const memberHtml = `
+                    <div class="member-item mb-2">
+                        <i class="fas fa-user me-2"></i>${member}
+                    </div>
+                `;
+                membersList.insertAdjacentHTML('beforeend', memberHtml);
+            });
+        } else {
+            membersList.innerHTML = '<p class="text-muted">No members in this team yet.</p>';
+        }
+    }
+});
+</script>
 {% endblock %} 

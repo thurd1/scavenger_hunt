@@ -18,12 +18,12 @@ class TeamConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
-
-        # Send initial team members list
-        team_members = await self.get_team_members()
+        
+        # Send initial team data
+        team_data = await self.get_team_data()
         await self.send(text_data=json.dumps({
-            'type': 'team_members',
-            'members': team_members
+            'type': 'team_update',
+            'members': team_data['members']
         }))
 
     async def disconnect(self, close_code):
@@ -72,9 +72,18 @@ class TeamConsumer(AsyncWebsocketConsumer):
     async def team_update(self, event):
         logger.info(f"Sending team update for team {self.team_id}: {event}")
         await self.send(text_data=json.dumps({
-            'type': 'team_members',
+            'type': 'team_update',
             'members': event['members']
         }))
+
+    @database_sync_to_async
+    def get_team_data(self):
+        team = Team.objects.prefetch_related('team_members').get(id=self.team_id)
+        return {
+            'id': team.id,
+            'name': team.name,
+            'members': list(team.team_members.values_list('role', flat=True))
+        }
 
 class LobbyConsumer(AsyncWebsocketConsumer):
     async def connect(self):

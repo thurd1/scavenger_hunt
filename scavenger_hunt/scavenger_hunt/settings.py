@@ -103,7 +103,7 @@ AUTH_USER_MODEL = 'hunt.CustomUser'
 
 ASGI_APPLICATION = "scavenger_hunt.asgi.application"
 CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
     }
 }
