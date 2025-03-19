@@ -399,14 +399,35 @@ def check_hunt_status(request, lobby_id):
         'redirect_url': reverse('first_zone', args=[lobby_id]) if lobby.hunt_started else None
     })
 
-@login_required
 def manage_riddles(request):
     if request.method == 'POST':
         race = Race.objects.create(
-            name=request.POST.get('race_name'),
+            name=request.POST.get('race_name'),  # Changed from 'name' to 'race_name'
             created_by=request.user,
-            is_active=False
+            start_location=request.POST.get('start_location'),
+            time_limit_minutes=request.POST.get('time_limit_minutes')
         )
+
+        # Handle zones and questions
+        zone_count = int(request.POST.get('zoneCount', 0))
+        for i in range(1, zone_count + 1):
+            zone = Zone.objects.create(
+                race=race,
+                number=i
+            )
+            
+            # Get all questions and answers for this zone
+            questions = request.POST.getlist(f'zone-{i}-questions[]')
+            answers = request.POST.getlist(f'zone-{i}-answers[]')
+            
+            # Create questions for this zone
+            for q, a in zip(questions, answers):
+                Question.objects.create(
+                    zone=zone,
+                    question_text=q,
+                    answer=a
+                )
+
         return redirect('manage_riddles')
     
     races = Race.objects.all().order_by('-created_at')
