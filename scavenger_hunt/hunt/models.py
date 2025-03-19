@@ -16,7 +16,7 @@ class Lobby(models.Model):
     is_active = models.BooleanField(default=True)
     hunt_started = models.BooleanField(default=False)
     start_time = models.DateTimeField(null=True, blank=True)
-    race = models.ForeignKey('Race', on_delete=models.CASCADE)
+    race = models.ForeignKey('Race', on_delete=models.CASCADE, null=True)
 
     def save(self, *args, **kwargs):
         if not self.code:
