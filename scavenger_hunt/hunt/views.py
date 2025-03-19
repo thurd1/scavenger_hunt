@@ -490,3 +490,18 @@ def toggle_race(request, race_id):
         status = 'activated' if race.is_active else 'deactivated'
         messages.success(request, f'Race {status} successfully!')
     return redirect('race_detail', race_id=race_id)
+
+@login_required
+def edit_race(request, race_id):
+    race = get_object_or_404(Race, id=race_id)
+    
+    if request.method == 'POST':
+        race.name = request.POST.get('race_name', race.name)
+        race.start_location = request.POST.get('start_location', race.start_location)
+        race.time_limit_minutes = request.POST.get('time_limit_minutes', race.time_limit_minutes)
+        race.save()
+        
+        messages.success(request, f'Race "{race.name}" has been updated.')
+        return redirect('race_detail', race_id=race.id)
+        
+    return render(request, 'hunt/edit_race.html', {'race': race})
