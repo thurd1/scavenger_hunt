@@ -13,6 +13,12 @@
         <h1>Manage Races</h1>
     </div>
 
+    <div class="navigation-buttons">
+        <a href="{% url 'leader_dashboard' %}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
     <div class="races-section">
         <div class="section-header">
             <h2>Active Races</h2>
@@ -61,22 +67,22 @@
             <div class="form-group">
                 <label for="name">Race Name</label>
                 <input type="text" id="name" name="name" required class="form-control">
-                        </div>
+            </div>
             <div class="form-group">
                 <label for="start_location">Start Location</label>
                 <input type="text" id="start_location" name="start_location" required class="form-control">
-                                </div>
+            </div>
             <div class="form-group">
                 <label for="time_limit_minutes">Time Limit (minutes)</label>
                 <input type="number" id="time_limit_minutes" name="time_limit_minutes" required class="form-control">
-                            </div>
+            </div>
             <div class="modal-buttons">
                 <button type="submit" class="submit-btn">Create Race</button>
                 <button type="button" class="cancel-btn" onclick="closeModal()">Cancel</button>
-                        </div>
-                    </form>
-                </div>
             </div>
+        </form>
+    </div>
+</div>
 
 <style>
 .container {
@@ -317,6 +323,28 @@
     border: 2px solid rgba(144, 200, 60, 0.3);
     border-radius: 12px;
     color: #ffffff;
+}
+
+.navigation-buttons {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(144, 200, 60, 0.1);
+    color: #90C83C;
+    padding: 12px 24px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.back-btn:hover {
+    background: rgba(144, 200, 60, 0.2);
+    transform: translateY(-2px);
 }
 </style>
 

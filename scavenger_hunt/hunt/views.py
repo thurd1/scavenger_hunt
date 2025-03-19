@@ -486,59 +486,29 @@ def check_hunt_status(request, lobby_id):
 
 def manage_riddles(request):
     if request.method == 'POST':
-        race_id = request.POST.get('race_id')
+        name = request.POST.get('name')
+        start_location = request.POST.get('start_location')
+        time_limit_minutes = request.POST.get('time_limit_minutes')
         
-        if race_id:
-            race = get_object_or_404(Race, id=race_id)
-            
-            # Handle activation/deactivation
-            if 'activate' in request.POST:
-                race.is_active = True
-                race.save()
-                messages.success(request, f'Race "{race.name}" has been activated.')
-            
-            elif 'deactivate' in request.POST:
-                race.is_active = False
-                race.save()
-                messages.success(request, f'Race "{race.name}" has been deactivated.')
-            
-            # Handle deletion
-            elif 'delete' in request.POST:
-                race.delete()
-                messages.success(request, f'Race "{race.name}" has been deleted.')
-            
+        # Add validation
+        if not name:
+            messages.error(request, 'Race name is required')
             return redirect('manage_riddles')
-        
-        # Handle new race creation
-        race = Race.objects.create(
-            name=request.POST.get('race_name'),
-            created_by=request.user,
-            start_location=request.POST.get('start_location'),
-            time_limit_minutes=int(request.POST.get('time_limit_minutes', 60))
-        )
-
-        # Handle zones and questions
-        zone_count = int(request.POST.get('zoneCount', 0))
-        for i in range(1, zone_count + 1):
-            zone = Zone.objects.create(
-                race=race,
-                number=i
+            
+        try:
+            race = Race.objects.create(
+                name=name,
+                start_location=start_location,
+                time_limit_minutes=time_limit_minutes,
+                created_by=request.user,
+                is_active=True
             )
-            
-            questions = request.POST.getlist(f'zone-{i}-questions[]')
-            answers = request.POST.getlist(f'zone-{i}-answers[]')
-            
-            for q, a in zip(questions, answers):
-                if q.strip() and a.strip():
-                    Question.objects.create(
-                        zone=zone,
-                        question_text=q.strip(),
-                        answer=a.strip()
-                    )
-
-        messages.success(request, f'Race "{race.name}" has been created.')
+            messages.success(request, f'Race "{name}" created successfully!')
+        except Exception as e:
+            messages.error(request, f'Error creating race: {str(e)}')
+        
         return redirect('manage_riddles')
-
+    
     races = Race.objects.all().order_by('-created_at')
     return render(request, 'hunt/manage_riddles.html', {'races': races})
 
