@@ -7,58 +7,90 @@
 <div class="container">
     <div class="join-header">
         <h1>Join a Team</h1>
-        <p class="lobby-code">Lobby Code: {{ lobby.code }}</p>
     </div>
 
-    <div class="teams-section">
-        <h2 class="section-title">Available Teams</h2>
-        <div class="teams-grid" id="teamsGrid">
-            {% for team in teams %}
-            <div class="team-card">
-                <div class="team-header">
-                    <h3>{{ team.name }}</h3>
-                    <span class="member-count">
-                        {{ team.members.count }} member{{ team.members.count|pluralize }}
-                    </span>
-                </div>
-                <div class="team-members">
-                    <ul class="member-list">
-                        {% for member in team.members.all %}
-                            <li>
-                                <i class="fas fa-user"></i>
-                                <span>{{ member.role }}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                    <form method="POST" action="{% url 'join_existing_team' lobby.id %}" class="join-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="team_code" value="{{ team.code }}">
-                        <button type="submit" class="join-team-btn">Join Team</button>
-                    </form>
-                </div>
+    <div class="join-team-form-container">
+        <form method="POST" action="{% url 'join_team' %}">
+            {% csrf_token %}
+            
+            {% if error %}
+            <div class="error-message">
+                {{ error }}
             </div>
-            {% endfor %}
+            {% endif %}
+            
+            <div class="form-group">
+                <label for="playerName">Your Name</label>
+                <input type="text" id="playerName" name="player_name" 
+                    value="{{ request.session.player_name }}" 
+                    placeholder="Enter your name"
+                    class="form-control"
+                    required>
+            </div>
+            
+            <div class="form-group">
+                <label for="teamCode">Team Code</label>
+                <input type="text" id="teamCode" name="team_code" 
+                    placeholder="Enter team code" 
+                    class="form-control"
+                    required>
+            </div>
+            
+            <button type="submit" class="join-team-btn">Join Team</button>
+        </form>
+        
+        <div class="options-section">
+            <p>Don't have a team code?</p>
+            <a href="{% url 'join_game_session' %}" class="back-button">
+                <i class="fas fa-home"></i> Go to Home
+            </a>
         </div>
-    </div>
-
-    <div class="create-team-section">
-        <a href="{% url 'create_team' lobby.id %}" class="create-team-btn">
-            <i class="fas fa-plus"></i> Create New Team
-        </a>
     </div>
 </div>
 
+<!-- Name prompt modal -->
+<div id="namePrompt" class="modal">
+    <div class="modal-content">
+        <h2 style="color: #90C83C">Enter Your Name</h2>
+        <input type="text" id="modalPlayerName" placeholder="Your name" class="form-control">
+        <button onclick="submitName()" class="join-team-btn">Submit</button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (!sessionStorage.getItem('playerName')) {
+        document.getElementById('namePrompt').style.display = 'block';
+    } else {
+        // Pre-fill the name field
+        document.getElementById('playerName').value = sessionStorage.getItem('playerName');
+    }
+});
+
+function submitName() {
+    const name = document.getElementById('modalPlayerName').value.trim();
+    if (name) {
+        sessionStorage.setItem('playerName', name);
+        document.getElementById('namePrompt').style.display = 'none';
+        // Update the form field as well
+        document.getElementById('playerName').value = name;
+    } else {
+        alert('Please enter a valid name');
+    }
+}
+</script>
+
 <style>
 .container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1.5rem;
 }
 
 .join-header {
     text-align: center;
-    margin-bottom: 30px;
-    padding: 20px;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
     background: rgba(33, 37, 41, 0.95);
     border: 2px solid rgba(144, 200, 60, 0.3);
     border-radius: 12px;
@@ -66,122 +98,126 @@
 
 .join-header h1 {
     color: #90C83C;
-    margin-bottom: 10px;
+    margin-bottom: 0;
 }
 
-.lobby-code {
-    display: inline-block;
-    background: rgba(144, 200, 60, 0.1);
-    padding: 8px 16px;
-    border-radius: 6px;
-    color: #90C83C;
-}
-
-.teams-section {
-    margin-bottom: 40px;
-}
-
-.section-title {
-    color: #90C83C;
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.teams-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-}
-
-.team-card {
+.join-team-form-container {
     background: rgba(33, 37, 41, 0.95);
     border: 2px solid rgba(144, 200, 60, 0.3);
     border-radius: 12px;
-    padding: 20px;
-    transition: transform 0.2s;
+    padding: 2rem;
 }
 
-.team-card:hover {
-    transform: translateY(-5px);
+.form-group {
+    margin-bottom: 1.5rem;
 }
 
-.team-header {
-    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
-    padding-bottom: 10px;
-    margin-bottom: 15px;
-}
-
-.team-header h3 {
+.form-group label {
+    display: block;
     color: #90C83C;
-    margin: 0;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
 }
 
-.member-count {
-    color: #ffffff;
-    font-size: 0.9rem;
-    opacity: 0.7;
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 8px;
+    color: white;
+    font-size: 1rem;
 }
 
-.member-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 15px 0;
-}
-
-.member-list li {
-    display: flex;
-    align-items: center;
-    padding: 8px;
-    margin-bottom: 5px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
-}
-
-.member-list li i {
-    color: #90C83C;
-    margin-right: 10px;
-}
-
-.member-list li span {
-    color: #ffffff;
-}
-
-.join-form {
-    text-align: center;
+.form-control:focus {
+    outline: none;
+    border-color: #90C83C;
+    box-shadow: 0 0 0 3px rgba(144, 200, 60, 0.2);
 }
 
 .join-team-btn {
-    background: #90C83C;
-    color: #ffffff;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.2s;
     width: 100%;
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+    border: none;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
 .join-team-btn:hover {
-    background: #7ab32f;
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
 }
 
-.create-team-section {
+.error-message {
+    background-color: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    color: #dc3545;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
     text-align: center;
-    margin-top: 30px;
 }
 
-.create-team-btn {
+.options-section {
+    margin-top: 2rem;
+    text-align: center;
+    border-top: 1px solid rgba(144, 200, 60, 0.2);
+    padding-top: 1rem;
+}
+
+.options-section p {
+    color: white;
+    margin-bottom: 1rem;
+}
+
+.back-button {
     display: inline-block;
+    padding: 0.5rem 1rem;
     background: rgba(144, 200, 60, 0.1);
     color: #90C83C;
-    padding: 15px 30px;
-    border-radius: 8px;
     text-decoration: none;
-    transition: background 0.2s;
+    border-radius: 6px;
+    transition: all 0.2s;
 }
 
-.create-team-btn:hover {
+.back-button:hover {
     background: rgba(144, 200, 60, 0.2);
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+.modal-content {
+    background-color: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    margin: 15% auto;
+    padding: 1.5rem;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.modal-content h2 {
+    margin-bottom: 1.5rem;
+}
+
+.modal-content .form-control {
+    margin-bottom: 1.5rem;
 }
 </style>
 {% endblock %} 

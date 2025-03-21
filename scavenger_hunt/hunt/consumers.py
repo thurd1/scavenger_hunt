@@ -67,8 +67,9 @@ class TeamConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_team_state(self):
-        team = Team.objects.prefetch_related('members').get(id=self.team_id)
-        return [{'id': member.id, 'role': member.role} for member in team.members.all()]
+        team = Team.objects.prefetch_related('team_members').get(id=self.team_id)
+        # Return members as simple string array of roles for easier client handling
+        return list(team.team_members.values_list('role', flat=True))
 
     async def send_team_state(self):
         members = await self.get_team_state()

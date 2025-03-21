@@ -45,6 +45,9 @@
                 </div>
             </div>
         </div>
+
+        <!-- Store session player name if available -->
+        <input type="hidden" id="sessionPlayerName" value="{{ request.session.player_name }}">
     </div>
 </div>
 
@@ -77,8 +80,27 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
-    const playerName = sessionStorage.getItem('playerName');
-    console.log('Player name from session:', playerName);  // Debug log
+    // Check sessionStorage first, then fallback to Django session value
+    let playerName = sessionStorage.getItem('playerName');
+    
+    if (!playerName) {
+        const sessionValue = document.getElementById('sessionPlayerName').value;
+        if (sessionValue) {
+            playerName = sessionValue;
+            // Save to sessionStorage for future use
+            sessionStorage.setItem('playerName', playerName);
+        }
+    }
+    
+    console.log('Player name:', playerName);  // Debug log
+    
+    // If player name isn't available, try to check if we're in members list
+    if (!playerName) {
+        console.log('Members count: {{ members|length }}');
+        {% for member in members %}
+        console.log('Member: {{ member.role }}');
+        {% endfor %}
+    }
     
     const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const teamSocket = new WebSocket(
@@ -118,9 +140,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (members && members.length > 0) {
             members.forEach(member => {
+                // Check if member is an object with role or just a string
+                let memberName = member;
+                if (typeof member === 'object' && member.role) {
+                    memberName = member.role;
+                }
+                
                 const memberHtml = `
                     <div class="member-item mb-2 p-2 bg-dark rounded">
-                        <i class="fas fa-user me-2"></i>${member}
+                        <i class="fas fa-user me-2"></i>${memberName}
                     </div>
                 `;
                 membersList.insertAdjacentHTML('beforeend', memberHtml);

@@ -196,7 +196,32 @@ def broadcast_team_update(team_id):
     )
 
 def join_team(request):
-    """Render the join team page."""
+    """Render the join team page with a simple form to enter a team code."""
+    if request.method == 'POST':
+        team_code = request.POST.get('team_code')
+        player_name = request.session.get('player_name') or request.POST.get('player_name')
+        
+        if not player_name:
+            return render(request, 'hunt/join_team.html', {'error': 'Please enter your name'})
+            
+        if not team_code:
+            return render(request, 'hunt/join_team.html', {'error': 'Please enter a team code'})
+            
+        try:
+            team = Team.objects.get(code=team_code)
+            
+            # Create team member if not exist
+            if not TeamMember.objects.filter(team=team, role=player_name).exists():
+                TeamMember.objects.create(team=team, role=player_name)
+                
+            # Store player name in session
+            request.session['player_name'] = player_name
+            request.session.modified = True
+            
+            return redirect('view_team', team_id=team.id)
+        except Team.DoesNotExist:
+            return render(request, 'hunt/join_team.html', {'error': 'Invalid team code'})
+    
     return render(request, 'hunt/join_team.html')
 
 @require_http_methods(["POST"])
@@ -419,6 +444,12 @@ def view_team(request, team_id):
     print(f"Members count: {members.count()}")
     print("Members:", [f"{m.id}: {m.role}" for m in members])
     
+    # If no player name in session but we're in team view, try to identify user
+    player_name = request.session.get('player_name')
+    if not player_name:
+        # Check if name is in sessionStorage using a hidden field in template
+        pass
+        
     context = {
         'team': team,
         'members': members
