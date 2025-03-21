@@ -264,7 +264,7 @@ def join_existing_team(request):
         return JsonResponse({'success': False, 'error': str(e)})
 
 @require_http_methods(["POST"])
-def create_team(request):
+def create_standalone_team(request):
     """Create a new team with the current player as a member."""
     if request.method == 'POST':
         team_name = request.POST.get('team_name')

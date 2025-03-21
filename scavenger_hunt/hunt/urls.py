@@ -21,6 +21,7 @@ urlpatterns = [
     path('create-lobby/', views.create_lobby, name='create_lobby'),
     path('lobby/<int:lobby_id>/', views.lobby_details, name='lobby_details'),
     path('lobby/<int:lobby_id>/create-team/', views.create_team, name='create_team'),
+    path('create-team/', views.create_standalone_team, name='create_team_standalone'),
     path('team/<int:team_id>/', views.team_dashboard, name='team_dashboard'),
     path('save-player-name/', views.save_player_name, name='save_player_name'),
     path('join-existing-team/', views.join_existing_team, name='join_existing_team'),

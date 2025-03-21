@@ -89,7 +89,7 @@
         <!-- Create team section -->
         <div class="create-team-section">
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
-            <form method="POST" action="{% url 'create_team' %}">
+            <form method="POST" action="{% url 'create_team_standalone' %}">
                 {% csrf_token %}
                 <div class="form-group">
                     <label for="createPlayerName">Your Name</label>
