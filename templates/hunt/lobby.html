@@ -1,0 +1,53 @@
+<div class="container">
+    <div id="namePrompt" class="modal">
+        <div class="modal-content">
+            <h2>Enter Your Name</h2>
+            <input type="text" id="playerName" placeholder="Your name">
+            <button onclick="submitName()">Submit</button>
+        </div>
+    </div>
+    // ... rest of lobby content ...
+</div>
+
+<script>
+// Add this at the start of your JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    if (!sessionStorage.getItem('playerName')) {
+        document.getElementById('namePrompt').style.display = 'block';
+    }
+});
+
+function submitName() {
+    const name = document.getElementById('playerName').value.trim();
+    if (name) {
+        sessionStorage.setItem('playerName', name);
+        document.getElementById('namePrompt').style.display = 'none';
+    } else {
+        alert('Please enter a valid name');
+    }
+}
+</script>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 500px;
+    border-radius: 8px;
+    text-align: center;
+}
+</style> 

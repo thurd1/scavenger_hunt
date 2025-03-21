@@ -14,7 +14,7 @@ from django.http import HttpResponseRedirect
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync  
 import logging
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.utils import timezone
 import random
 import string
@@ -515,8 +515,15 @@ def manage_riddles(request):
 @login_required
 def race_detail(request, race_id):
     race = get_object_or_404(Race, id=race_id)
-    zones = Zone.objects.filter(race=race).order_by('created_at')
-    questions = Question.objects.filter(zone__race=race).order_by('zone__created_at')
+    try:
+        zones = Zone.objects.filter(race=race).order_by('created_at')
+    except:
+        zones = []
+    
+    try:
+        questions = Question.objects.filter(zone__race=race).order_by('zone__created_at')
+    except:
+        questions = []
     
     context = {
         'race': race,
@@ -628,3 +635,27 @@ def add_question(request, race_id):
             messages.error(request, f'Error adding question: {str(e)}')
             
     return redirect('race_detail', race_id=race_id)
+
+@require_http_methods(["POST"])
+def join_team(request):
+    data = json.loads(request.body)
+    team_code = data.get('team_code')
+    player_name = data.get('player_name')
+
+    if not team_code or not player_name:
+        return JsonResponse({'success': False, 'error': 'Missing team code or player name'})
+
+    try:
+        team = Team.objects.get(code=team_code)
+        # Create team member
+        TeamMember.objects.create(team=team, role=player_name)
+        
+        return JsonResponse({
+            'success': True,
+            'redirect_url': reverse('view_team', args=[team.id]),
+            'team_id': team.id
+        })
+    except Team.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Team not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

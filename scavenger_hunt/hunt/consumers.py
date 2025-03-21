@@ -10,8 +10,9 @@ class TeamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.team_id = self.scope['url_route']['kwargs']['team_id']
         self.team_group_name = f'team_{self.team_id}'
-        self.player_name = self.scope.get('session', {}).get('player_name')
-        logger.info(f"WebSocket connecting for team {self.team_id} with player {self.player_name}")
+        # Get player name from session storage via JS
+        self.player_name = None  # Will be set when received from client
+        logger.info(f"WebSocket connecting for team {self.team_id}")
 
         await self.channel_layer.group_add(
             self.team_group_name,
@@ -88,6 +89,30 @@ class TeamConsumer(AsyncWebsocketConsumer):
             'name': team.name,
             'members': list(team.team_members.values_list('role', flat=True))
         }
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        if 'player_name' in data:
+            self.player_name = data['player_name']
+            logger.info(f"Received player name: {self.player_name} for team {self.team_id}")
+            # Create team member
+            await self.create_team_member()
+            # Send updated state to all clients
+            await self.channel_layer.group_send(
+                self.team_group_name,
+                {
+                    'type': 'team_update'
+                }
+            )
+
+    @database_sync_to_async
+    def create_team_member(self):
+        if self.player_name:
+            team = Team.objects.get(id=self.team_id)
+            TeamMember.objects.get_or_create(
+                team=team,
+                role=self.player_name
+            )
 
 class LobbyConsumer(AsyncWebsocketConsumer):
     async def connect(self):
