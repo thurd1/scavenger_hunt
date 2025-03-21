@@ -61,15 +61,15 @@ class TeamConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_team_members(self):
         team = Team.objects.get(id=self.team_id)
-        members = list(team.team_members.all().values_list('role', flat=True))
+        members = list(team.members.all().values_list('role', flat=True))
         logger.info(f"Retrieved team members for team {self.team_id}: {members}")
         return members
 
     @database_sync_to_async
     def get_team_state(self):
-        team = Team.objects.prefetch_related('team_members').get(id=self.team_id)
+        team = Team.objects.prefetch_related('members').get(id=self.team_id)
         # Return members as simple string array of roles for easier client handling
-        return list(team.team_members.values_list('role', flat=True))
+        return list(team.members.values_list('role', flat=True))
 
     async def send_team_state(self):
         members = await self.get_team_state()
@@ -83,11 +83,11 @@ class TeamConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_team_data(self):
-        team = Team.objects.prefetch_related('team_members').get(id=self.team_id)
+        team = Team.objects.prefetch_related('members').get(id=self.team_id)
         return {
             'id': team.id,
             'name': team.name,
-            'members': list(team.team_members.values_list('role', flat=True))
+            'members': list(team.members.values_list('role', flat=True))
         }
 
     async def receive(self, text_data):
@@ -155,11 +155,11 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_available_teams(self):
         """Get all active teams with their members"""
-        teams = Team.objects.all().prefetch_related('team_members')
+        teams = Team.objects.all().prefetch_related('members')
         teams_data = []
         
         for team in teams:
-            members = list(team.team_members.values_list('role', flat=True))
+            members = list(team.members.values_list('role', flat=True))
             teams_data.append({
                 'id': team.id,
                 'name': team.name,
@@ -236,10 +236,10 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_lobby_data(self):
-        lobby = Lobby.objects.prefetch_related('teams__team_members').get(id=self.lobby_id)
+        lobby = Lobby.objects.prefetch_related('teams__members').get(id=self.lobby_id)
         teams = []
         for team in lobby.teams.all():
-            members = list(team.team_members.values_list('role', flat=True))
+            members = list(team.members.values_list('role', flat=True))
             teams.append({
                 'id': team.id,
                 'name': team.name,

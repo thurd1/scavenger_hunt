@@ -20,11 +20,11 @@
                     <div class="team-card">
                         <div class="team-header">
                             <h4>{{ team.name }}</h4>
-                            <span class="member-count">{{ team.team_members.count }} member(s)</span>
+                            <span class="member-count">{{ team.members.count }} member(s)</span>
                         </div>
                         <div class="team-members">
                             <ul class="members-list">
-                                {% for member in team.team_members.all %}
+                                {% for member in team.members.all %}
                                 <li><i class="fas fa-user"></i> {{ member.role }}</li>
                                 {% endfor %}
                             </ul>

@@ -198,7 +198,7 @@ def broadcast_team_update(team_id):
 def join_team(request):
     """Render the join team page with available teams and forms to join or create teams."""
     # Get all active teams
-    teams = Team.objects.all().prefetch_related('team_members')
+    teams = Team.objects.all().prefetch_related('members')
     
     if request.method == 'POST':
         team_code = request.POST.get('team_code')
@@ -339,7 +339,7 @@ def riddle_detail(request):
     return render(request, 'hunt/riddle_list.html')
 
 def team_list(request):
-    teams = Team.objects.all().prefetch_related('team_members')
+    teams = Team.objects.all().prefetch_related('members')
     return render(request, 'hunt/team_list.html', {'teams': teams})
 
 def assign_riddles(request):
@@ -480,8 +480,8 @@ def edit_team(request, team_id):
 
 @login_required
 def view_team(request, team_id):
-    team = get_object_or_404(Team.objects.prefetch_related('team_members'), id=team_id)
-    members = team.team_members.all()
+    team = get_object_or_404(Team.objects.prefetch_related('members'), id=team_id)
+    members = team.members.all()
     
     # Debug prints
     print(f"Team ID: {team.id}")
