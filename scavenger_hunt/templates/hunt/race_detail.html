@@ -132,7 +132,7 @@
     </div>
 
     <div class="back-button-container">
-        <a href="{% url 'manage_riddles' %}" class="back-btn">
+        <a href="{% url 'manage_riddles' %}" class="btn btn-success">
             <i class="fas fa-arrow-left"></i> Back to Races
         </a>
     </div>
@@ -558,6 +558,24 @@
 .back-btn:hover {
     background: linear-gradient(135deg, #7AAF2F, #90C83C);
     transform: translateY(-2px);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+    border: none;
+    display: inline-block;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
 }
 
 .modal {
