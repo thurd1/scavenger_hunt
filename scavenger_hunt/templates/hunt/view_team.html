@@ -77,6 +77,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
+    const playerName = sessionStorage.getItem('playerName');
+    console.log('Player name from session:', playerName);  // Debug log
+    
     const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const teamSocket = new WebSocket(
         ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
@@ -93,6 +96,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     teamSocket.onopen = function(e) {
         console.log('WebSocket connection established');  // Debug log
+        
+        // Send player name when connection is established
+        if (playerName) {
+            console.log('Sending player name:', playerName);  // Debug log
+            teamSocket.send(JSON.stringify({
+                'player_name': playerName
+            }));
+        }
     };
 
     teamSocket.onerror = function(e) {

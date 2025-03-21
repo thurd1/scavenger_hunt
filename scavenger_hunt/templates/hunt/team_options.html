@@ -12,7 +12,7 @@
             <div class="option-box">
                 <h2>Join Existing Team</h2>
                 <p>Have a team code? Enter it below to join your team.</p>
-                <a href="{% url 'join_existing_team' lobby_id=lobby.id %}" class="btn btn-primary">
+                <a href="{% url 'join_team' %}" class="btn btn-primary" onclick="checkPlayerName(event)">
                     <i class="fas fa-users"></i> Join Team
                 </a>
             </div>
@@ -20,13 +20,47 @@
             <div class="option-box">
                 <h2>Create New Team</h2>
                 <p>Start a new team and invite others to join.</p>
-                <a href="{% url 'create_team' lobby_id=lobby.id %}" class="btn btn-success">
+                <a href="{% url 'create_team' lobby_id=lobby.id %}" class="btn btn-success" onclick="checkPlayerName(event)">
                     <i class="fas fa-plus-circle"></i> Create Team
                 </a>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Name prompt modal -->
+<div id="namePrompt" class="modal">
+    <div class="modal-content">
+        <h2 style="color: #90C83C">Enter Your Name</h2>
+        <input type="text" id="playerName" placeholder="Your name" class="input-field">
+        <button onclick="submitName()" class="btn btn-primary">Submit</button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (!sessionStorage.getItem('playerName')) {
+        document.getElementById('namePrompt').style.display = 'block';
+    }
+});
+
+function submitName() {
+    const name = document.getElementById('playerName').value.trim();
+    if (name) {
+        sessionStorage.setItem('playerName', name);
+        document.getElementById('namePrompt').style.display = 'none';
+    } else {
+        alert('Please enter a valid name');
+    }
+}
+
+function checkPlayerName(event) {
+    if (!sessionStorage.getItem('playerName')) {
+        event.preventDefault();
+        document.getElementById('namePrompt').style.display = 'block';
+    }
+}
+</script>
 
 <style>
 .container {
@@ -101,6 +135,44 @@
 
 .btn i {
     margin-right: 0.5rem;
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+.modal-content {
+    background-color: rgba(33, 37, 41, 0.9);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    margin: 15% auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 80%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.modal-content h2 {
+    margin-bottom: 20px;
+}
+
+.input-field {
+    width: 100%;
+    padding: 0.8rem;
+    border-radius: 8px;
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    background-color: rgba(33, 37, 41, 0.5);
+    color: white;
+    font-size: 16px;
+    margin-bottom: 20px;
 }
 </style>
 

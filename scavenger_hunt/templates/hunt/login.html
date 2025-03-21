@@ -5,96 +5,106 @@
 {% block welcome_text %}{% endblock %}
 
 {% block content %}
-    <div class="form-container">
-        <form method="POST" action="{% url 'login' %}" style="color: #90C83C">
+<div class="container">
+    <div class="login-container">
+        <h2>Welcome to Scavenger Hunt</h2>
+        <form method="POST" action="{% url 'login' %}">
             {% csrf_token %}
             <div class="form-group">
-                <label for="id_username">Username:</label>
-                <input type="text" name="username" id="id_username" value="{{ form.username.value }}" class="input-field">
+                <label for="id_username">Username</label>
+                <input type="text" name="username" id="id_username" value="{{ form.username.value }}" class="form-control">
             </div>
-            <br>
             <div class="form-group">
-                <label for="id_password">Password:</label>
-                <input type="password" name="password" id="id_password" value="{{ form.password.value }}" class="input-field">
+                <label for="id_password">Password</label>
+                <input type="password" name="password" id="id_password" value="{{ form.password.value }}" class="form-control">
             </div>
-            <br>
             {% if form.errors %}
                 <div class="alert alert-danger">
                     <strong>Error:</strong> Invalid username or password.
                 </div>
             {% endif %}
-            <button type="submit" class="btn">Login</button>
+            <button type="submit" class="login-btn">Login</button>
         </form>
-        <p style="color: #90C83C">Need an account? <a href="{% url 'register' %}" style="color: #FFA500; font-weight: bold;">Register here</a></p>
     </div>
+</div>
+
 <style>
-.input-field {
+.container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: rgba(33, 37, 41, 0.9);
+}
+
+.login-container {
+    background-color: rgba(33, 37, 41, 0.9);
+    border-radius: 15px;
+    border: 1px solid rgba(144, 200, 60, 0.2);
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
     width: 100%;
-    padding: 14px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    background-color: #fff;
-    font-size: 16px;
-    color: #333;
-    box-sizing: border-box;
-    transition: all 0.3s ease-in-out;
+    max-width: 400px;
 }
 
-.input-field:focus {
-    border-color: #FFA500;
-    outline: none;
-    box-shadow: 0 0 5px rgba(255, 165, 0, 0.7);
-}
-
-.input-field::placeholder {
-    color: #bbb;
-    font-style: italic;
-}
-
-/* Styling for the form group labels */
-.form-group label {
-    font-size: 16px;
-    color: #fff;
-    margin-bottom: 8px;
-    display: block;
-}
-
-/* Styling for the submit button */
-button[type="submit"] {
-    width: 100%;
-    padding: 16px;
-    font-size: 18px;
-    color: white;
-    background: linear-gradient(135deg, #FFA500, #FF7F00);
-    border-radius: 25px;
-    border: none;
-    cursor: pointer;
-    transition: all 0.3s ease-in-out;
-    font-weight: bold;
-}
-
-button[type="submit"]:hover {
-    background: linear-gradient(135deg, #FF7F00, #FF4500);
-    transform: scale(1.05);
-}
-
-/* Styling for the alert message */
-.alert.alert-danger {
-    background-color: #FF6347;
-    color: white;
-    padding: 10px;
-    border-radius: 5px;
-    margin-top: 10px;
-}
-
-/* Styling for links */
-a {
+h2 {
     color: #90C83C;
-    text-decoration: none;
+    margin-bottom: 1.5rem;
+    text-align: center;
 }
 
-a:hover {
-    text-decoration: underline;
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+    color: #90C83C;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid rgba(144, 200, 60, 0.2);
+    border-radius: 8px;
+    background-color: rgba(33, 37, 41, 0.5);
+    color: white;
+    font-size: 1rem;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #90C83C;
+    box-shadow: 0 0 0 2px rgba(144, 200, 60, 0.2);
+}
+
+.login-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: linear-gradient(135deg, #90C83C, #5a8023);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+.login-btn:hover {
+    background: linear-gradient(135deg, #5a8023, #90C83C);
+    transform: translateY(-2px);
+}
+
+.alert-danger {
+    background-color: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
 }
 </style>
 {% endblock %}

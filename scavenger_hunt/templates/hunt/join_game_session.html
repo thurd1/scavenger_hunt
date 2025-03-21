@@ -41,6 +41,33 @@
 </div>
 {% endif %}
 
+<!-- Name prompt modal -->
+<div id="namePrompt" class="modal">
+    <div class="modal-content">
+        <h2 style="color: #90C83C">Enter Your Name</h2>
+        <input type="text" id="playerName" placeholder="Your name" class="input-field">
+        <button onclick="submitName()" class="btn">Submit</button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (!sessionStorage.getItem('playerName')) {
+        document.getElementById('namePrompt').style.display = 'block';
+    }
+});
+
+function submitName() {
+    const name = document.getElementById('playerName').value.trim();
+    if (name) {
+        sessionStorage.setItem('playerName', name);
+        document.getElementById('namePrompt').style.display = 'none';
+    } else {
+        alert('Please enter a valid name');
+    }
+}
+</script>
+
 <style>
 .container {
     max-width: 800px;
@@ -147,6 +174,41 @@ h2 {
 .alert-success {
     background-color: rgba(144, 200, 60, 0.2);
     color: #90C83C;
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+.modal-content {
+    background-color: rgba(33, 37, 41, 0.9);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    margin: 15% auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 80%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.modal-content h2 {
+    margin-bottom: 20px;
+}
+
+.modal-content .input-field {
+    margin-bottom: 20px;
+}
+
+.modal-content .btn {
+    margin-top: 10px;
 }
 </style>
 {% endblock %} 

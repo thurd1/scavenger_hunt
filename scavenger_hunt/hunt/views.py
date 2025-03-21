@@ -195,6 +195,10 @@ def broadcast_team_update(team_id):
         }
     )
 
+def join_team(request):
+    """Render the join team page."""
+    return render(request, 'hunt/join_team.html')
+
 @require_http_methods(["POST"])
 def join_existing_team(request):
     data = json.loads(request.body)
