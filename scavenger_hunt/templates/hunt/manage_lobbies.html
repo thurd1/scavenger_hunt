@@ -44,7 +44,7 @@
     </div>
 
     <div class="back-button-container">
-        <a href="{% url 'leader_dashboard' %}" class="back-btn">
+        <a href="{% url 'leader_dashboard' %}" class="btn btn-success">
             <i class="fas fa-arrow-left"></i> Back to Dashboard
         </a>
     </div>
@@ -220,6 +220,23 @@
 .back-btn:hover {
     background: rgba(144, 200, 60, 0.2);
     transform: translateY(-2px);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
 }
 </style>
 

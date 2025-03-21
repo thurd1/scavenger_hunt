@@ -450,22 +450,31 @@ def delete_lobby(request, lobby_id):
 def delete_team(request, team_id):
     try:
         team = get_object_or_404(Team, id=team_id)
-        lobby_id = team.participating_lobbies.first().id
+        
+        # Get lobby ID if team has any participating lobbies
+        lobby = team.participating_lobbies.first()
+        lobby_id = lobby.id if lobby else None
+        
+        team_name = team.name
         team.delete()
         
-        # Broadcast update
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'lobby_{lobby_id}',
-            {
-                'type': 'lobby_update',
-                'message': 'team_deleted'
-            }
-        )
+        # Broadcast update if lobby exists
+        if lobby_id:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'lobby_{lobby_id}',
+                {
+                    'type': 'lobby_update',
+                    'message': 'team_deleted'
+                }
+            )
         
-        return JsonResponse({'status': 'success'})
+        messages.success(request, f'Team "{team_name}" has been deleted.')
+        return redirect('team_list')
+        
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        messages.error(request, f'Error deleting team: {str(e)}')
+        return redirect('team_list')
 
 def edit_team(request, team_id):
     team = get_object_or_404(Team, id=team_id)
