@@ -8,9 +8,6 @@
             <h2 style="color: #90C83C">Team Details: {{ team.name }}</h2>
             <div>
                 <span class="badge bg-success mb-2 d-block">Team Code: {{ team.code }}</span>
-                <a href="{% url 'team_list' %}" class="btn btn-success">
-                    <i class="fas fa-arrow-left"></i> Back to Teams
-                </a>
             </div>
         </div>
 
@@ -50,6 +47,13 @@
 
         <!-- Store session player name if available -->
         <input type="hidden" id="sessionPlayerName" value="{{ request.session.player_name }}">
+        
+        <!-- Back button moved to bottom and redirects to join_team -->
+        <div class="text-center mt-4">
+            <a href="{% url 'join_team' %}" class="btn btn-success">
+                <i class="fas fa-arrow-left"></i> Back to Teams
+            </a>
+        </div>
     </div>
 </div>
 
@@ -75,6 +79,18 @@
 .member-item:hover {
     transform: translateX(5px);
     background-color: rgba(144, 200, 60, 0.1) !important;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    border: none;
+    padding: 10px 20px;
+    transition: all 0.3s;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
 }
 </style>
 
