@@ -7,7 +7,7 @@
 {% block content %}
 <div class="container">
     <div class="login-container">
-        <h2>Welcome to Scavenger Hunt</h2>
+        <h2>Scavenger Hunt Organizer Dashboard</h2>
         <form method="POST" action="{% url 'login' %}">
             {% csrf_token %}
             <div class="form-group">
@@ -34,7 +34,6 @@
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background-color: rgba(33, 37, 41, 0.9);
 }
 
 .login-container {
