@@ -196,16 +196,25 @@ def broadcast_team_update(team_id):
     )
 
 def join_team(request):
-    """Render the join team page with a simple form to enter a team code."""
+    """Render the join team page with available teams and forms to join or create teams."""
+    # Get all active teams
+    teams = Team.objects.all().prefetch_related('team_members')
+    
     if request.method == 'POST':
         team_code = request.POST.get('team_code')
         player_name = request.session.get('player_name') or request.POST.get('player_name')
         
         if not player_name:
-            return render(request, 'hunt/join_team.html', {'error': 'Please enter your name'})
+            return render(request, 'hunt/join_team.html', {
+                'error': 'Please enter your name',
+                'teams': teams
+            })
             
         if not team_code:
-            return render(request, 'hunt/join_team.html', {'error': 'Please enter a team code'})
+            return render(request, 'hunt/join_team.html', {
+                'error': 'Please enter a team code',
+                'teams': teams
+            })
             
         try:
             team = Team.objects.get(code=team_code)
@@ -220,9 +229,12 @@ def join_team(request):
             
             return redirect('view_team', team_id=team.id)
         except Team.DoesNotExist:
-            return render(request, 'hunt/join_team.html', {'error': 'Invalid team code'})
+            return render(request, 'hunt/join_team.html', {
+                'error': 'Invalid team code',
+                'teams': teams
+            })
     
-    return render(request, 'hunt/join_team.html')
+    return render(request, 'hunt/join_team.html', {'teams': teams})
 
 @require_http_methods(["POST"])
 def join_existing_team(request):
@@ -253,25 +265,58 @@ def join_existing_team(request):
 
 @require_http_methods(["POST"])
 def create_team(request):
-    data = json.loads(request.body)
-    team_name = data.get('team_name')
-    player_name = data.get('player_name')
-
-    if not team_name or not player_name:
-        return JsonResponse({'success': False, 'error': 'Missing team name or player name'})
-
-    try:
-        # Create team with a random code
-        team = Team.objects.create(name=team_name)
-        # Add creator as team member
-        TeamMember.objects.create(team=team, role=player_name)
+    """Create a new team with the current player as a member."""
+    if request.method == 'POST':
+        team_name = request.POST.get('team_name')
+        player_name = request.POST.get('player_name')
         
-        return JsonResponse({
-            'success': True,
-            'redirect_url': reverse('view_team', args=[team.id])
-        })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        if not team_name:
+            messages.error(request, 'Team name is required')
+            return redirect('join_team')
+            
+        if not player_name:
+            messages.error(request, 'Player name is required')
+            return redirect('join_team')
+        
+        try:
+            # Generate a unique code
+            code = generate_code()
+            while Team.objects.filter(code=code).exists():
+                code = generate_code()
+                
+            # Create the team
+            team = Team.objects.create(
+                name=team_name,
+                code=code
+            )
+            
+            # Add player as team member
+            TeamMember.objects.create(
+                team=team,
+                role=player_name
+            )
+            
+            # Store player name in session
+            request.session['player_name'] = player_name
+            request.session.modified = True
+            
+            # Broadcast team update to all clients
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'available_teams',
+                {
+                    'type': 'teams_update'
+                }
+            )
+            
+            messages.success(request, f'Team "{team_name}" created successfully! Your team code is: {code}')
+            return redirect('view_team', team_id=team.id)
+            
+        except Exception as e:
+            messages.error(request, f'Error creating team: {str(e)}')
+            return redirect('join_team')
+            
+    return redirect('join_team')
 
 def register(request):
     if request.method == 'POST':
@@ -539,16 +584,140 @@ def race_detail(request, race_id):
         zones = []
     
     try:
-        questions = Question.objects.filter(zone__race=race).order_by('zone__created_at')
+        questions = Question.objects.filter(zone__race=race).select_related('zone').order_by('zone__created_at')
     except:
         questions = []
+    
+    # Count questions per zone for the template
+    question_counts = {}
+    for question in questions:
+        zone_id = question.zone.id
+        if zone_id in question_counts:
+            question_counts[zone_id] += 1
+        else:
+            question_counts[zone_id] = 1
     
     context = {
         'race': race,
         'zones': zones,
         'questions': questions,
+        'question_counts': question_counts,
     }
     return render(request, 'hunt/race_detail.html', context)
+
+@login_required
+def edit_zone(request, race_id):
+    """Edit an existing zone"""
+    if request.method == 'POST':
+        race = get_object_or_404(Race, id=race_id)
+        zone_id = request.POST.get('zone_id')
+        name = request.POST.get('name')
+        location = request.POST.get('location')
+        
+        try:
+            zone = Zone.objects.get(id=zone_id, race=race)
+            zone.name = name
+            zone.location = location
+            zone.save()
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Zone "{name}" updated successfully!',
+                    'zone': {
+                        'id': zone.id,
+                        'name': zone.name,
+                        'location': zone.location
+                    }
+                })
+            
+            messages.success(request, f'Zone "{name}" updated successfully!')
+        except Zone.DoesNotExist:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Zone not found'
+                })
+            
+            messages.error(request, 'Zone not found')
+        except Exception as e:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                })
+            
+            messages.error(request, f'Error updating zone: {str(e)}')
+            
+    return redirect('race_detail', race_id=race_id)
+
+@login_required
+def delete_zone(request, race_id):
+    """Delete a zone and its associated questions"""
+    if request.method == 'POST':
+        race = get_object_or_404(Race, id=race_id)
+        zone_id = request.POST.get('zone_id')
+        
+        try:
+            zone = Zone.objects.get(id=zone_id, race=race)
+            zone_name = zone.name
+            zone.delete()
+            
+            messages.success(request, f'Zone "{zone_name}" and all its questions have been deleted.')
+        except Zone.DoesNotExist:
+            messages.error(request, 'Zone not found')
+        except Exception as e:
+            messages.error(request, f'Error deleting zone: {str(e)}')
+            
+    return redirect('race_detail', race_id=race_id)
+
+@login_required
+def edit_question(request, race_id):
+    """Edit an existing question"""
+    if request.method == 'POST':
+        race = get_object_or_404(Race, id=race_id)
+        question_id = request.POST.get('question_id')
+        text = request.POST.get('text')
+        answer = request.POST.get('answer')
+        zone_id = request.POST.get('zone')
+        
+        try:
+            # Ensure the zone belongs to the race
+            zone = Zone.objects.get(id=zone_id, race=race)
+            question = Question.objects.get(id=question_id, zone__race=race)
+            
+            question.text = text
+            question.answer = answer
+            question.zone = zone
+            question.save()
+            
+            messages.success(request, 'Question updated successfully!')
+        except Zone.DoesNotExist:
+            messages.error(request, 'Selected zone does not exist')
+        except Question.DoesNotExist:
+            messages.error(request, 'Question not found')
+        except Exception as e:
+            messages.error(request, f'Error updating question: {str(e)}')
+            
+    return redirect('race_detail', race_id=race_id)
+
+@login_required
+def delete_question(request, race_id):
+    """Delete a question"""
+    if request.method == 'POST':
+        question_id = request.POST.get('question_id')
+        
+        try:
+            question = Question.objects.get(id=question_id, zone__race_id=race_id)
+            question.delete()
+            
+            messages.success(request, 'Question deleted successfully!')
+        except Question.DoesNotExist:
+            messages.error(request, 'Question not found')
+        except Exception as e:
+            messages.error(request, f'Error deleting question: {str(e)}')
+            
+    return redirect('race_detail', race_id=race_id)
 
 @login_required
 def delete_race(request, race_id):

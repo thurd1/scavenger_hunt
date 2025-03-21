@@ -6,16 +6,18 @@
     <div class="dashboard-box p-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 style="color: #90C83C">Team Details: {{ team.name }}</h2>
-            <a href="{% url 'team_list' %}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Teams
-            </a>
+            <div>
+                <span class="badge bg-success mb-2 d-block">Team Code: {{ team.code }}</span>
+                <a href="{% url 'team_list' %}" class="btn btn-success">
+                    <i class="fas fa-arrow-left"></i> Back to Teams
+                </a>
+            </div>
         </div>
 
         <div class="row">
             <div class="col-md-6">
                 <div class="info-section mb-4">
                     <h4 style="color: #90C83C">Team Information</h4>
-                    <p><strong style="color: #90C83C">Team Code:</strong> {{ team.code }}</p>
                     <p><strong style="color: #90C83C">Created:</strong> {{ team.created_at|date:"F j, Y" }}</p>
                     <p><strong style="color: #90C83C">Status:</strong>
                         {% if team.is_active %}
@@ -30,7 +32,7 @@
             <div class="col-md-6">
                 <div class="members-section">
                     <h4 style="color: #90C83C">Team Members</h4>
-                    <div class="members-list">
+                    <div class="members-list" id="members-container">
                         {% if members %}
                             {% for member in members %}
                             <div class="member-item mb-2 p-2 bg-dark rounded">
@@ -80,6 +82,8 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
+    const membersContainer = document.getElementById('members-container');
+    
     // Check sessionStorage first, then fallback to Django session value
     let playerName = sessionStorage.getItem('playerName');
     
@@ -94,67 +98,63 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('Player name:', playerName);  // Debug log
     
-    // If player name isn't available, try to check if we're in members list
-    if (!playerName) {
-        console.log('Members count: {{ members|length }}');
-        {% for member in members %}
-        console.log('Member: {{ member.role }}');
-        {% endfor %}
-    }
-    
+    // WebSocket connection setup
     const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const teamSocket = new WebSocket(
         ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
     );
 
-    teamSocket.onmessage = function(e) {
-        console.log('WebSocket message received:', e.data);  // Debug log
-        const data = JSON.parse(e.data);
-        if (data.type === 'team_update') {
-            console.log('Updating members with:', data.members);  // Debug log
-            updateMembers(data.members);
-        }
-    };
-
     teamSocket.onopen = function(e) {
-        console.log('WebSocket connection established');  // Debug log
+        console.log('WebSocket connection established');
         
         // Send player name when connection is established
         if (playerName) {
-            console.log('Sending player name:', playerName);  // Debug log
+            console.log('Sending player name:', playerName);
             teamSocket.send(JSON.stringify({
                 'player_name': playerName
             }));
         }
     };
-
-    teamSocket.onerror = function(e) {
-        console.error('WebSocket error:', e);  // Debug log
+    
+    teamSocket.onmessage = function(e) {
+        console.log('WebSocket message received');
+        const data = JSON.parse(e.data);
+        if (data.type === 'team_update') {
+            updateMembersList(data.members);
+        }
     };
-
-    function updateMembers(members) {
-        const membersList = document.querySelector('.members-list');
-        if (!membersList) return;
-
-        membersList.innerHTML = '';
+    
+    teamSocket.onerror = function(e) {
+        console.error('WebSocket error:', e);
+    };
+    
+    teamSocket.onclose = function(e) {
+        console.log('WebSocket connection closed');
+    };
+    
+    // Function to update the members list
+    function updateMembersList(members) {
+        console.log('Updating members list with:', members);
+        
+        if (!membersContainer) return;
+        
+        // Clear existing content
+        membersContainer.innerHTML = '';
         
         if (members && members.length > 0) {
+            // Add each member to the list
             members.forEach(member => {
-                // Check if member is an object with role or just a string
-                let memberName = member;
-                if (typeof member === 'object' && member.role) {
-                    memberName = member.role;
-                }
-                
-                const memberHtml = `
-                    <div class="member-item mb-2 p-2 bg-dark rounded">
-                        <i class="fas fa-user me-2"></i>${memberName}
-                    </div>
-                `;
-                membersList.insertAdjacentHTML('beforeend', memberHtml);
+                const memberItem = document.createElement('div');
+                memberItem.className = 'member-item mb-2 p-2 bg-dark rounded';
+                memberItem.innerHTML = `<i class="fas fa-user me-2"></i> ${member}`;
+                membersContainer.appendChild(memberItem);
             });
         } else {
-            membersList.innerHTML = '<p class="text-muted">No members in this team yet.</p>';
+            // No members
+            const noMembers = document.createElement('p');
+            noMembers.className = 'text-muted';
+            noMembers.textContent = 'No members in this team yet.';
+            membersContainer.appendChild(noMembers);
         }
     }
 });

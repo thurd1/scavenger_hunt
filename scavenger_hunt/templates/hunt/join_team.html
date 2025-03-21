@@ -10,39 +10,111 @@
     </div>
 
     <div class="join-team-form-container">
-        <form method="POST" action="{% url 'join_team' %}">
-            {% csrf_token %}
+        <!-- Display existing teams with direct join buttons -->
+        <div class="existing-teams-section">
+            <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Available Teams</h3>
             
-            {% if error %}
-            <div class="error-message">
-                {{ error }}
+            <div class="teams-grid" id="teamsContainer">
+                {% if teams %}
+                    {% for team in teams %}
+                    <div class="team-card">
+                        <div class="team-header">
+                            <h4>{{ team.name }}</h4>
+                            <span class="member-count">{{ team.team_members.count }} member(s)</span>
+                        </div>
+                        <div class="team-members">
+                            <ul class="members-list">
+                                {% for member in team.team_members.all %}
+                                <li><i class="fas fa-user"></i> {{ member.role }}</li>
+                                {% endfor %}
+                            </ul>
+                            <form method="POST" action="{% url 'join_team' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="team_code" value="{{ team.code }}">
+                                <input type="hidden" id="playerName{{ team.id }}" name="player_name" value="">
+                                <button type="submit" class="join-btn">Join Team</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-teams-message">
+                        <p>No teams available. Create one below!</p>
+                    </div>
+                {% endif %}
             </div>
-            {% endif %}
-            
-            <div class="form-group">
-                <label for="playerName">Your Name</label>
-                <input type="text" id="playerName" name="player_name" 
-                    value="{{ request.session.player_name }}" 
-                    placeholder="Enter your name"
-                    class="form-control"
-                    required>
-            </div>
-            
-            <div class="form-group">
-                <label for="teamCode">Team Code</label>
-                <input type="text" id="teamCode" name="team_code" 
-                    placeholder="Enter team code" 
-                    class="form-control"
-                    required>
-            </div>
-            
-            <button type="submit" class="join-team-btn">Join Team</button>
-        </form>
+        </div>
+
+        <div class="divider">
+            <span>OR</span>
+        </div>
+
+        <!-- Manual team code entry form -->
+        <div class="manual-code-section">
+            <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Enter Team Code</h3>
+            <form method="POST" action="{% url 'join_team' %}">
+                {% csrf_token %}
+                
+                {% if error %}
+                <div class="error-message">
+                    {{ error }}
+                </div>
+                {% endif %}
+                
+                <div class="form-group">
+                    <label for="playerNameInput">Your Name</label>
+                    <input type="text" id="playerNameInput" name="player_name" 
+                        value="{{ request.session.player_name }}" 
+                        placeholder="Enter your name"
+                        class="form-control"
+                        required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="teamCode">Team Code</label>
+                    <input type="text" id="teamCode" name="team_code" 
+                        placeholder="Enter team code" 
+                        class="form-control"
+                        required>
+                </div>
+                
+                <button type="submit" class="join-team-btn">Join Team</button>
+            </form>
+        </div>
+        
+        <div class="divider">
+            <span>OR</span>
+        </div>
+        
+        <!-- Create team section -->
+        <div class="create-team-section">
+            <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
+            <form method="POST" action="{% url 'create_team' %}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="createPlayerName">Your Name</label>
+                    <input type="text" id="createPlayerName" name="player_name" 
+                        value="{{ request.session.player_name }}" 
+                        placeholder="Enter your name"
+                        class="form-control"
+                        required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="teamName">Team Name</label>
+                    <input type="text" id="teamName" name="team_name" 
+                        placeholder="Enter team name" 
+                        class="form-control"
+                        required>
+                </div>
+                
+                <button type="submit" class="create-team-btn">Create Team</button>
+            </form>
+        </div>
         
         <div class="options-section">
-            <p>Don't have a team code?</p>
             <a href="{% url 'join_game_session' %}" class="back-button">
-                <i class="fas fa-home"></i> Go to Home
+                <i class="fas fa-home"></i> Back to Home
             </a>
         </div>
     </div>
@@ -59,11 +131,88 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    if (!sessionStorage.getItem('playerName')) {
+    // Check for player name in session storage
+    const storedPlayerName = sessionStorage.getItem('playerName');
+    
+    if (!storedPlayerName) {
         document.getElementById('namePrompt').style.display = 'block';
     } else {
-        // Pre-fill the name field
-        document.getElementById('playerName').value = sessionStorage.getItem('playerName');
+        // Pre-fill all player name fields
+        document.getElementById('playerNameInput').value = storedPlayerName;
+        document.getElementById('createPlayerName').value = storedPlayerName;
+        
+        // Fill hidden player name inputs for each team
+        {% if teams %}
+            {% for team in teams %}
+            const playerNameInput{{ team.id }} = document.getElementById('playerName{{ team.id }}');
+            if (playerNameInput{{ team.id }}) {
+                playerNameInput{{ team.id }}.value = storedPlayerName;
+            }
+            {% endfor %}
+        {% endif %}
+    }
+    
+    // Set up WebSocket connection to get real-time updates
+    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const teamsSocket = new WebSocket(
+        ws_scheme + '://' + window.location.host + '/ws/available-teams/'
+    );
+    
+    teamsSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'teams_update') {
+            updateTeams(data.teams);
+        }
+    };
+    
+    teamsSocket.onclose = function(e) {
+        console.error('Teams socket closed unexpectedly');
+    };
+    
+    function updateTeams(teams) {
+        const teamsContainer = document.getElementById('teamsContainer');
+        if (!teamsContainer) return;
+        
+        if (teams && teams.length > 0) {
+            teamsContainer.innerHTML = '';
+            teams.forEach(team => {
+                const teamCard = document.createElement('div');
+                teamCard.className = 'team-card';
+                
+                let membersHtml = '';
+                if (team.members && team.members.length > 0) {
+                    team.members.forEach(member => {
+                        membersHtml += `<li><i class="fas fa-user"></i> ${member}</li>`;
+                    });
+                }
+                
+                teamCard.innerHTML = `
+                    <div class="team-header">
+                        <h4>${team.name}</h4>
+                        <span class="member-count">${team.members ? team.members.length : 0} member(s)</span>
+                    </div>
+                    <div class="team-members">
+                        <ul class="members-list">
+                            ${membersHtml}
+                        </ul>
+                        <form method="POST" action="{% url 'join_team' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="team_code" value="${team.code}">
+                            <input type="hidden" name="player_name" value="${storedPlayerName || ''}">
+                            <button type="submit" class="join-btn">Join Team</button>
+                        </form>
+                    </div>
+                `;
+                
+                teamsContainer.appendChild(teamCard);
+            });
+        } else {
+            teamsContainer.innerHTML = `
+                <div class="no-teams-message">
+                    <p>No teams available. Create one below!</p>
+                </div>
+            `;
+        }
     }
 });
 
@@ -72,8 +221,20 @@ function submitName() {
     if (name) {
         sessionStorage.setItem('playerName', name);
         document.getElementById('namePrompt').style.display = 'none';
-        // Update the form field as well
-        document.getElementById('playerName').value = name;
+        
+        // Update all name fields
+        document.getElementById('playerNameInput').value = name;
+        document.getElementById('createPlayerName').value = name;
+        
+        // Update hidden player name inputs for each team
+        {% if teams %}
+            {% for team in teams %}
+            const playerNameInput{{ team.id }} = document.getElementById('playerName{{ team.id }}');
+            if (playerNameInput{{ team.id }}) {
+                playerNameInput{{ team.id }}.value = name;
+            }
+            {% endfor %}
+        {% endif %}
     } else {
         alert('Please enter a valid name');
     }
@@ -82,7 +243,7 @@ function submitName() {
 
 <style>
 .container {
-    max-width: 800px;
+    max-width: 1000px;
     margin: 2rem auto;
     padding: 1.5rem;
 }
@@ -106,6 +267,104 @@ function submitName() {
     border: 2px solid rgba(144, 200, 60, 0.3);
     border-radius: 12px;
     padding: 2rem;
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 2rem 0;
+    color: #90C83C;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid rgba(144, 200, 60, 0.3);
+}
+
+.divider span {
+    padding: 0 1rem;
+}
+
+.teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.team-card {
+    background: rgba(33, 37, 41, 0.7);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: transform 0.2s;
+}
+
+.team-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.team-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+}
+
+.team-header h4 {
+    color: #90C83C;
+    margin: 0 0 0.5rem 0;
+}
+
+.member-count {
+    font-size: 0.875rem;
+    color: white;
+    opacity: 0.7;
+}
+
+.members-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem 0;
+}
+
+.members-list li {
+    padding: 0.5rem 0;
+    color: white;
+}
+
+.members-list i {
+    color: #90C83C;
+    margin-right: 0.5rem;
+}
+
+.join-btn, .create-team-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+    border: none;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.join-btn:hover, .create-team-btn:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
+}
+
+.no-teams-message {
+    text-align: center;
+    padding: 2rem;
+    background: rgba(33, 37, 41, 0.5);
+    border-radius: 8px;
+    color: white;
 }
 
 .form-group {

@@ -41,4 +41,8 @@ urlpatterns = [
     path('race/create/', views.create_race, name='create_race'),
     path('race/<int:race_id>/add-zone/', views.add_zone, name='add_zone'),
     path('race/<int:race_id>/add-question/', views.add_question, name='add_question'),
+    path('race/<int:race_id>/edit-zone/', views.edit_zone, name='edit_zone'),
+    path('race/<int:race_id>/delete-zone/', views.delete_zone, name='delete_zone'),
+    path('race/<int:race_id>/edit-question/', views.edit_question, name='edit_question'),
+    path('race/<int:race_id>/delete-question/', views.delete_question, name='delete_question'),
 ]

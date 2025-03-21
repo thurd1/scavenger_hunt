@@ -127,6 +127,65 @@ class TeamConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error creating team member: {e}")
 
+
+class AvailableTeamsConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.group_name = 'available_teams'
+        logger.info(f"WebSocket connecting for available teams page")
+
+        # Join the group
+        await self.channel_layer.group_add(
+            self.group_name,
+            self.channel_name
+        )
+        await self.accept()
+        
+        # Send initial state
+        await self.send_teams_state()
+
+    async def disconnect(self, close_code):
+        logger.info(f"WebSocket disconnected from available teams page")
+        
+        # Leave the group
+        await self.channel_layer.group_discard(
+            self.group_name,
+            self.channel_name
+        )
+
+    @database_sync_to_async
+    def get_available_teams(self):
+        """Get all active teams with their members"""
+        teams = Team.objects.all().prefetch_related('team_members')
+        teams_data = []
+        
+        for team in teams:
+            members = list(team.team_members.values_list('role', flat=True))
+            teams_data.append({
+                'id': team.id,
+                'name': team.name,
+                'code': team.code,
+                'members': members
+            })
+        
+        return teams_data
+
+    async def send_teams_state(self):
+        """Send current teams state to the client"""
+        teams = await self.get_available_teams()
+        await self.send(text_data=json.dumps({
+            'type': 'teams_update',
+            'teams': teams
+        }))
+
+    async def teams_update(self, event):
+        """Send teams update to the client"""
+        await self.send_teams_state()
+
+    async def receive(self, text_data):
+        """Handle messages from client - not needed for this consumer"""
+        pass
+
+
 class LobbyConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.lobby_id = self.scope['url_route']['kwargs']['lobby_id']
