@@ -27,11 +27,7 @@
                 </div>
             </div>
         </div>
-
-        <!-- Store session player name if available -->
         <input type="hidden" id="sessionPlayerName" value="{{ request.session.player_name }}">
-        
-        <!-- Back button moved to bottom and redirects to join_team -->
         <div class="text-center mt-4">
             <a href="{% url 'join_team' %}" class="btn btn-success">
                 <i class="fas fa-arrow-left"></i> Back to Teams
@@ -76,8 +72,6 @@
     transform: translateY(-2px);
 }
 </style>
-
-<!-- WebSocket connection -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';

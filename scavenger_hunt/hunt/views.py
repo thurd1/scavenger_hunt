@@ -562,7 +562,6 @@ def manage_riddles(request):
         start_location = request.POST.get('start_location')
         time_limit_minutes = request.POST.get('time_limit_minutes')
         
-        # Add validation
         if not name:
             messages.error(request, 'Race name is required')
             return redirect('manage_riddles')

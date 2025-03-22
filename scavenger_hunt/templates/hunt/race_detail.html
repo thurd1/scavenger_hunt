@@ -751,7 +751,6 @@ textarea.form-control {
     color: #ffffff;
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
     .card-header, .zone-actions {
         flex-direction: column;
@@ -771,7 +770,7 @@ function toggleZone(zoneId) {
     const collapseElement = document.getElementById(`collapse${zoneId}`);
     const iconElement = document.getElementById(`icon${zoneId}`);
     
-    // Toggle the collapse state
+    // Toggles collapse state
     if (collapseElement.classList.contains('show')) {
         collapseElement.classList.remove('show');
         collapseElement.style.height = '0';

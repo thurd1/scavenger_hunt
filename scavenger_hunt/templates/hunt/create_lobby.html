@@ -169,7 +169,6 @@ select.form-control option {
     transform: translateY(-2px);
 }
 
-/* Add animation for form appearance */
 .form-card {
     animation: slideIn 0.3s ease-out;
 }
@@ -185,7 +184,6 @@ select.form-control option {
     }
 }
 
-/* Error message styling */
 .error-message {
     color: #ff4444;
     background: rgba(255, 68, 68, 0.1);
@@ -196,7 +194,6 @@ select.form-control option {
     text-align: center;
 }
 
-/* Success message styling */
 .success-message {
     color: #90C83C;
     background: rgba(144, 200, 60, 0.1);
@@ -207,7 +204,6 @@ select.form-control option {
     text-align: center;
 }
 
-/* Add messages container */
 .messages {
     margin-bottom: 20px;
 }
@@ -233,7 +229,6 @@ select.form-control option {
 </style>
 
 <script>
-// Add form validation if needed
 document.querySelector('.create-lobby-form').addEventListener('submit', function(e) {
     const raceSelect = document.getElementById('race');
     if (!raceSelect.value) {

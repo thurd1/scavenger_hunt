@@ -83,7 +83,6 @@
     </div>
 </div>
 
-<!-- Name prompt modal -->
 <div id="namePrompt" class="modal">
     <div class="modal-content">
         <h2 style="color: #90C83C">Enter Your Name</h2>
@@ -115,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {% endif %}
     }
     
-    // Set up WebSocket connection to get real-time updates
+    // WebSocket connection to get real time updates
     const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const teamsSocket = new WebSocket(
         ws_scheme + '://' + window.location.host + '/ws/available-teams/'
@@ -411,7 +410,6 @@ function submitName() {
     background: rgba(144, 200, 60, 0.2);
 }
 
-/* Modal styles */
 .modal {
     display: none;
     position: fixed;
