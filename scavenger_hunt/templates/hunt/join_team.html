@@ -1,136 +1,289 @@
-{% extends "base.html" %}
-{% load static %}
+{% extends 'base.html' %}
 
 {% block content %}
-<div class="container py-4">
-    <div class="dashboard-box p-4">
-        <div class="welcome-header text-center mb-4">
-            <h1>Welcome, {{ player_name }}!</h1>
-            <p class="lead">Please choose a team to join or create your own team</p>
-        </div>
+<div class="container">
+    <div class="join-header">
+        <h1>Join or Create a Team</h1>
+    </div>
 
-        {% if messages %}
-        <div class="messages mb-4">
-            {% for message in messages %}
-            <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">
-                {{ message }}
+    <div class="join-team-form-container">
+        <!-- Player name input section -->
+        <div class="player-name-section">
+            <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Your Information</h3>
+            <div class="form-group">
+                <label for="playerName">Your Name</label>
+                <input type="text" 
+                       id="playerName" 
+                       name="player_name" 
+                       class="form-control" 
+                       required 
+                       value="{{ request.session.player_name|default:'' }}"
+                       placeholder="Enter your name">
             </div>
-            {% endfor %}
         </div>
-        {% endif %}
 
-        <div class="row">
-            <!-- Create Team Section -->
-            <div class="col-md-6 mb-4">
-                <div class="create-team-section p-4 border rounded">
-                    <h2>Create New Team</h2>
-                    <form id="createTeamForm">
-                        <div class="form-group">
-                            <label for="team_name">Team Name:</label>
-                            <input type="text" id="team_name" class="form-control" required>
+        <!-- Existing teams section -->
+        <div class="existing-teams-section">
+            <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Available Teams</h3>
+            <div id="teamsContainer" class="teams-grid">
+                {% if teams %}
+                    {% for team in teams %}
+                        <div class="team-card">
+                            <div class="team-header">
+                                <h4>{{ team.name }}</h4>
+                                <span class="member-count">{{ team.members.count }} member(s)</span>
+                            </div>
+                            <div class="team-members">
+                                <ul class="members-list">
+                                    {% for member in team.members.all %}
+                                        <li><i class="fas fa-user"></i> {{ member.role }}</li>
+                                    {% endfor %}
+                                </ul>
+                                <button onclick="joinTeam('{{ team.code }}')" class="join-btn">Join Team</button>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-success mt-3 w-100">Create Team</button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Join Team Section -->
-            <div class="col-md-6 mb-4">
-                <div class="join-team-section p-4 border rounded">
-                    <h2>Available Teams</h2>
-                    <div id="teamsContainer">
-                        <!-- Teams will be populated here -->
+                    {% endfor %}
+                {% else %}
+                    <div class="no-teams-message">
+                        <p>No teams available. Create one below!</p>
                     </div>
-                </div>
+                {% endif %}
             </div>
+        </div>
+
+        <div class="divider">
+            <span>OR</span>
+        </div>
+        
+        <!-- Create team section -->
+        <div class="create-team-section">
+            <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
+            <div class="form-group">
+                <label for="teamName">Team Name</label>
+                <input type="text" 
+                       id="teamName" 
+                       name="team_name" 
+                       class="form-control"
+                       required 
+                       placeholder="Enter team name">
+            </div>
+            
+            <button onclick="createTeam()" class="create-team-btn">Create Team</button>
         </div>
     </div>
 </div>
 
-<script>
-let socket;
-const playerName = "{{ player_name }}";
-
-function setupWebSocket() {
-    // Use wss:// if the page is served over HTTPS, ws:// otherwise
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/available-teams/`;
-    
-    socket = new WebSocket(wsUrl);
-    
-    socket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        
-        if (data.type === 'teams_update') {
-            if (data.action === 'join') {
-                // Handle join event
-                const teamCard = document.querySelector(`[data-team-id="${data.team_id}"]`);
-                if (teamCard) {
-                    const membersList = teamCard.querySelector('.team-members');
-                    if (!membersList.textContent.includes(data.player_name)) {
-                        const li = document.createElement('li');
-                        li.textContent = data.player_name;
-                        membersList.appendChild(li);
-                    }
-                }
-            } else if (data.action === 'leave') {
-                // Handle leave event
-                const teamCard = document.querySelector(`[data-team-id="${data.team_id}"]`);
-                if (teamCard) {
-                    const membersList = teamCard.querySelector('.team-members');
-                    const members = membersList.querySelectorAll('li');
-                    members.forEach(member => {
-                        if (member.textContent === data.player_name) {
-                            member.remove();
-                        }
-                    });
-                }
-            } else if (data.teams) {
-                // Full teams update
-                updateTeamsList(data.teams);
-            }
-        }
-    };
-    
-    socket.onclose = function() {
-        console.log('WebSocket closed, attempting to reconnect...');
-        setTimeout(setupWebSocket, 1000);
-    };
+<style>
+.container {
+    max-width: 1000px;
+    margin: 2rem auto;
+    padding: 1.5rem;
 }
 
-function updateTeamsList(teams) {
-    const container = document.getElementById('teamsContainer');
-    if (teams.length === 0) {
-        container.innerHTML = '<p class="text-center">No teams available. Create one!</p>';
+.join-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.join-header h1 {
+    color: #90C83C;
+    margin-bottom: 0;
+}
+
+.join-team-form-container {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 2rem;
+}
+
+.player-name-section {
+    margin-bottom: 2rem;
+}
+
+.existing-teams-section {
+    margin-bottom: 2rem;
+}
+
+.teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.team-card {
+    background: rgba(33, 37, 41, 0.8);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: transform 0.2s;
+}
+
+.team-card:hover {
+    transform: translateY(-2px);
+}
+
+.team-header {
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+.team-header h4 {
+    color: #90C83C;
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.member-count {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+}
+
+.members-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem 0;
+}
+
+.members-list li {
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.members-list i {
+    color: #90C83C;
+}
+
+.join-btn {
+    width: 100%;
+    background: rgba(144, 200, 60, 0.1);
+    color: #90C83C;
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    padding: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.join-btn:hover {
+    background: rgba(144, 200, 60, 0.2);
+    transform: translateY(-2px);
+}
+
+.divider {
+    text-align: center;
+    margin: 2rem 0;
+    position: relative;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 45%;
+    height: 1px;
+    background: rgba(144, 200, 60, 0.3);
+}
+
+.divider::before {
+    left: 0;
+}
+
+.divider::after {
+    right: 0;
+}
+
+.divider span {
+    background: rgba(33, 37, 41, 0.95);
+    color: #90C83C;
+    padding: 0 1rem;
+}
+
+.create-team-section {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    color: #90C83C;
+    margin-bottom: 0.5rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(144, 200, 60, 0.1);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 4px;
+    color: #ffffff;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #90C83C;
+    box-shadow: 0 0 0 2px rgba(144, 200, 60, 0.2);
+}
+
+.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.create-team-btn {
+    width: 100%;
+    background: rgba(144, 200, 60, 0.1);
+    color: #90C83C;
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    padding: 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1rem;
+}
+
+.create-team-btn:hover {
+    background: rgba(144, 200, 60, 0.2);
+    transform: translateY(-2px);
+}
+
+.no-teams-message {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.7);
+    font-style: italic;
+    padding: 2rem;
+    background: rgba(33, 37, 41, 0.8);
+    border-radius: 8px;
+}
+</style>
+
+<script>
+function joinTeam(teamCode) {
+    const playerName = document.getElementById('playerName').value.trim();
+    
+    if (!playerName) {
+        alert('Please enter your name first');
+        document.getElementById('playerName').focus();
         return;
     }
-    
-    let html = '';
-    teams.forEach(team => {
-        const membersList = team.members.map(member => `<li>${member.role}</li>`).join('');
-        html += `
-            <div class="team-card mb-3 p-3 border rounded" data-team-id="${team.id}">
-                <h3 class="team-name">${team.name}</h3>
-                <p class="team-code">Team Code: ${team.code}</p>
-                <div class="team-members-section">
-                    <h4>Members:</h4>
-                    <ul class="team-members">${membersList}</ul>
-                </div>
-                <button class="btn btn-success join-team-btn" onclick="joinTeam('${team.code}')">
-                    Join Team
-                </button>
-            </div>
-        `;
-    });
-    container.innerHTML = html;
-}
 
-function joinTeam(teamCode) {
-    fetch('/join-existing-team/', {
+    fetch('{% url "join_existing_team" %}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
+            'X-CSRFToken': '{{ csrf_token }}'
         },
         body: JSON.stringify({
             team_code: teamCode,
@@ -142,24 +295,36 @@ function joinTeam(teamCode) {
         if (data.success) {
             window.location.href = data.redirect_url;
         } else {
-            alert(data.error);
+            alert(data.error || 'Failed to join team');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while joining the team');
+        alert('Failed to join team');
     });
 }
 
-document.getElementById('createTeamForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const teamName = document.getElementById('team_name').value;
+function createTeam() {
+    const playerName = document.getElementById('playerName').value.trim();
+    const teamName = document.getElementById('teamName').value.trim();
     
-    fetch('/create-team-standalone/', {
+    if (!playerName) {
+        alert('Please enter your name');
+        document.getElementById('playerName').focus();
+        return;
+    }
+    
+    if (!teamName) {
+        alert('Please enter a team name');
+        document.getElementById('teamName').focus();
+        return;
+    }
+
+    fetch('{% url "create_standalone_team" %}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
+            'X-CSRFToken': '{{ csrf_token }}'
         },
         body: JSON.stringify({
             team_name: teamName,
@@ -171,142 +336,13 @@ document.getElementById('createTeamForm').addEventListener('submit', function(e)
         if (data.success) {
             window.location.href = data.redirect_url;
         } else {
-            alert(data.error);
+            alert(data.error || 'Failed to create team');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while creating the team');
+        alert('Failed to create team');
     });
-});
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
 }
-
-// Initialize WebSocket connection when page loads
-setupWebSocket();
 </script>
-
-<style>
-.dashboard-box {
-    background-color: rgba(33, 37, 41, 0.9);
-    border-radius: 15px;
-    border: 1px solid rgba(144, 200, 60, 0.2);
-}
-
-.welcome-header {
-    color: #90C83C;
-    padding: 20px;
-    background: rgba(33, 37, 41, 0.95);
-    border: 2px solid rgba(144, 200, 60, 0.3);
-    border-radius: 12px;
-    margin-bottom: 30px;
-}
-
-.welcome-header h1 {
-    color: #90C83C;
-    font-size: 2.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.welcome-header .lead {
-    color: white;
-    font-size: 1.2rem;
-}
-
-.create-team-section, .join-team-section {
-    background: rgba(33, 37, 41, 0.95);
-    border: 2px solid rgba(144, 200, 60, 0.3) !important;
-}
-
-.create-team-section h2, .join-team-section h2 {
-    color: #90C83C;
-    font-size: 1.8rem;
-    margin-bottom: 1.5rem;
-}
-
-.form-group label {
-    color: #90C83C;
-    font-weight: bold;
-}
-
-input[type="text"] {
-    background-color: rgba(33, 37, 41, 0.7);
-    border: 1px solid rgba(144, 200, 60, 0.3);
-    color: white;
-    padding: 0.8rem;
-}
-
-input[type="text"]:focus {
-    background-color: rgba(33, 37, 41, 0.8);
-    border-color: #90C83C;
-    box-shadow: 0 0 0 0.2rem rgba(144, 200, 60, 0.25);
-    color: white;
-}
-
-.team-card {
-    background: rgba(33, 37, 41, 0.95);
-    border: 1px solid rgba(144, 200, 60, 0.3) !important;
-    margin-bottom: 1rem;
-}
-
-.team-card h3 {
-    color: #90C83C;
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.team-card .team-code {
-    color: #ffffff80;
-    font-size: 0.9rem;
-    margin-bottom: 1rem;
-}
-
-.team-members-section h4 {
-    color: #90C83C;
-    font-size: 1.2rem;
-    margin-bottom: 0.5rem;
-}
-
-.team-members {
-    list-style: none;
-    padding-left: 0;
-    margin-bottom: 1rem;
-    color: white;
-}
-
-.team-members li {
-    padding: 0.3rem 0;
-    border-bottom: 1px solid rgba(144, 200, 60, 0.1);
-}
-
-.btn-success {
-    background: linear-gradient(135deg, #90C83C, #7AAF2F);
-    border: none;
-    transition: all 0.3s ease;
-}
-
-.btn-success:hover {
-    background: linear-gradient(135deg, #7AAF2F, #90C83C);
-    transform: translateY(-2px);
-}
-
-.alert {
-    background: rgba(33, 37, 41, 0.95);
-    border: 1px solid rgba(144, 200, 60, 0.3);
-    color: #90C83C;
-}
-</style>
 {% endblock %} 
