@@ -6,11 +6,9 @@
             <button onclick="submitName()">Submit</button>
         </div>
     </div>
-    // ... rest of lobby content ...
 </div>
 
 <script>
-// Add this at the start of your JavaScript
 document.addEventListener('DOMContentLoaded', function() {
     if (!sessionStorage.getItem('playerName')) {
         document.getElementById('namePrompt').style.display = 'block';

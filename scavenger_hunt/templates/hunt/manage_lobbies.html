@@ -12,7 +12,7 @@
         <div class="lobbies-grid">
             {% for lobby in lobbies %}
             <div class="lobby-card">
-                <button class="delete-lobby-btn" onclick="deleteLobby({{ lobby.id }})">
+                <button class="delete-lobby-btn" onclick="confirmDeleteLobby({{ lobby.id }})">
                     <i class="fas fa-times"></i>
                 </button>
                 <div class="lobby-header">
@@ -47,6 +47,23 @@
         <a href="{% url 'leader_dashboard' %}" class="btn btn-success">
             <i class="fas fa-arrow-left"></i> Back to Dashboard
         </a>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Delete Lobby</h3>
+            <button class="close-btn" onclick="closeDeleteModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete this lobby? This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="delete-confirm-btn" onclick="deleteLobby()">Delete</button>
+            <button class="cancel-btn" onclick="closeDeleteModal()">Cancel</button>
+        </div>
     </div>
 </div>
 
@@ -238,29 +255,120 @@
     color: white;
     text-decoration: none;
 }
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+}
+
+.modal-content {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h3 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.modal-body {
+    color: #ffffff;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.delete-confirm-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.delete-confirm-btn:hover {
+    background: #c82333;
+}
+
+.cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
 </style>
 
 <script>
-function deleteLobby(lobbyId) {
-    if (confirm('Are you sure you want to delete this lobby?')) {
-        fetch(`/lobby/${lobbyId}/delete/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                location.reload();
-            } else {
-                alert('Failed to delete lobby');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
+let lobbyToDelete = null;
+
+function confirmDeleteLobby(lobbyId) {
+    lobbyToDelete = lobbyId;
+    document.getElementById('deleteModal').style.display = 'block';
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+    lobbyToDelete = null;
+}
+
+function deleteLobby() {
+    if (!lobbyToDelete) return;
+    
+    fetch(`/lobby/${lobbyToDelete}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            window.location.reload();
+        } else {
             alert('Failed to delete lobby');
-        });
-    }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to delete lobby');
+    });
 }
 
 function getCookie(name) {
@@ -281,5 +389,12 @@ function getCookie(name) {
 function showCreateForm() {
     window.location.href = "{% url 'create_lobby' %}";
 }
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target.className === 'modal') {
+        event.target.style.display = 'none';
+    }
+};
 </script>
 {% endblock %} 

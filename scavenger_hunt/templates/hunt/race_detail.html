@@ -114,7 +114,7 @@
                                         {% endif %}
                                     {% endfor %}
                                     
-                                    {% if not question_counts|get_item:zone.id %}
+                                    {% if not questions|get_item:zone.id %}
                                     <p class="no-items">No questions for this zone yet</p>
                                     {% endif %}
                                 </div>
@@ -597,7 +597,9 @@
     width: 90%;
     max-width: 500px;
     margin: 50px auto;
-    overflow: hidden;
+    padding: 20px;
+    max-height: 80vh;
+    overflow-y: auto;
 }
 
 .modal-header {
@@ -640,16 +642,19 @@
     border: 1px solid rgba(144, 200, 60, 0.3);
     border-radius: 4px;
     color: #ffffff;
+    box-sizing: border-box;
 }
 
 .form-control:focus {
     outline: none;
     border-color: #90C83C;
+    background-color: rgba(144, 200, 60, 0.2);
 }
 
 textarea.form-control {
     min-height: 100px;
     resize: vertical;
+    font-family: inherit;
 }
 
 .modal-buttons {
