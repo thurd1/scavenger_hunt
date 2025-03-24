@@ -29,15 +29,24 @@ class TeamConsumer(AsyncWebsocketConsumer):
             # Remove the team member
             await self.remove_team_member()
             
-            # Get updated list of team members
-            team_members = await self.get_team_members()
-            
             # Broadcast the update to all connected clients
             await self.channel_layer.group_send(
                 self.team_group_name,
                 {
                     'type': 'team_update',
-                    'members': team_members
+                    'action': 'leave',
+                    'player_name': self.player_name
+                }
+            )
+            
+            # Also broadcast to available teams
+            await self.channel_layer.group_send(
+                'available_teams',
+                {
+                    'type': 'teams_update',
+                    'action': 'leave',
+                    'team_id': self.team_id,
+                    'player_name': self.player_name
                 }
             )
 
@@ -55,13 +64,15 @@ class TeamConsumer(AsyncWebsocketConsumer):
                 role=self.player_name
             ).delete()
             logger.info(f"Removed player {self.player_name} from team {self.team_id}")
+            return True
         except Exception as e:
             logger.error(f"Error removing team member: {e}")
+            return False
 
     @database_sync_to_async
     def get_team_members(self):
         team = Team.objects.get(id=self.team_id)
-        members = list(team.members.all().values_list('role', flat=True))
+        members = list(team.members.all().values('id', 'role'))
         logger.info(f"Retrieved team members for team {self.team_id}: {members}")
         return members
 
@@ -72,14 +83,15 @@ class TeamConsumer(AsyncWebsocketConsumer):
         return list(team.members.values_list('role', flat=True))
 
     async def send_team_state(self):
-        members = await self.get_team_state()
+        members = await self.get_team_members()
         await self.send(text_data=json.dumps({
             'type': 'team_update',
             'members': members
         }))
 
     async def team_update(self, event):
-        await self.send_team_state()
+        # Forward the update to WebSocket
+        await self.send(text_data=json.dumps(event))
 
     @database_sync_to_async
     def get_team_data(self):
@@ -131,9 +143,7 @@ class TeamConsumer(AsyncWebsocketConsumer):
 class AvailableTeamsConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.group_name = 'available_teams'
-        logger.info(f"WebSocket connecting for available teams page")
-
-        # Join the group
+        
         await self.channel_layer.group_add(
             self.group_name,
             self.channel_name
@@ -144,9 +154,6 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         await self.send_teams_state()
 
     async def disconnect(self, close_code):
-        logger.info(f"WebSocket disconnected from available teams page")
-        
-        # Leave the group
         await self.channel_layer.group_discard(
             self.group_name,
             self.channel_name
@@ -154,25 +161,18 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_available_teams(self):
-        """Get all active teams with their members"""
-        teams = Team.objects.all().prefetch_related('members')
+        teams = Team.objects.prefetch_related('members').all()
         teams_data = []
-        
         for team in teams:
-            # Get unique members only
-            members = list(team.members.values_list('role', flat=True).distinct())
             teams_data.append({
                 'id': team.id,
                 'name': team.name,
                 'code': team.code,
-                'members': members,
-                'member_count': len(members)
+                'members': list(team.members.values('id', 'role'))
             })
-        
         return teams_data
 
     async def send_teams_state(self):
-        """Send current teams state to the client"""
         teams = await self.get_available_teams()
         await self.send(text_data=json.dumps({
             'type': 'teams_update',
@@ -180,11 +180,14 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         }))
 
     async def teams_update(self, event):
-        """Send teams update to the client"""
-        await self.send_teams_state()
+        # If we have specific action (join/leave), forward as is
+        if 'action' in event:
+            await self.send(text_data=json.dumps(event))
+        else:
+            # Otherwise send full state
+            await self.send_teams_state()
 
     async def receive(self, text_data):
-        """Handle messages from client"""
         try:
             data = json.loads(text_data)
             if data.get('type') == 'request_update':
