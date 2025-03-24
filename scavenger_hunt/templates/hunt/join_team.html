@@ -284,10 +284,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // WebSocket setup
     const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
     let teamsSocket = new WebSocket(
-        ws_scheme + '://' + window.location.host + '/ws/available-teams'
+        ws_scheme + '://' + window.location.host + '/ws/available-teams/'
     );
     
-    console.log('Attempting WebSocket connection to:', ws_scheme + '://' + window.location.host + '/ws/available-teams');
+    console.log('Attempting WebSocket connection to:', ws_scheme + '://' + window.location.host + '/ws/available-teams/');
     
     teamsSocket.onopen = function(e) {
         console.log('WebSocket connection established');
