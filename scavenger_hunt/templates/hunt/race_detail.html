@@ -884,6 +884,31 @@ textarea.form-control {
         margin-top: 10px;
     }
 }
+
+.modal-content textarea,
+.modal-content input,
+.modal-content select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    background: rgba(144, 200, 60, 0.1);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 4px;
+    color: #90C83C;
+}
+
+.modal-content textarea:focus,
+.modal-content input:focus,
+.modal-content select:focus {
+    outline: none;
+    border-color: #90C83C;
+    box-shadow: 0 0 0 2px rgba(144, 200, 60, 0.2);
+}
+
+.modal-content textarea::placeholder,
+.modal-content input::placeholder {
+    color: rgba(144, 200, 60, 0.5);
+}
 </style>
 
 <script>
