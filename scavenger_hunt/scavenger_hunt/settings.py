@@ -57,12 +57,8 @@ WSGI_APPLICATION = 'scavenger_hunt.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'scavenger_hunt',
-        'USER': 'admin',
-        'PASSWORD': '123',
-        'HOST': 'ec2-35-84-106-252.us-west-2.compute.amazonaws.com',
-        'PORT': '5432',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
