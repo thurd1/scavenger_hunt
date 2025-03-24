@@ -52,7 +52,8 @@
 
 .member-item {
     border: 1px solid rgba(144, 200, 60, 0.2);
-    transition: transform 0.2s;
+    transition: all 0.3s ease;
+    opacity: 1;
 }
 
 .member-item:hover {
@@ -97,23 +98,65 @@ document.addEventListener('DOMContentLoaded', function() {
         ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
     );
 
-    teamSocket.onopen = function(e) {
-        console.log('WebSocket connection established');
-        
-        // Send player name when connection is established
-        if (playerName) {
-            console.log('Sending player name:', playerName);
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    let reconnectTimeout;
+
+    function connect() {
+        teamSocket.onopen = function(e) {
+            console.log('WebSocket connection established');
+            reconnectAttempts = 0;
+            
+            // Send player name and request initial state
+            if (playerName) {
+                console.log('Sending player name:', playerName);
+                teamSocket.send(JSON.stringify({
+                    'action': 'join',
+                    'player_name': playerName
+                }));
+            }
+            
+            // Request initial state
             teamSocket.send(JSON.stringify({
-                'player_name': playerName
+                'action': 'get_state'
             }));
+        };
+    }
+
+    function reconnect() {
+        if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log(`Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
+            reconnectTimeout = setTimeout(() => {
+                teamSocket = new WebSocket(
+                    ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
+                );
+                connect();
+            }, 3000);
         }
-    };
+    }
     
     teamSocket.onmessage = function(e) {
-        console.log('WebSocket message received');
+        console.log('WebSocket message received:', e.data);
         const data = JSON.parse(e.data);
+        
         if (data.type === 'team_update') {
-            updateMembersList(data.members);
+            switch(data.action) {
+                case 'join':
+                    console.log('Member joined:', data.player_name);
+                    addMemberToList(data.player_name);
+                    break;
+                    
+                case 'leave':
+                    console.log('Member left:', data.player_name);
+                    removeMemberFromList(data.player_name);
+                    break;
+                    
+                case 'state':
+                    console.log('Received state update:', data);
+                    updateMembersList(data.members);
+                    break;
+            }
         }
     };
     
@@ -123,7 +166,76 @@ document.addEventListener('DOMContentLoaded', function() {
     
     teamSocket.onclose = function(e) {
         console.log('WebSocket connection closed');
+        
+        // If the player is still on the page, try to reconnect
+        if (playerName) {
+            reconnect();
+        }
+        
+        // Send leave message before the page unloads
+        if (playerName) {
+            const leaveMessage = JSON.stringify({
+                'action': 'leave',
+                'player_name': playerName
+            });
+            
+            // Use sendBeacon for more reliable delivery during page unload
+            navigator.sendBeacon(
+                ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/',
+                leaveMessage
+            );
+        }
     };
+
+    // Handle page unload
+    window.addEventListener('beforeunload', function() {
+        if (playerName && teamSocket.readyState === WebSocket.OPEN) {
+            teamSocket.send(JSON.stringify({
+                'action': 'leave',
+                'player_name': playerName
+            }));
+        }
+    });
+    
+    function addMemberToList(memberName) {
+        // Don't add if already exists
+        if (!document.querySelector(`.member-item[data-member="${memberName}"]`)) {
+            const memberItem = document.createElement('div');
+            memberItem.className = 'member-item mb-2 p-2 bg-dark rounded';
+            memberItem.setAttribute('data-member', memberName);
+            memberItem.innerHTML = `<i class="fas fa-user me-2"></i> ${memberName}`;
+            
+            // Add with animation
+            memberItem.style.opacity = '0';
+            membersContainer.appendChild(memberItem);
+            setTimeout(() => memberItem.style.opacity = '1', 10);
+            
+            // Remove "No members" message if it exists
+            const noMembers = membersContainer.querySelector('.text-muted');
+            if (noMembers) {
+                noMembers.remove();
+            }
+        }
+    }
+    
+    function removeMemberFromList(memberName) {
+        const memberItem = document.querySelector(`.member-item[data-member="${memberName}"]`);
+        if (memberItem) {
+            // Remove with animation
+            memberItem.style.opacity = '0';
+            setTimeout(() => {
+                memberItem.remove();
+                
+                // Add "No members" message if list is empty
+                if (!membersContainer.querySelector('.member-item')) {
+                    const noMembers = document.createElement('p');
+                    noMembers.className = 'text-muted';
+                    noMembers.textContent = 'No members in this team yet.';
+                    membersContainer.appendChild(noMembers);
+                }
+            }, 300);
+        }
+    }
     
     // Function to update the members list
     function updateMembersList(members) {
@@ -139,6 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
             members.forEach(member => {
                 const memberItem = document.createElement('div');
                 memberItem.className = 'member-item mb-2 p-2 bg-dark rounded';
+                memberItem.setAttribute('data-member', member);
                 memberItem.innerHTML = `<i class="fas fa-user me-2"></i> ${member}`;
                 membersContainer.appendChild(memberItem);
             });
@@ -150,6 +263,9 @@ document.addEventListener('DOMContentLoaded', function() {
             membersContainer.appendChild(noMembers);
         }
     }
+
+    // Initial connection
+    connect();
 });
 </script>
 {% endblock %} 

@@ -3,6 +3,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from .models import Team, TeamMember, Lobby
 import logging
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +31,13 @@ class TeamConsumer(AsyncWebsocketConsumer):
             # Remove the team member
             await self.remove_team_member()
             
-            # Get updated list of team members
-            team_members = await self.get_team_members()
-            
             # Broadcast the update to all connected clients
             await self.channel_layer.group_send(
                 self.team_group_name,
                 {
                     'type': 'team_update',
-                    'members': team_members
+                    'action': 'leave',
+                    'player_name': self.player_name
                 }
             )
 
@@ -55,6 +55,15 @@ class TeamConsumer(AsyncWebsocketConsumer):
                 role=self.player_name
             ).delete()
             logger.info(f"Removed player {self.player_name} from team {self.team_id}")
+            
+            # Also broadcast to available teams
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'available_teams',
+                {
+                    'type': 'teams_update'
+                }
+            )
         except Exception as e:
             logger.error(f"Error removing team member: {e}")
 
@@ -68,62 +77,76 @@ class TeamConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_team_state(self):
         team = Team.objects.prefetch_related('members').get(id=self.team_id)
-        # Return members as simple string array of roles for easier client handling
-        return list(team.members.values_list('role', flat=True))
+        return {
+            'members': list(team.members.values_list('role', flat=True)),
+            'team_name': team.name,
+            'team_code': team.code
+        }
 
     async def send_team_state(self):
-        members = await self.get_team_state()
+        state = await self.get_team_state()
         await self.send(text_data=json.dumps({
             'type': 'team_update',
-            'members': members
+            'action': 'state',
+            **state
         }))
 
     async def team_update(self, event):
-        await self.send_team_state()
-
-    @database_sync_to_async
-    def get_team_data(self):
-        team = Team.objects.prefetch_related('members').get(id=self.team_id)
-        return {
-            'id': team.id,
-            'name': team.name,
-            'members': list(team.members.values_list('role', flat=True))
-        }
+        # Forward the update to the WebSocket
+        await self.send(text_data=json.dumps(event))
 
     async def receive(self, text_data):
         try:
             data = json.loads(text_data)
             logger.info(f"WebSocket received data: {data}")
             
-            if 'player_name' in data:
-                self.player_name = data['player_name']
-                logger.info(f"Received player name: {self.player_name} for team {self.team_id}")
+            if data.get('action') == 'join':
+                self.player_name = data.get('player_name')
+                if self.player_name:
+                    await self.create_team_member()
+                    await self.channel_layer.group_send(
+                        self.team_group_name,
+                        {
+                            'type': 'team_update',
+                            'action': 'join',
+                            'player_name': self.player_name
+                        }
+                    )
+            elif data.get('action') == 'leave':
+                if self.player_name:
+                    await self.remove_team_member()
+                    await self.channel_layer.group_send(
+                        self.team_group_name,
+                        {
+                            'type': 'team_update',
+                            'action': 'leave',
+                            'player_name': self.player_name
+                        }
+                    )
+            elif data.get('action') == 'get_state':
+                await self.send_team_state()
                 
-                # Create team member
-                await self.create_team_member()
-                
-                # Send updated state to all clients
-                await self.channel_layer.group_send(
-                    self.team_group_name,
-                    {
-                        'type': 'team_update'
-                    }
-                )
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON received")
         except Exception as e:
-            logger.error(f"Error processing WebSocket message: {e}")
+            logger.error(f"Error in receive: {e}")
 
     @database_sync_to_async
     def create_team_member(self):
         try:
-            if self.player_name:
-                team = Team.objects.get(id=self.team_id)
-                # Check if already exists
-                if not TeamMember.objects.filter(team=team, role=self.player_name).exists():
-                    TeamMember.objects.create(
-                        team=team,
-                        role=self.player_name
-                    )
-                    logger.info(f"Created team member: {self.player_name} for team {self.team_id}")
+            team = Team.objects.get(id=self.team_id)
+            if not TeamMember.objects.filter(team=team, role=self.player_name).exists():
+                TeamMember.objects.create(team=team, role=self.player_name)
+                logger.info(f"Created team member {self.player_name} for team {self.team_id}")
+                
+                # Also broadcast to available teams
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    'available_teams',
+                    {
+                        'type': 'teams_update'
+                    }
+                )
         except Exception as e:
             logger.error(f"Error creating team member: {e}")
 
