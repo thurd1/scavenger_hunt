@@ -28,12 +28,7 @@
                                 <li><i class="fas fa-user"></i> {{ member.role }}</li>
                                 {% endfor %}
                             </ul>
-                            <form method="POST" action="{% url 'join_team' %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="team_code" value="{{ team.code }}">
-                                <input type="hidden" id="playerName{{ team.id }}" name="player_name" value="">
-                                <button type="submit" class="join-btn">Join Team</button>
-                            </form>
+                            <button onclick="joinTeam('{{ team.code }}')" class="join-btn">Join Team</button>
                         </div>
                     </div>
                     {% endfor %}
@@ -52,69 +47,30 @@
         <!-- Create team section -->
         <div class="create-team-section">
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
-            <form method="POST" action="{% url 'create_team_standalone' %}">
-                {% csrf_token %}
-                <div class="form-group">
-                    <label for="createPlayerName">Your Name</label>
-                    <input type="text" id="createPlayerName" name="player_name" 
-                        value="{{ request.session.player_name }}" 
-                        placeholder="Enter your name"
-                        class="form-control"
-                        required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="teamName">Team Name</label>
-                    <input type="text" id="teamName" name="team_name" 
-                        placeholder="Enter team name" 
-                        class="form-control"
-                        required>
-                </div>
-                
-                <button type="submit" class="create-team-btn">Create Team</button>
-            </form>
+            <div class="form-group">
+                <label for="createPlayerName">Your Name</label>
+                <input type="text" id="createPlayerName" name="player_name" 
+                    placeholder="Enter your name"
+                    class="form-control"
+                    required>
+            </div>
+            
+            <div class="form-group">
+                <label for="teamName">Team Name</label>
+                <input type="text" id="teamName" name="team_name" 
+                    placeholder="Enter team name" 
+                    class="form-control"
+                    required>
+            </div>
+            
+            <button onclick="createTeam()" class="create-team-btn">Create Team</button>
         </div>
-        
-        <div class="options-section">
-            <a href="{% url 'join_game_session' %}" class="back-button">
-                <i class="fas fa-home"></i> Back to Home
-            </a>
-        </div>
-    </div>
-</div>
-
-<div id="namePrompt" class="modal">
-    <div class="modal-content">
-        <h2 style="color: #90C83C">Enter Your Name</h2>
-        <input type="text" id="modalPlayerName" placeholder="Your name" class="form-control">
-        <button onclick="submitName()" class="join-team-btn">Submit</button>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Check for player name in session storage
-    const storedPlayerName = sessionStorage.getItem('playerName');
-    
-    if (!storedPlayerName) {
-        document.getElementById('namePrompt').style.display = 'block';
-    } else {
-        // Pre-fill all player name fields
-        document.getElementById('playerNameInput').value = storedPlayerName;
-        document.getElementById('createPlayerName').value = storedPlayerName;
-        
-        // Fill hidden player name inputs for each team
-        {% if teams %}
-            {% for team in teams %}
-            const playerNameInput{{ team.id }} = document.getElementById('playerName{{ team.id }}');
-            if (playerNameInput{{ team.id }}) {
-                playerNameInput{{ team.id }}.value = storedPlayerName;
-            }
-            {% endfor %}
-        {% endif %}
-    }
-    
-    // WebSocket connection to get real time updates
+    // WebSocket connection for real-time updates
     const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const teamsSocket = new WebSocket(
         ws_scheme + '://' + window.location.host + '/ws/available-teams/'
@@ -126,79 +82,120 @@ document.addEventListener('DOMContentLoaded', function() {
             updateTeams(data.teams);
         }
     };
-    
-    teamsSocket.onclose = function(e) {
-        console.error('Teams socket closed unexpectedly');
-    };
-    
-    function updateTeams(teams) {
-        const teamsContainer = document.getElementById('teamsContainer');
-        if (!teamsContainer) return;
-        
-        if (teams && teams.length > 0) {
-            teamsContainer.innerHTML = '';
-            teams.forEach(team => {
-                const teamCard = document.createElement('div');
-                teamCard.className = 'team-card';
-                
-                let membersHtml = '';
-                if (team.members && team.members.length > 0) {
-                    team.members.forEach(member => {
-                        membersHtml += `<li><i class="fas fa-user"></i> ${member}</li>`;
-                    });
-                }
-                
-                teamCard.innerHTML = `
-                    <div class="team-header">
-                        <h4>${team.name}</h4>
-                        <span class="member-count">${team.members ? team.members.length : 0} member(s)</span>
-                    </div>
-                    <div class="team-members">
-                        <ul class="members-list">
-                            ${membersHtml}
-                        </ul>
-                        <form method="POST" action="{% url 'join_team' %}">
-                            {% csrf_token %}
-                            <input type="hidden" name="team_code" value="${team.code}">
-                            <input type="hidden" name="player_name" value="${storedPlayerName || ''}">
-                            <button type="submit" class="join-btn">Join Team</button>
-                        </form>
-                    </div>
-                `;
-                
-                teamsContainer.appendChild(teamCard);
-            });
-        } else {
-            teamsContainer.innerHTML = `
-                <div class="no-teams-message">
-                    <p>No teams available. Create one below!</p>
-                </div>
-            `;
-        }
-    }
 });
 
-function submitName() {
-    const name = document.getElementById('modalPlayerName').value.trim();
-    if (name) {
-        sessionStorage.setItem('playerName', name);
-        document.getElementById('namePrompt').style.display = 'none';
-        
-        // Update all name fields
-        document.getElementById('playerNameInput').value = name;
-        document.getElementById('createPlayerName').value = name;
-        
-        // Update hidden player name inputs for each team
-        {% if teams %}
-            {% for team in teams %}
-            const playerNameInput{{ team.id }} = document.getElementById('playerName{{ team.id }}');
-            if (playerNameInput{{ team.id }}) {
-                playerNameInput{{ team.id }}.value = name;
+function joinTeam(teamCode) {
+    const playerName = document.getElementById('createPlayerName').value.trim();
+    
+    if (!playerName) {
+        alert('Please enter your name first');
+        return;
+    }
+
+    fetch('{% url "join_existing_team" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            team_code: teamCode,
+            player_name: playerName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            sessionStorage.setItem('playerName', playerName);
+            window.location.href = data.redirect_url;
+        } else {
+            alert(data.error || 'Failed to join team');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to join team');
+    });
+}
+
+function createTeam() {
+    const playerName = document.getElementById('createPlayerName').value.trim();
+    const teamName = document.getElementById('teamName').value.trim();
+    
+    if (!playerName) {
+        alert('Please enter your name');
+        return;
+    }
+    
+    if (!teamName) {
+        alert('Please enter a team name');
+        return;
+    }
+
+    fetch('{% url "create_standalone_team" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            team_name: teamName,
+            player_name: playerName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            sessionStorage.setItem('playerName', playerName);
+            window.location.href = data.redirect_url;
+        } else {
+            alert(data.error || 'Failed to create team');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to create team');
+    });
+}
+
+function updateTeams(teams) {
+    const teamsContainer = document.getElementById('teamsContainer');
+    if (!teamsContainer) return;
+    
+    if (teams && teams.length > 0) {
+        teamsContainer.innerHTML = '';
+        teams.forEach(team => {
+            const teamCard = document.createElement('div');
+            teamCard.className = 'team-card';
+            
+            let membersHtml = '';
+            if (team.members && team.members.length > 0) {
+                team.members.forEach(member => {
+                    membersHtml += `<li><i class="fas fa-user"></i> ${member}</li>`;
+                });
             }
-            {% endfor %}
-        {% endif %}
+            
+            teamCard.innerHTML = `
+                <div class="team-header">
+                    <h4>${team.name}</h4>
+                    <span class="member-count">${team.members ? team.members.length : 0} member(s)</span>
+                </div>
+                <div class="team-members">
+                    <ul class="members-list">
+                        ${membersHtml}
+                    </ul>
+                    <button onclick="joinTeam('${team.code}')" class="join-btn">Join Team</button>
+                </div>
+            `;
+            
+            teamsContainer.appendChild(teamCard);
+        });
     } else {
-        alert('Please enter a valid name');
+        teamsContainer.innerHTML = `
+            <div class="no-teams-message">
+                <p>No teams available. Create one below!</p>
+            </div>
+        `;
     }
 }
 </script>
@@ -342,18 +339,18 @@ function submitName() {
 
 .form-control {
     width: 100%;
-    padding: 0.75rem;
-    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    background: rgba(144, 200, 60, 0.1);
     border: 1px solid rgba(144, 200, 60, 0.3);
-    border-radius: 8px;
-    color: white;
-    font-size: 1rem;
+    border-radius: 4px;
+    color: #000000;
+    box-sizing: border-box;
 }
 
 .form-control:focus {
     outline: none;
     border-color: #90C83C;
-    box-shadow: 0 0 0 3px rgba(144, 200, 60, 0.2);
+    background: rgba(144, 200, 60, 0.15);
 }
 
 .join-team-btn {

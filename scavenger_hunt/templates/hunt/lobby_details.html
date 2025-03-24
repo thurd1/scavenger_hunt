@@ -520,6 +520,11 @@
     const lobbyId = {{ lobby.id }};
     let socket;
 
+    // Initialize WebSocket connection when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        connectWebSocket();
+    });
+
     function connectWebSocket() {
         const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
         socket = new WebSocket(
@@ -536,6 +541,14 @@
         socket.onclose = function(e) {
             console.log('Socket closed, attempting to reconnect...');
             setTimeout(connectWebSocket, 1000);
+        };
+
+        socket.onerror = function(e) {
+            console.error('WebSocket error:', e);
+        };
+
+        socket.onopen = function(e) {
+            console.log('WebSocket connection established');
         };
     }
 
@@ -650,8 +663,5 @@
             alert('Failed to delete lobby');
         });
     }
-
-    // Connect when page loads
-    document.addEventListener('DOMContentLoaded', connectWebSocket);
 </script>
 {% endblock %}

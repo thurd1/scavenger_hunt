@@ -19,9 +19,6 @@
             <div class="card-header">
                 <h2>Race Details</h2>
                 <div>
-                    <button class="action-btn start-race-btn" onclick="startRace({{ race.id }})">
-                        <i class="fas fa-play"></i> Start Race
-                    </button>
                     <form method="POST" action="{% url 'toggle_race' race.id %}" style="display: inline;">
                         {% csrf_token %}
                         <button type="submit" class="action-btn {% if race.is_active %}deactivate-btn{% else %}activate-btn{% endif %}">
@@ -744,6 +741,15 @@
     outline: none;
     border-color: #90C83C;
     background: rgba(144, 200, 60, 0.15);
+}
+
+select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2390C83C'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 20px;
+    padding-right: 40px;
 }
 
 textarea.form-control {
