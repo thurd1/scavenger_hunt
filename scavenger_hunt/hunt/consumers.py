@@ -153,22 +153,27 @@ class TeamConsumer(AsyncWebsocketConsumer):
 
 class AvailableTeamsConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        """Handle connection to available teams websocket"""
         self.group_name = 'available_teams'
         self.player_name = self.scope.get('session', {}).get('player_name')
-        logger.info(f"WebSocket connecting for available teams page with player {self.player_name}")
-
+        
+        logger.info(f"WebSocket connecting for available teams with player {self.player_name}")
+        
         # Join the group
         await self.channel_layer.group_add(
             self.group_name,
             self.channel_name
         )
+        
+        # Accept the connection
         await self.accept()
         
         # Send initial state
         await self.send_teams_state()
 
     async def disconnect(self, close_code):
-        logger.info(f"WebSocket disconnected from available teams page for player {self.player_name}")
+        """Handle disconnection"""
+        logger.info(f"WebSocket disconnected from available teams for player {self.player_name}")
         
         if self.player_name:
             # Remove player from all teams they're in
@@ -182,8 +187,8 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def remove_player_from_all_teams(self):
+        """Remove the player from all teams they're in"""
         try:
-            # Delete all team memberships for this player
             deleted_count = TeamMember.objects.filter(role=self.player_name).delete()[0]
             logger.info(f"Removed player {self.player_name} from {deleted_count} teams")
         except Exception as e:
@@ -191,23 +196,21 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_available_teams(self):
-        """Get all active teams with their members"""
+        """Get all teams with their members"""
         teams = Team.objects.all().prefetch_related('members')
         teams_data = []
         
         for team in teams:
-            # Get unique members only
+            # Get unique members
             members = list(TeamMember.objects.filter(team=team).values_list('role', flat=True).distinct())
             
-            # Only include teams that have members
-            if members:
-                teams_data.append({
-                    'id': team.id,
-                    'name': team.name,
-                    'code': team.code,
-                    'members': members,
-                    'member_count': len(members)
-                })
+            teams_data.append({
+                'id': team.id,
+                'name': team.name,
+                'code': team.code,
+                'members': members,
+                'member_count': len(members)
+            })
         
         return teams_data
 
@@ -220,21 +223,24 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         }))
 
     async def teams_update(self, event):
-        """Send teams update to the client"""
+        """Handle teams update event"""
         await self.send_teams_state()
 
     async def receive(self, text_data):
         """Handle messages from client"""
         try:
             data = json.loads(text_data)
+            logger.info(f"Received WebSocket message: {data}")
+            
             if data.get('type') == 'request_update':
                 await self.send_teams_state()
-            elif data.get('action') == 'leave_all_teams':
-                if self.player_name:
-                    await self.remove_player_from_all_teams()
-                    await self.send_teams_state()
+            elif data.get('action') == 'leave_all_teams' and self.player_name:
+                await self.remove_player_from_all_teams()
+                await self.send_teams_state()
         except json.JSONDecodeError:
-            pass
+            logger.error("Invalid JSON received")
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
 
 
 class LobbyConsumer(AsyncWebsocketConsumer):
