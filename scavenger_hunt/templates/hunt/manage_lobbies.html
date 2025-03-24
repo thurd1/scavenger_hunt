@@ -28,6 +28,9 @@
                     </p>
                 </div>
                 <div class="lobby-actions">
+                    <button class="start-race-btn" onclick="startRace({{ lobby.id }})">
+                        <i class="fas fa-play"></i> Start Race
+                    </button>
                     <a href="{% url 'lobby_details' lobby.id %}" class="btn view-btn">
                         <i class="fas fa-eye"></i> View Details
                     </a>
@@ -177,24 +180,48 @@
 }
 
 .lobby-actions {
-    text-align: center;
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.start-race-btn {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+}
+
+.start-race-btn:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
 }
 
 .view-btn {
-    background: #90C83C;
-    color: #ffffff;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
+    background: rgba(144, 200, 60, 0.1);
+    color: #90C83C;
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    padding: 8px 15px;
+    border-radius: 4px;
     text-decoration: none;
-    transition: background 0.2s;
-    display: inline-block;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+    justify-content: center;
 }
 
 .view-btn:hover {
-    background: #7ab32f;
-    color: #ffffff;
-    text-decoration: none;
+    background: rgba(144, 200, 60, 0.2);
+    transform: translateY(-2px);
 }
 
 .create-section {
@@ -396,6 +423,39 @@ function getCookie(name) {
 
 function showCreateForm() {
     window.location.href = "{% url 'create_lobby' %}";
+}
+
+function startRace(lobbyId) {
+    // Create WebSocket connection
+    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const raceSocket = new WebSocket(
+        ws_scheme + '://' + window.location.host + '/ws/race/' + lobbyId + '/'
+    );
+
+    raceSocket.onopen = function(e) {
+        console.log('Race WebSocket connection established');
+        // Send message to start the race
+        raceSocket.send(JSON.stringify({
+            'type': 'start_race',
+            'lobby_id': lobbyId
+        }));
+    };
+
+    raceSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'race_started') {
+            alert('Race has started! Players can now join.');
+        }
+    };
+
+    raceSocket.onerror = function(e) {
+        console.error('WebSocket error:', e);
+        alert('Error starting race. Please try again.');
+    };
+
+    raceSocket.onclose = function(e) {
+        console.log('Race WebSocket connection closed');
+    };
 }
 
 // Close modal when clicking outside
