@@ -19,6 +19,9 @@
             <div class="card-header">
                 <h2>Race Details</h2>
                 <div>
+                    <button class="action-btn start-race-btn" onclick="startRace({{ race.id }})">
+                        <i class="fas fa-play"></i> Start Race
+                    </button>
                     <form method="POST" action="{% url 'toggle_race' race.id %}" style="display: inline;">
                         {% csrf_token %}
                         <button type="submit" class="action-btn {% if race.is_active %}deactivate-btn{% else %}activate-btn{% endif %}">
@@ -730,18 +733,17 @@
 .form-control {
     width: 100%;
     padding: 10px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(144, 200, 60, 0.1);
     border: 1px solid rgba(144, 200, 60, 0.3);
     border-radius: 4px;
     color: #000000;
     box-sizing: border-box;
-    background-color: #ffffff;
 }
 
 .form-control:focus {
     outline: none;
     border-color: #90C83C;
-    background-color: #ffffff;
+    background: rgba(144, 200, 60, 0.15);
 }
 
 textarea.form-control {
@@ -847,6 +849,22 @@ textarea.form-control {
     padding: 20px;
     text-align: center;
     color: #ffffff;
+}
+
+.start-race-btn {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F) !important;
+    color: white !important;
+    border: none !important;
+    padding: 8px 15px !important;
+    border-radius: 4px !important;
+    margin-right: 10px !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+}
+
+.start-race-btn:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C) !important;
+    transform: translateY(-2px) !important;
 }
 
 @media (max-width: 768px) {
@@ -1028,5 +1046,38 @@ window.onclick = function(event) {
         event.target.style.display = 'none';
     }
 };
+
+function startRace(raceId) {
+    // Create WebSocket connection
+    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const raceSocket = new WebSocket(
+        ws_scheme + '://' + window.location.host + '/ws/race/' + raceId + '/'
+    );
+
+    raceSocket.onopen = function(e) {
+        console.log('Race WebSocket connection established');
+        // Send message to start the race
+        raceSocket.send(JSON.stringify({
+            'type': 'start_race',
+            'race_id': raceId
+        }));
+    };
+
+    raceSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'race_started') {
+            alert('Race has started! Players can now join.');
+        }
+    };
+
+    raceSocket.onerror = function(e) {
+        console.error('WebSocket error:', e);
+        alert('Error starting race. Please try again.');
+    };
+
+    raceSocket.onclose = function(e) {
+        console.log('Race WebSocket connection closed');
+    };
+}
 </script>
 {% endblock %}
