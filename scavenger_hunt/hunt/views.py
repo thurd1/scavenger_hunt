@@ -247,56 +247,58 @@ def create_standalone_team(request):
         team_name = data.get('team_name')
         player_name = data.get('player_name')
         
-        if not team_name:
-            return JsonResponse({'success': False, 'error': 'Team name is required'})
+        if not team_name or not player_name:
+            return JsonResponse({
+                'success': False,
+                'error': 'Both team name and player name are required'
+            })
             
-        if not player_name:
-            return JsonResponse({'success': False, 'error': 'Player name is required'})
-        
-        # Check for duplicate team name
+        # Check if team name already exists
         if Team.objects.filter(name=team_name).exists():
-            return JsonResponse({'success': False, 'error': 'A team with this name already exists'})
-        
-        # Generate a unique code
-        code = generate_code()
-        while Team.objects.filter(code=code).exists():
-            code = generate_code()
+            return JsonResponse({
+                'success': False,
+                'error': 'A team with this name already exists'
+            })
             
+        # Generate a unique code
+        while True:
+            code = generate_code()
+            if not Team.objects.filter(code=code).exists():
+                break
+                
         # Create the team
         team = Team.objects.create(
             name=team_name,
             code=code
         )
         
-        # Add player as team member
+        # Create the team member
         TeamMember.objects.create(
             team=team,
             role=player_name
         )
         
-        # Store player name in session
+        # Store in session
+        request.session['team_id'] = team.id
         request.session['player_name'] = player_name
         request.session.modified = True
         
-        # Broadcast team update to all clients
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            'available_teams',
-            {
-                'type': 'teams_update'
-            }
-        )
-        
         return JsonResponse({
             'success': True,
-            'redirect_url': reverse('view_team', args=[team.id]),
-            'message': f'Team "{team_name}" created successfully! Your team code is: {code}'
+            'team_code': team.code,
+            'redirect_url': reverse('view_team', args=[team.id])
         })
-            
+        
     except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'error': 'Invalid JSON data'})
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        })
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 def register(request):
     if request.method == 'POST':
@@ -467,7 +469,6 @@ def edit_team(request, team_id):
         return redirect('team_list')
     return render(request, 'hunt/edit_team.html', {'team': team})
 
-@login_required
 def view_team(request, team_id):
     team = get_object_or_404(Team.objects.prefetch_related('members'), id=team_id)
     members = team.members.all()
