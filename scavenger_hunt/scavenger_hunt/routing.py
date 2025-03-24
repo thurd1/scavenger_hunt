@@ -6,9 +6,9 @@ from hunt.consumers import TeamConsumer, AvailableTeamsConsumer, LobbyConsumer
 from django.core.asgi import get_asgi_application
 
 websocket_urlpatterns = [
-    re_path(r'ws/team/(?P<team_id>\d+)/?$', TeamConsumer.as_asgi()),
-    re_path(r'ws/available-teams/?$', AvailableTeamsConsumer.as_asgi()),
-    re_path(r'ws/lobby/(?P<lobby_id>\d+)/?$', LobbyConsumer.as_asgi()),
+    re_path(r'^ws/team/(?P<team_id>\d+)/?$', TeamConsumer.as_asgi()),
+    re_path(r'^ws/available-teams/?$', AvailableTeamsConsumer.as_asgi()),
+    re_path(r'^ws/lobby/(?P<lobby_id>\d+)/?$', LobbyConsumer.as_asgi()),
 ]
 
 application = ProtocolTypeRouter({
