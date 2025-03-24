@@ -12,6 +12,7 @@ urlpatterns = [
     path('riddles/', views.riddle_list, name='riddle_list'),
     path('riddles/<int:riddle_id>/', views.riddle_detail, name='riddle_detail'),
     path('join-game-session/', views.join_game_session, name='join_game_session'),
+    path('enter-name/', views.enter_name, name='enter_name'),
     path('join-team/', views.join_team, name='join_team'),
     path('register-team/', views.register_team, name='register_team'),
     path('assign-riddles/', views.assign_riddles, name='assign_riddles'),

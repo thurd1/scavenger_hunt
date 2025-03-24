@@ -157,56 +157,41 @@ def join_game_session(request):
         try:
             lobby = Lobby.objects.get(code=lobby_code, is_active=True)
             request.session['lobby_code'] = lobby_code
-            
-            # Instead of redirecting, return a JSON response indicating success
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': True,
-                    'message': 'Valid lobby code',
-                    'lobby_name': lobby.name
-                })
-            
-            return render(request, 'hunt/join_game_session.html', {
-                'show_name_modal': True,
-                'lobby': lobby
-            })
+            return redirect('enter_name')
             
         except Lobby.DoesNotExist:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Invalid lobby code. Please try again.'
-                })
             messages.error(request, 'Invalid lobby code. Please try again.')
+            return render(request, 'hunt/join_game_session.html', {'error': 'Invalid lobby code'})
     
     return render(request, 'hunt/join_game_session.html')
+
+def enter_name(request):
+    """Show the name input page after validating lobby code."""
+    lobby_code = request.session.get('lobby_code')
+    if not lobby_code:
+        return redirect('join_game_session')
+        
+    try:
+        lobby = Lobby.objects.get(code=lobby_code)
+        return render(request, 'hunt/enter_name.html', {'lobby': lobby})
+    except Lobby.DoesNotExist:
+        messages.error(request, 'Invalid lobby code')
+        return redirect('join_game_session')
 
 def save_player_name(request):
     if request.method == 'POST':
         player_name = request.POST.get('player_name')
         
         if not player_name:
-            return JsonResponse({
-                'success': False,
-                'error': 'Please enter your name'
-            })
+            messages.error(request, 'Please enter your name')
+            return redirect('enter_name')
         
         request.session['player_name'] = player_name
         request.session.modified = True
         
-        lobby_code = request.session.get('lobby_code')
-        if lobby_code:
-            lobby = get_object_or_404(Lobby, code=lobby_code)
-            return JsonResponse({
-                'success': True,
-                'redirect_url': reverse('join_team'),
-                'player_name': player_name
-            })
-        
-        return JsonResponse({
-            'success': False,
-            'error': 'No active lobby found'
-        })
+        return redirect('join_team')
+    
+    return redirect('enter_name')
 
 def broadcast_team_update(team_id):
     channel_layer = get_channel_layer()

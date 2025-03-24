@@ -16,7 +16,8 @@
         {% endif %}
 
         <div class="join-form-container">
-            <form id="joinGameForm" class="text-center">
+            <form id="joinGameForm" method="POST" class="text-center">
+                {% csrf_token %}
                 <div class="form-group">
                     <label for="lobby_code">Game Code:</label>
                     <input type="text" 
@@ -31,109 +32,6 @@
         </div>
     </div>
 </div>
-
-<!-- Name Input Modal -->
-<div class="modal fade" id="nameModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Enter Your Name</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="nameForm">
-                    <div class="form-group">
-                        <label for="player_name">Your Name:</label>
-                        <input type="text" 
-                               id="player_name" 
-                               name="player_name" 
-                               class="form-control" 
-                               required 
-                               placeholder="Enter your name">
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-success" onclick="submitPlayerName()">Continue</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-document.getElementById('joinGameForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const lobbyCode = document.getElementById('lobby_code').value;
-    
-    fetch('/join-game-session/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken'),
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({
-            lobby_code: lobbyCode
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Show the name input modal
-            const nameModal = new bootstrap.Modal(document.getElementById('nameModal'));
-            nameModal.show();
-        } else {
-            alert(data.error || 'Invalid game code');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while joining the game');
-    });
-});
-
-function submitPlayerName() {
-    const playerName = document.getElementById('player_name').value;
-    
-    fetch('/save-player-name/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            player_name: playerName
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.href = data.redirect_url;
-        } else {
-            alert(data.error || 'Please enter your name');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while saving your name');
-    });
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-</script>
 
 <style>
 .dashboard-box {
@@ -214,28 +112,6 @@ input[type="text"]:focus {
 .alert {
     background: rgba(33, 37, 41, 0.95);
     border: 1px solid rgba(144, 200, 60, 0.3);
-    color: #90C83C;
-}
-
-/* Modal Styling */
-.modal-content {
-    background-color: rgba(33, 37, 41, 0.95);
-    border: 2px solid rgba(144, 200, 60, 0.3);
-}
-
-.modal-header {
-    border-bottom: 1px solid rgba(144, 200, 60, 0.3);
-}
-
-.modal-header .modal-title {
-    color: #90C83C;
-}
-
-.modal-footer {
-    border-top: 1px solid rgba(144, 200, 60, 0.3);
-}
-
-.btn-close {
     color: #90C83C;
 }
 </style>
