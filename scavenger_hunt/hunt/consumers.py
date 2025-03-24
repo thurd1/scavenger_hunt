@@ -159,12 +159,14 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         teams_data = []
         
         for team in teams:
-            members = list(team.members.values_list('role', flat=True))
+            # Get unique members only
+            members = list(team.members.values_list('role', flat=True).distinct())
             teams_data.append({
                 'id': team.id,
                 'name': team.name,
                 'code': team.code,
-                'members': members
+                'members': members,
+                'member_count': len(members)
             })
         
         return teams_data
@@ -182,8 +184,13 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         await self.send_teams_state()
 
     async def receive(self, text_data):
-        """Handle messages from client - not needed for this consumer"""
-        pass
+        """Handle messages from client"""
+        try:
+            data = json.loads(text_data)
+            if data.get('type') == 'request_update':
+                await self.send_teams_state()
+        except json.JSONDecodeError:
+            pass
 
 
 class LobbyConsumer(AsyncWebsocketConsumer):

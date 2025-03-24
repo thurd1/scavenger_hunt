@@ -261,10 +261,12 @@
 </style>
 
 <script>
+let teamsSocket;
+
 document.addEventListener('DOMContentLoaded', function() {
     // WebSocket connection for real-time updates
     const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const teamsSocket = new WebSocket(
+    teamsSocket = new WebSocket(
         ws_scheme + '://' + window.location.host + '/ws/available-teams/'
     );
     
@@ -274,7 +276,61 @@ document.addEventListener('DOMContentLoaded', function() {
             updateTeams(data.teams);
         }
     };
+
+    teamsSocket.onopen = function() {
+        // Request initial state
+        teamsSocket.send(JSON.stringify({
+            type: 'request_update'
+        }));
+    };
+
+    teamsSocket.onclose = function() {
+        console.log('WebSocket connection closed');
+        // Try to reconnect after 5 seconds
+        setTimeout(connectWebSocket, 5000);
+    };
 });
+
+function updateTeams(teams) {
+    const teamsContainer = document.getElementById('teamsContainer');
+    if (!teamsContainer) return;
+    
+    if (teams && teams.length > 0) {
+        teamsContainer.innerHTML = '';
+        teams.forEach(team => {
+            const teamCard = document.createElement('div');
+            teamCard.className = 'team-card';
+            
+            let membersHtml = '';
+            if (team.members && team.members.length > 0) {
+                team.members.forEach(member => {
+                    membersHtml += `<li><i class="fas fa-user"></i> ${member}</li>`;
+                });
+            }
+            
+            teamCard.innerHTML = `
+                <div class="team-header">
+                    <h4>${team.name}</h4>
+                    <span class="member-count">${team.member_count} member(s)</span>
+                </div>
+                <div class="team-members">
+                    <ul class="members-list">
+                        ${membersHtml}
+                    </ul>
+                    <button onclick="joinTeam('${team.code}')" class="join-btn">Join Team</button>
+                </div>
+            `;
+            
+            teamsContainer.appendChild(teamCard);
+        });
+    } else {
+        teamsContainer.innerHTML = `
+            <div class="no-teams-message">
+                <p>No teams available. Create one below!</p>
+            </div>
+        `;
+    }
+}
 
 function joinTeam(teamCode) {
     const playerName = document.getElementById('createPlayerName').value.trim();
@@ -348,47 +404,6 @@ function createTeam() {
         console.error('Error:', error);
         alert('Failed to create team');
     });
-}
-
-function updateTeams(teams) {
-    const teamsContainer = document.getElementById('teamsContainer');
-    if (!teamsContainer) return;
-    
-    if (teams && teams.length > 0) {
-        teamsContainer.innerHTML = '';
-        teams.forEach(team => {
-            const teamCard = document.createElement('div');
-            teamCard.className = 'team-card';
-            
-            let membersHtml = '';
-            if (team.members && team.members.length > 0) {
-                team.members.forEach(member => {
-                    membersHtml += `<li><i class="fas fa-user"></i> ${member}</li>`;
-                });
-            }
-            
-            teamCard.innerHTML = `
-                <div class="team-header">
-                    <h4>${team.name}</h4>
-                    <span class="member-count">${team.members ? team.members.length : 0} member(s)</span>
-                </div>
-                <div class="team-members">
-                    <ul class="members-list">
-                        ${membersHtml}
-                    </ul>
-                    <button onclick="joinTeam('${team.code}')" class="join-btn">Join Team</button>
-                </div>
-            `;
-            
-            teamsContainer.appendChild(teamCard);
-        });
-    } else {
-        teamsContainer.innerHTML = `
-            <div class="no-teams-message">
-                <p>No teams available. Create one below!</p>
-            </div>
-        `;
-    }
 }
 </script>
 {% endblock %} 

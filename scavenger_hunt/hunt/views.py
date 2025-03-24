@@ -277,6 +277,10 @@ def create_standalone_team(request):
         if not player_name:
             return JsonResponse({'success': False, 'error': 'Player name is required'})
         
+        # Check for duplicate team name
+        if Team.objects.filter(name=team_name).exists():
+            return JsonResponse({'success': False, 'error': 'A team with this name already exists'})
+        
         # Generate a unique code
         code = generate_code()
         while Team.objects.filter(code=code).exists():
@@ -492,18 +496,6 @@ def view_team(request, team_id):
     team = get_object_or_404(Team.objects.prefetch_related('members'), id=team_id)
     members = team.members.all()
     
-    # Debug prints
-    print(f"Team ID: {team.id}")
-    print(f"Team Name: {team.name}")
-    print(f"Members count: {members.count()}")
-    print("Members:", [f"{m.id}: {m.role}" for m in members])
-    
-    # If no player name in session but we're in team view, try to identify user
-    player_name = request.session.get('player_name')
-    if not player_name:
-        # Check if name is in sessionStorage using a hidden field in template
-        pass
-        
     context = {
         'team': team,
         'members': members

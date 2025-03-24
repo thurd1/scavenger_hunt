@@ -33,13 +33,15 @@ class Lobby(models.Model):
         return f"Lobby {self.code}"
     
 class Team(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
     code = models.CharField(max_length=6, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         if not self.code:
             code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            while Team.objects.filter(code=code).exists():
+                code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
             self.code = code
         super().save(*args, **kwargs)
 
@@ -92,6 +94,9 @@ class CustomUser(AbstractUser):
 class TeamMember(models.Model):
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='members')
     role = models.CharField(max_length=100)
+
+    class Meta:
+        unique_together = ('team', 'role')  # Prevent duplicate members in a team
 
     def __str__(self):
         return f"{self.role} - {self.team.name}"
