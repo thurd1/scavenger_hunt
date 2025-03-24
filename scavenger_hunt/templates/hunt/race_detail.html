@@ -367,11 +367,17 @@
     padding: 15px 20px;
     cursor: pointer;
     background: rgba(144, 200, 60, 0.05);
-    transition: background 0.2s;
+    transition: all 0.2s;
+    position: relative;
 }
 
 .accordion-header:hover {
     background: rgba(144, 200, 60, 0.1);
+}
+
+.accordion-header:hover .zone-actions {
+    opacity: 1;
+    transform: translateX(0);
 }
 
 .zone-title {
@@ -380,6 +386,8 @@
     gap: 10px;
     color: #ffffff;
     font-weight: 500;
+    flex: 1;
+    padding-right: 100px;
 }
 
 .zone-icon {
@@ -396,32 +404,55 @@
 }
 
 .zone-actions {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%) translateX(10px);
     display: flex;
-    align-items: center;
-    gap: 10px;
+    gap: 12px;
+    opacity: 0;
+    transition: all 0.3s ease;
+    background: rgba(33, 37, 41, 0.8);
+    padding: 5px;
+    border-radius: 20px;
 }
 
-.edit-btn, .delete-btn {
+.zone-actions button {
     background: none;
     border: none;
     cursor: pointer;
-    transition: transform 0.2s;
-    padding: 5px;
+    padding: 8px;
+    border-radius: 50%;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 35px;
+    height: 35px;
 }
 
-.edit-btn {
+.zone-actions .edit-btn {
     color: #17a2b8;
+    background: rgba(23, 162, 184, 0.1);
 }
 
-.delete-btn {
+.zone-actions .delete-btn {
     color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
 }
 
-.edit-btn:hover, .delete-btn:hover {
-    transform: scale(1.2);
+.zone-actions .edit-btn:hover {
+    transform: scale(1.1);
+    background: rgba(23, 162, 184, 0.2);
+}
+
+.zone-actions .delete-btn:hover {
+    transform: scale(1.1);
+    background: rgba(220, 53, 69, 0.2);
 }
 
 .toggle-icon {
+    margin-left: 10px;
     color: #90C83C;
     transition: transform 0.3s;
 }
@@ -650,7 +681,7 @@
     max-height: 80vh;
     overflow-y: auto;
     position: relative;
-    left: -25%;
+    transform: translateX(-25%);
 }
 
 .modal-header {
