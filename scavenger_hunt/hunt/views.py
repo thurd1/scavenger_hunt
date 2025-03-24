@@ -200,41 +200,13 @@ def join_team(request):
     # Get all active teams
     teams = Team.objects.all().prefetch_related('members')
     
-    if request.method == 'POST':
-        team_code = request.POST.get('team_code')
-        player_name = request.session.get('player_name') or request.POST.get('player_name')
-        
-        if not player_name:
-            return render(request, 'hunt/join_team.html', {
-                'error': 'Please enter your name',
-                'teams': teams
-            })
-            
-        if not team_code:
-            return render(request, 'hunt/join_team.html', {
-                'error': 'Please enter a team code',
-                'teams': teams
-            })
-            
-        try:
-            team = Team.objects.get(code=team_code)
-            
-            # Create team member if not exist
-            if not TeamMember.objects.filter(team=team, role=player_name).exists():
-                TeamMember.objects.create(team=team, role=player_name)
-                
-            # Store player name in session
-            request.session['player_name'] = player_name
-            request.session.modified = True
-            
-            return redirect('view_team', team_id=team.id)
-        except Team.DoesNotExist:
-            return render(request, 'hunt/join_team.html', {
-                'error': 'Invalid team code',
-                'teams': teams
-            })
+    # Get player name from session
+    player_name = request.session.get('player_name', '')
     
-    return render(request, 'hunt/join_team.html', {'teams': teams})
+    return render(request, 'hunt/join_team.html', {
+        'teams': teams,
+        'player_name': player_name
+    })
 
 @require_http_methods(["POST"])
 def join_existing_team(request):
@@ -253,6 +225,10 @@ def join_existing_team(request):
             
         # Create team member
         TeamMember.objects.create(team=team, role=player_name)
+        
+        # Store player name in session
+        request.session['player_name'] = player_name
+        request.session.modified = True
         
         return JsonResponse({
             'success': True,
