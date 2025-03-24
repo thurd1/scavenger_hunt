@@ -266,57 +266,57 @@ def join_existing_team(request):
 @require_http_methods(["POST"])
 def create_standalone_team(request):
     """Create a new team with the current player as a member."""
-    if request.method == 'POST':
-        team_name = request.POST.get('team_name')
-        player_name = request.POST.get('player_name')
+    try:
+        data = json.loads(request.body)
+        team_name = data.get('team_name')
+        player_name = data.get('player_name')
         
         if not team_name:
-            messages.error(request, 'Team name is required')
-            return redirect('join_team')
+            return JsonResponse({'success': False, 'error': 'Team name is required'})
             
         if not player_name:
-            messages.error(request, 'Player name is required')
-            return redirect('join_team')
+            return JsonResponse({'success': False, 'error': 'Player name is required'})
         
-        try:
-            # Generate a unique code
+        # Generate a unique code
+        code = generate_code()
+        while Team.objects.filter(code=code).exists():
             code = generate_code()
-            while Team.objects.filter(code=code).exists():
-                code = generate_code()
-                
-            # Create the team
-            team = Team.objects.create(
-                name=team_name,
-                code=code
-            )
             
-            # Add player as team member
-            TeamMember.objects.create(
-                team=team,
-                role=player_name
-            )
+        # Create the team
+        team = Team.objects.create(
+            name=team_name,
+            code=code
+        )
+        
+        # Add player as team member
+        TeamMember.objects.create(
+            team=team,
+            role=player_name
+        )
+        
+        # Store player name in session
+        request.session['player_name'] = player_name
+        request.session.modified = True
+        
+        # Broadcast team update to all clients
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            'available_teams',
+            {
+                'type': 'teams_update'
+            }
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'redirect_url': reverse('view_team', args=[team.id]),
+            'message': f'Team "{team_name}" created successfully! Your team code is: {code}'
+        })
             
-            # Store player name in session
-            request.session['player_name'] = player_name
-            request.session.modified = True
-            
-            # Broadcast team update to all clients
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                'available_teams',
-                {
-                    'type': 'teams_update'
-                }
-            )
-            
-            messages.success(request, f'Team "{team_name}" created successfully! Your team code is: {code}')
-            return redirect('view_team', team_id=team.id)
-            
-        except Exception as e:
-            messages.error(request, f'Error creating team: {str(e)}')
-            return redirect('join_team')
-            
-    return redirect('join_team')
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON data'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 def register(request):
     if request.method == 'POST':
