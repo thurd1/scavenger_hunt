@@ -154,7 +154,8 @@ class TeamConsumer(AsyncWebsocketConsumer):
 class AvailableTeamsConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.group_name = 'available_teams'
-        logger.info(f"WebSocket connecting for available teams page")
+        self.player_name = self.scope.get('session', {}).get('player_name')
+        logger.info(f"WebSocket connecting for available teams page with player {self.player_name}")
 
         # Join the group
         await self.channel_layer.group_add(
@@ -167,13 +168,26 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         await self.send_teams_state()
 
     async def disconnect(self, close_code):
-        logger.info(f"WebSocket disconnected from available teams page")
+        logger.info(f"WebSocket disconnected from available teams page for player {self.player_name}")
+        
+        if self.player_name:
+            # Remove player from all teams they're in
+            await self.remove_player_from_all_teams()
         
         # Leave the group
         await self.channel_layer.group_discard(
             self.group_name,
             self.channel_name
         )
+
+    @database_sync_to_async
+    def remove_player_from_all_teams(self):
+        try:
+            # Delete all team memberships for this player
+            deleted_count = TeamMember.objects.filter(role=self.player_name).delete()[0]
+            logger.info(f"Removed player {self.player_name} from {deleted_count} teams")
+        except Exception as e:
+            logger.error(f"Error removing player from teams: {e}")
 
     @database_sync_to_async
     def get_available_teams(self):
@@ -183,14 +197,17 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         
         for team in teams:
             # Get unique members only
-            members = list(team.members.values_list('role', flat=True).distinct())
-            teams_data.append({
-                'id': team.id,
-                'name': team.name,
-                'code': team.code,
-                'members': members,
-                'member_count': len(members)
-            })
+            members = list(TeamMember.objects.filter(team=team).values_list('role', flat=True).distinct())
+            
+            # Only include teams that have members
+            if members:
+                teams_data.append({
+                    'id': team.id,
+                    'name': team.name,
+                    'code': team.code,
+                    'members': members,
+                    'member_count': len(members)
+                })
         
         return teams_data
 
@@ -212,6 +229,10 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
             data = json.loads(text_data)
             if data.get('type') == 'request_update':
                 await self.send_teams_state()
+            elif data.get('action') == 'leave_all_teams':
+                if self.player_name:
+                    await self.remove_player_from_all_teams()
+                    await self.send_teams_state()
         except json.JSONDecodeError:
             pass
 

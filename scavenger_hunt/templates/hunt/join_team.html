@@ -270,79 +270,183 @@
 </style>
 
 <script>
-function joinTeam(teamCode) {
-    const playerName = document.getElementById('playerName').value.trim();
+document.addEventListener('DOMContentLoaded', function() {
+    const teamsContainer = document.getElementById('teamsContainer');
+    const playerNameInput = document.getElementById('playerName');
     
-    if (!playerName) {
-        alert('Please enter your name first');
-        document.getElementById('playerName').focus();
-        return;
+    // Get player name from session storage or input
+    let playerName = sessionStorage.getItem('playerName');
+    if (!playerName && playerNameInput.value) {
+        playerName = playerNameInput.value;
+        sessionStorage.setItem('playerName', playerName);
     }
-
-    fetch('{% url "join_existing_team" %}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: JSON.stringify({
-            team_code: teamCode,
-            player_name: playerName
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.href = data.redirect_url;
-        } else {
-            alert(data.error || 'Failed to join team');
+    
+    // WebSocket setup
+    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    let teamsSocket = new WebSocket(
+        ws_scheme + '://' + window.location.host + '/ws/available_teams/'
+    );
+    
+    teamsSocket.onopen = function(e) {
+        console.log('WebSocket connection established');
+    };
+    
+    teamsSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'teams_update') {
+            updateTeamsDisplay(data.teams);
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to join team');
-    });
-}
-
-function createTeam() {
-    const playerName = document.getElementById('playerName').value.trim();
-    const teamName = document.getElementById('teamName').value.trim();
+    };
     
-    if (!playerName) {
-        alert('Please enter your name');
-        document.getElementById('playerName').focus();
-        return;
-    }
-    
-    if (!teamName) {
-        alert('Please enter a team name');
-        document.getElementById('teamName').focus();
-        return;
-    }
-
-    fetch('{% url "create_standalone_team" %}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: JSON.stringify({
-            team_name: teamName,
-            player_name: playerName
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.href = data.redirect_url;
-        } else {
-            alert(data.error || 'Failed to create team');
+    teamsSocket.onclose = function(e) {
+        console.log('WebSocket connection closed');
+        // Send leave message for all teams
+        if (playerName) {
+            teamsSocket.send(JSON.stringify({
+                'action': 'leave_all_teams',
+                'player_name': playerName
+            }));
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to create team');
+    };
+    
+    // Update player name when input changes
+    playerNameInput.addEventListener('change', function() {
+        playerName = this.value;
+        sessionStorage.setItem('playerName', playerName);
     });
-}
+    
+    function updateTeamsDisplay(teams) {
+        if (!teamsContainer) return;
+        
+        teamsContainer.innerHTML = '';
+        
+        if (teams && teams.length > 0) {
+            teams.forEach(team => {
+                const teamCard = document.createElement('div');
+                teamCard.className = 'team-card';
+                teamCard.innerHTML = `
+                    <div class="team-header">
+                        <h4>${team.name}</h4>
+                        <span class="member-count">${team.member_count} member(s)</span>
+                    </div>
+                    <div class="team-members">
+                        <ul class="members-list">
+                            ${team.members.map(member => `
+                                <li><i class="fas fa-user"></i> ${member}</li>
+                            `).join('')}
+                        </ul>
+                        <button onclick="joinTeam('${team.code}')" class="join-btn">Join Team</button>
+                    </div>
+                `;
+                teamsContainer.appendChild(teamCard);
+            });
+        } else {
+            teamsContainer.innerHTML = `
+                <div class="no-teams-message">
+                    <p>No teams available. Create one below!</p>
+                </div>
+            `;
+        }
+    }
+    
+    // Make these functions global
+    window.joinTeam = async function(teamCode) {
+        if (!playerName) {
+            alert('Please enter your name first!');
+            playerNameInput.focus();
+            return;
+        }
+        
+        try {
+            const response = await fetch('/join-existing-team/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    team_code: teamCode,
+                    player_name: playerName
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                window.location.href = data.redirect_url;
+            } else {
+                alert(data.error || 'Failed to join team');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to join team');
+        }
+    };
+    
+    window.createTeam = async function() {
+        const teamName = document.getElementById('teamName').value;
+        
+        if (!playerName) {
+            alert('Please enter your name first!');
+            playerNameInput.focus();
+            return;
+        }
+        
+        if (!teamName) {
+            alert('Please enter a team name!');
+            document.getElementById('teamName').focus();
+            return;
+        }
+        
+        try {
+            const response = await fetch('/create-team-standalone/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    team_name: teamName,
+                    player_name: playerName
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                window.location.href = data.redirect_url;
+            } else {
+                alert(data.error || 'Failed to create team');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to create team');
+        }
+    };
+    
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // Handle page unload
+    window.addEventListener('beforeunload', function() {
+        if (playerName && teamsSocket.readyState === WebSocket.OPEN) {
+            teamsSocket.send(JSON.stringify({
+                'action': 'leave_all_teams',
+                'player_name': playerName
+            }));
+        }
+    });
+});
 </script>
 {% endblock %} 
