@@ -22,12 +22,19 @@
 <div class="container py-4">
     <div class="dashboard-box p-4">
         <div class="lobby-header">
-            <h1>{{ lobby.name }}</h1>
+            <div class="lobby-title">
+                <h1>{{ lobby.name }}</h1>
+                <button class="delete-btn" onclick="confirmDeleteLobby({{ lobby.id }})">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
             <div class="lobby-info">
-                <p><strong>Game Code:</strong> {{ lobby.code }}</p>
-                <p><strong>Race:</strong> {{ lobby.race.name }}</p>
-                <p><strong>Status:</strong> {% if lobby.is_active %}Active{% else %}Inactive{% endif %}</p>
-                <p><strong>Created:</strong> {{ lobby.created_at|date:"F d, Y" }}</p>
+                <p class="code">Code: {{ lobby.code }}</p>
+                <p>Created: {{ lobby.created_at|date:"F d, Y" }}</p>
+                <p>Teams: {{ lobby.teams.count }}</p>
+                <p class="status {% if lobby.is_active %}active{% else %}inactive{% endif %}">
+                    Status: {% if lobby.is_active %}Active{% else %}Inactive{% endif %}
+                </p>
             </div>
         </div>
 
@@ -319,6 +326,191 @@
     background: rgba(255, 255, 255, 0.2);
     transform: translateY(-2px);
 }
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.lobby-header {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.lobby-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.lobby-title h1 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.delete-btn {
+    background: none;
+    border: none;
+    color: #dc3545;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 5px;
+    transition: transform 0.2s;
+}
+
+.delete-btn:hover {
+    transform: scale(1.2);
+    color: #ff0000;
+}
+
+.lobby-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.lobby-info p {
+    color: #ffffff;
+    margin: 0;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+}
+
+.code {
+    color: #90C83C !important;
+    font-weight: bold;
+}
+
+.status {
+    font-weight: bold;
+}
+
+.status.active {
+    color: #90C83C !important;
+}
+
+.status.inactive {
+    color: #dc3545 !important;
+}
+
+.teams-section {
+    text-align: center;
+    margin: 40px 0;
+}
+
+.teams-section h2 {
+    color: #90C83C;
+    font-size: 2rem;
+    margin: 0;
+}
+
+.back-button-container {
+    text-align: center;
+    margin-top: 40px;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+    border: none;
+    display: inline-block;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+}
+
+.modal-content {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h3 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.modal-body {
+    color: #ffffff;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.delete-confirm-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.delete-confirm-btn:hover {
+    background: #c82333;
+}
+
+.cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
 </style>
 
 <!-- icons -->
@@ -427,6 +619,36 @@
             }
         }
         return cookieValue;
+    }
+
+    let lobbyToDelete = {{ lobby.id }};
+
+    function confirmDeleteLobby(lobbyId) {
+        document.getElementById('deleteModal').style.display = 'block';
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+    }
+
+    function deleteLobby() {
+        fetch(`/lobby/${lobbyToDelete}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.href = "{% url 'manage_lobbies' %}";
+            } else {
+                alert('Failed to delete lobby');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete lobby');
+        });
     }
 
     // Connect when page loads

@@ -525,6 +525,29 @@
 .question-actions {
     display: flex;
     gap: 8px;
+    margin-left: 10px;
+}
+
+.question-actions .edit-btn,
+.question-actions .delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    transition: transform 0.2s;
+}
+
+.question-actions .edit-btn {
+    color: #17a2b8;
+}
+
+.question-actions .delete-btn {
+    color: #dc3545;
+}
+
+.question-actions .edit-btn:hover,
+.question-actions .delete-btn:hover {
+    transform: scale(1.2);
 }
 
 .no-items {
@@ -561,21 +584,20 @@
 }
 
 .btn-success {
-    background: linear-gradient(135deg, #90C83C, #7AAF2F);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 6px;
-    text-decoration: none;
-    transition: all 0.2s;
-    border: none;
-    display: inline-block;
+    background: linear-gradient(135deg, #90C83C, #7AAF2F) !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    border-radius: 6px !important;
+    text-decoration: none !important;
+    transition: all 0.2s !important;
 }
 
 .btn-success:hover {
-    background: linear-gradient(135deg, #7AAF2F, #90C83C);
-    transform: translateY(-2px);
-    color: white;
-    text-decoration: none;
+    background: linear-gradient(135deg, #7AAF2F, #90C83C) !important;
+    transform: translateY(-2px) !important;
+    color: white !important;
+    text-decoration: none !important;
 }
 
 .modal {
@@ -600,6 +622,8 @@
     padding: 20px;
     max-height: 80vh;
     overflow-y: auto;
+    position: relative;
+    left: -25%;
 }
 
 .modal-header {
