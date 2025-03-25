@@ -85,17 +85,27 @@ def lobby_details(request, lobby_id):
 @login_required
 def start_race(request, lobby_id):
     """Start a race in a lobby and redirect to the first question."""
-    lobby = get_object_or_404(Lobby, id=lobby_id)
-    if not lobby.hunt_started or not lobby.race:
-        messages.error(request, 'Race has not been started yet.')
-        return JsonResponse({
-            'success': False,
-            'error': 'Race has not been started yet.'
-        })
-    
     try:
-        # Get the first zone and its questions
-        first_zone = lobby.race.zones.first()
+        data = json.loads(request.body) if request.body else {}
+        race_id = data.get('race_id')
+        
+        lobby = get_object_or_404(Lobby, id=lobby_id)
+        race = get_object_or_404(Race, id=race_id) if race_id else lobby.race
+
+        if not race:
+            return JsonResponse({
+                'success': False,
+                'error': 'No race selected.'
+            })
+
+        # Update lobby with race info
+        lobby.race = race
+        lobby.hunt_started = True
+        lobby.start_time = timezone.now()
+        lobby.save()
+
+        # Get the first zone and question
+        first_zone = race.zones.first()
         if not first_zone:
             return JsonResponse({
                 'success': False,

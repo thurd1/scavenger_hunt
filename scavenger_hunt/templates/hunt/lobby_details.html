@@ -583,6 +583,7 @@
     // Initialize WebSocket connection when the page loads
     document.addEventListener('DOMContentLoaded', function() {
         connectWebSocket();
+        setupRaceForm();
     });
 
     function connectWebSocket() {
@@ -593,9 +594,15 @@
 
         socket.onmessage = function(e) {
             const data = JSON.parse(e.data);
+            console.log('Received WebSocket message:', data);
+            
             if (data.type === 'lobby_state') {
                 updateTeamsDisplay(data.teams);
+                if (data.hunt_started && data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                }
             } else if (data.type === 'race_started') {
+                console.log('Race started, redirecting to:', data.redirect_url);
                 window.location.href = data.redirect_url;
             }
         };
@@ -611,16 +618,23 @@
 
         socket.onopen = function(e) {
             console.log('WebSocket connection established');
+            // Request initial state
+            socket.send(JSON.stringify({
+                'type': 'request_update'
+            }));
         };
     }
-
-    let currentTeamToDelete = null;
 
     function updateTeamsDisplay(teams) {
         const teamsGrid = document.querySelector('.teams-grid');
         if (!teamsGrid) return;
         
         teamsGrid.innerHTML = '';
+
+        if (teams.length === 0) {
+            teamsGrid.innerHTML = '<p class="no-teams">No teams have joined this lobby yet.</p>';
+            return;
+        }
 
         teams.forEach(team => {
             const teamCard = document.createElement('div');
@@ -638,8 +652,7 @@
         });
     }
 
-    // Handle race start form submission
-    document.addEventListener('DOMContentLoaded', function() {
+    function setupRaceForm() {
         const raceForm = document.querySelector('.race-form');
         if (raceForm) {
             raceForm.addEventListener('submit', function(e) {
@@ -665,7 +678,8 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        window.location.href = data.redirect_url;
+                        // The WebSocket will handle the redirect
+                        console.log('Race started successfully');
                     } else {
                         alert(data.error || 'Error starting race');
                     }
@@ -676,7 +690,7 @@
                 });
             });
         }
-    });
+    }
 
     function getCookie(name) {
         let cookieValue = null;

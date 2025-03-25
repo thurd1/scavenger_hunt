@@ -5,6 +5,7 @@ from .models import Team, TeamMember, Lobby
 import logging
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from django.urls import reverse
 
 logger = logging.getLogger(__name__)
 
@@ -278,13 +279,24 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 'code': team.code,
                 'members': [{'id': m.id, 'role': m.role} for m in team.members.all()]
             })
+
+        # Get first question URL if hunt has started
+        redirect_url = None
+        if lobby.hunt_started and lobby.race:
+            first_zone = lobby.race.zones.first()
+            if first_zone:
+                first_question = first_zone.questions.first()
+                if first_question:
+                    redirect_url = f"{reverse('start_race', args=[lobby.id])}?question_id={first_question.id}"
+
         return {
             'teams': teams_data,
             'hunt_started': lobby.hunt_started,
             'race': {
                 'id': lobby.race.id,
                 'name': lobby.race.name
-            } if lobby.race else None
+            } if lobby.race else None,
+            'redirect_url': redirect_url
         }
 
     async def send_lobby_state(self):
@@ -305,6 +317,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             'type': 'race_started',
             'redirect_url': event['redirect_url']
         }))
+        # Also send updated lobby state
+        await self.send_lobby_state()
 
     async def receive(self, text_data):
         """Handle received messages"""
