@@ -21,7 +21,7 @@ class TeamConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
-        
+
         # Send initial state
         await self.send_team_state()
 
@@ -327,6 +327,14 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             data = json.loads(text_data)
             if data.get('type') == 'request_update':
                 await self.send_lobby_state()
+            elif data.get('type') == 'team_update':
+                # Broadcast team update to all connected clients
+                await self.channel_layer.group_send(
+                    self.lobby_group_name,
+                    {
+                        'type': 'lobby_update'
+                    }
+                )
         except json.JSONDecodeError:
             logger.error("Invalid JSON received")
         except Exception as e:

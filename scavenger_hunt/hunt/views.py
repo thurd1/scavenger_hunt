@@ -241,13 +241,13 @@ def save_player_name(request):
             request.session['player_name'] = player_name
             request.session.modified = True
             print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
-            
-            lobby_code = request.session.get('lobby_code')
-            print(f"Lobby code in session: {lobby_code}")  # Debug print
-            
+        
+        lobby_code = request.session.get('lobby_code')
+        print(f"Lobby code in session: {lobby_code}")  # Debug print
+        
             if lobby_code:
-                lobby = get_object_or_404(Lobby, code=lobby_code)
-                return render(request, 'hunt/team_options.html', {'lobby': lobby})
+        lobby = get_object_or_404(Lobby, code=lobby_code)
+        return render(request, 'hunt/team_options.html', {'lobby': lobby})
             
         print("No player name provided or lobby code missing")  # Debug print
     return redirect('join_game_session')
@@ -255,28 +255,39 @@ def save_player_name(request):
 def broadcast_team_update(team_id):
     channel_layer = get_channel_layer()
     team = Team.objects.prefetch_related('team_members').get(id=team_id)
-    members = list(team.team_members.values_list('role', flat=True))
-    
-    async_to_sync(channel_layer.group_send)(
+                    members = list(team.team_members.values_list('role', flat=True))
+                    
+                    async_to_sync(channel_layer.group_send)(
         f'team_{team_id}',
-        {
-            'type': 'team_update',
-            'members': members
-        }
-    )
+                        {
+                            'type': 'team_update',
+                            'members': members
+                        }
+                    )
 
 def join_team(request):
     """Render the join team page with available teams and forms to join or create teams."""
-    # Get all active teams
-    teams = Team.objects.all().prefetch_related('members')
-    
-    # Get player name from session
-    player_name = request.session.get('player_name', '')
-    
-    return render(request, 'hunt/join_team.html', {
-        'teams': teams,
-        'player_name': player_name
-    })
+    # Get lobby code from session
+    lobby_code = request.session.get('lobby_code')
+    if not lobby_code:
+        return redirect('join_game_session')
+        
+    try:
+        # Get the lobby and its teams
+        lobby = Lobby.objects.get(code=lobby_code)
+        teams = lobby.teams.all().prefetch_related('members')
+        
+        # Get player name from session
+        player_name = request.session.get('player_name', '')
+        
+        return render(request, 'hunt/join_team.html', {
+            'teams': teams,
+            'player_name': player_name,
+            'lobby': lobby
+        })
+    except Lobby.DoesNotExist:
+        messages.error(request, 'Invalid lobby code')
+        return redirect('join_game_session')
 
 @require_http_methods(["POST"])
 def join_existing_team(request):
@@ -451,7 +462,7 @@ def create_team(request, lobby_id):
             
             request.session['team_id'] = team.id
             messages.success(request, f'Team created! Your team code is: {team.code}')
-            return redirect('team_dashboard', team_id=team.id)
+            return redirect('view_team', team_id=team.id)
     else:
         form = TeamForm()
     
@@ -494,8 +505,8 @@ def toggle_lobby(request, lobby_id):
 
 @require_POST
 def delete_lobby(request, lobby_id):
-    lobby = get_object_or_404(Lobby, id=lobby_id)
-    lobby.delete()
+        lobby = get_object_or_404(Lobby, id=lobby_id)
+        lobby.delete()
     return JsonResponse({'status': 'success'})
 
 @require_POST
@@ -522,7 +533,7 @@ def delete_team(request, team_id):
             )
         
         messages.success(request, f'Team "{team_name}" has been deleted.')
-        return redirect('team_list')
+    return redirect('team_list')
         
     except Exception as e:
         messages.error(request, f'Error deleting team: {str(e)}')
@@ -1003,3 +1014,26 @@ def upload_photo(request, lobby_id, question_id):
             'success': False,
             'error': str(e)
         })
+
+def student_question(request, lobby_id, question_id):
+    """Display a question to the student."""
+    lobby = get_object_or_404(Lobby, id=lobby_id)
+    question = get_object_or_404(Question, id=question_id)
+    
+    if not lobby.hunt_started or not lobby.race:
+        messages.error(request, 'Race has not started yet.')
+        return redirect('lobby_details', lobby_id=lobby_id)
+    
+    # Check if time is up
+    time_elapsed = timezone.now() - lobby.start_time
+    if time_elapsed.total_seconds() > (lobby.race.time_limit_minutes * 60):
+        messages.error(request, 'Time is up!')
+        return redirect('lobby_details', lobby_id=lobby_id)
+    
+    context = {
+        'lobby': lobby,
+        'question': question,
+        'time_limit_minutes': lobby.race.time_limit_minutes,
+        'start_time': lobby.start_time.isoformat()
+    }
+    return render(request, 'hunt/studentQuestion.html', context)

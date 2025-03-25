@@ -47,7 +47,7 @@
                     <option value="">Select a race...</option>
                     {% for race in races %}
                     <option value="{{ race.id }}">{{ race.name }} ({{ race.time_limit_minutes }} minutes)</option>
-                    {% endfor %}
+            {% endfor %}
                 </select>
                 <button type="submit" name="start_race" class="btn btn-success start-race-btn">
                     <i class="fas fa-play"></i> Start Race
