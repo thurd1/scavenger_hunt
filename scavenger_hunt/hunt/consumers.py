@@ -245,6 +245,7 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
 
 class LobbyConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        """Handle connection to lobby websocket"""
         self.lobby_id = self.scope['url_route']['kwargs']['lobby_id']
         self.lobby_group_name = f'lobby_{self.lobby_id}'
 
@@ -259,6 +260,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         await self.send_lobby_state()
 
     async def disconnect(self, close_code):
+        """Handle disconnection"""
         await self.channel_layer.group_discard(
             self.lobby_group_name,
             self.channel_name
@@ -266,6 +268,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_lobby_state(self):
+        """Get current lobby state including teams and race status"""
         lobby = Lobby.objects.get(id=self.lobby_id)
         teams_data = []
         for team in lobby.teams.all().prefetch_related('members'):
@@ -275,21 +278,44 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 'code': team.code,
                 'members': [{'id': m.id, 'role': m.role} for m in team.members.all()]
             })
-        return teams_data
+        return {
+            'teams': teams_data,
+            'hunt_started': lobby.hunt_started,
+            'race': {
+                'id': lobby.race.id,
+                'name': lobby.race.name
+            } if lobby.race else None
+        }
 
     async def send_lobby_state(self):
-        teams_data = await self.get_lobby_state()
+        """Send current lobby state to the client"""
+        state = await self.get_lobby_state()
         await self.send(text_data=json.dumps({
             'type': 'lobby_state',
-            'teams': teams_data
+            **state
         }))
 
     async def lobby_update(self, event):
+        """Handle lobby update event"""
         await self.send_lobby_state()
 
+    async def race_started(self, event):
+        """Handle race started event"""
+        await self.send(text_data=json.dumps({
+            'type': 'race_started',
+            'redirect_url': event['redirect_url']
+        }))
+
     async def receive(self, text_data):
-        # Handle received messages if needed
-        pass
+        """Handle received messages"""
+        try:
+            data = json.loads(text_data)
+            if data.get('type') == 'request_update':
+                await self.send_lobby_state()
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON received")
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
 
     @database_sync_to_async
     def get_lobby_data(self):

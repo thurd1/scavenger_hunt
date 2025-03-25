@@ -595,6 +595,8 @@
             const data = JSON.parse(e.data);
             if (data.type === 'lobby_state') {
                 updateTeamsDisplay(data.teams);
+            } else if (data.type === 'race_started') {
+                window.location.href = data.redirect_url;
             }
         };
 
@@ -615,69 +617,66 @@
     let currentTeamToDelete = null;
 
     function updateTeamsDisplay(teams) {
-        const teamsGrid = document.getElementById('teamsGrid');
+        const teamsGrid = document.querySelector('.teams-grid');
+        if (!teamsGrid) return;
+        
         teamsGrid.innerHTML = '';
 
         teams.forEach(team => {
             const teamCard = document.createElement('div');
             teamCard.className = 'team-card';
             teamCard.innerHTML = `
-                <button class="delete-team-btn" onclick="showDeleteConfirm(${team.id})">
-                    <i class="fas fa-times"></i>
-                </button>
                 <div class="team-header">
                     <h3>${team.name}</h3>
                     <span class="team-code">Code: ${team.code}</span>
                 </div>
-                <div class="team-members">
-                    <h4>Members</h4>
-                    ${team.members && team.members.length > 0 ? `
-                        <ul class="member-list">
-                            ${team.members.map(member => `
-                                <li>
-                                    <i class="fas fa-user"></i>
-                                    <span>${member.role}</span>
-                                </li>
-                            `).join('')}
-                        </ul>
-                    ` : '<p class="no-members">No members in this team yet</p>'}
+                <div class="team-info">
+                    <p><i class="fas fa-users"></i> Players: ${team.members ? team.members.length : 0}</p>
                 </div>
             `;
             teamsGrid.appendChild(teamCard);
         });
     }
 
-    function showDeleteConfirm(teamId) {
-        currentTeamToDelete = teamId;
-        document.getElementById('deleteConfirmModal').style.display = 'flex';
-    }
-
-    function closeModal() {
-        document.getElementById('deleteConfirmModal').style.display = 'none';
-        currentTeamToDelete = null;
-    }
-
-    function confirmDelete() {
-        if (currentTeamToDelete) {
-            fetch(`/team/${currentTeamToDelete}/delete/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
+    // Handle race start form submission
+    document.addEventListener('DOMContentLoaded', function() {
+        const raceForm = document.querySelector('.race-form');
+        if (raceForm) {
+            raceForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const raceId = document.querySelector('select[name="race_id"]').value;
+                if (!raceId) {
+                    alert('Please select a race');
+                    return;
                 }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to delete team');
-                }
-                closeModal();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to delete team');
-                closeModal();
+
+                // Send the start race request via POST
+                fetch(`/lobby/${lobbyId}/start-race/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        race_id: raceId
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        alert(data.error || 'Error starting race');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error starting race. Please try again.');
+                });
             });
         }
-    }
+    });
 
     function getCookie(name) {
         let cookieValue = null;

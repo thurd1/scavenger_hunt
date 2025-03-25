@@ -84,28 +84,57 @@ def lobby_details(request, lobby_id):
 
 @login_required
 def start_race(request, lobby_id):
+    """Start a race in a lobby and redirect to the first question."""
     lobby = get_object_or_404(Lobby, id=lobby_id)
     if not lobby.hunt_started or not lobby.race:
         messages.error(request, 'Race has not been started yet.')
-        return redirect('lobby_details', lobby_id=lobby_id)
+        return JsonResponse({
+            'success': False,
+            'error': 'Race has not been started yet.'
+        })
     
-    # Get the first zone and its questions
-    first_zone = lobby.race.zones.first()
-    if not first_zone:
-        messages.error(request, 'No zones found in this race.')
-        return redirect('lobby_details', lobby_id=lobby_id)
-    
-    first_question = first_zone.questions.first()
-    if not first_question:
-        messages.error(request, 'No questions found in the first zone.')
-        return redirect('lobby_details', lobby_id=lobby_id)
-    
-    context = {
-        'lobby': lobby,
-        'zone': first_zone,
-        'question': first_question,
-    }
-    return render(request, 'hunt/studentQuestion.html', context)
+    try:
+        # Get the first zone and its questions
+        first_zone = lobby.race.zones.first()
+        if not first_zone:
+            return JsonResponse({
+                'success': False,
+                'error': 'No zones found in this race.'
+            })
+        
+        first_question = first_zone.questions.first()
+        if not first_question:
+            return JsonResponse({
+                'success': False,
+                'error': 'No questions found in the first zone.'
+            })
+        
+        # Get the URL for the first question
+        redirect_url = reverse('start_race', args=[lobby_id])
+        if first_question:
+            redirect_url = f"{redirect_url}?question_id={first_question.id}"
+        
+        # Notify all connected clients through WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'lobby_{lobby_id}',
+            {
+                'type': 'race_started',
+                'redirect_url': redirect_url
+            }
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'redirect_url': redirect_url
+        })
+        
+    except Exception as e:
+        logger.error(f"Error starting race: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 class LobbyDetailsView(DetailView):
     model = Lobby
