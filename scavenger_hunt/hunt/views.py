@@ -222,15 +222,15 @@ def save_player_name(request):
 def broadcast_team_update(team_id):
     channel_layer = get_channel_layer()
     team = Team.objects.prefetch_related('team_members').get(id=team_id)
-                    members = list(team.team_members.values_list('role', flat=True))
-                    
-                    async_to_sync(channel_layer.group_send)(
+    members = list(team.team_members.values_list('role', flat=True))
+                   
+    async_to_sync(channel_layer.group_send)(
         f'team_{team_id}',
-                        {
-                            'type': 'team_update',
-                            'members': members
-                        }
-                    )
+        {
+            'type': 'team_update',
+            'members': members
+        }
+    )
 
 def join_team(request, lobby_id):
     lobby = get_object_or_404(Lobby, id=lobby_id)
@@ -484,20 +484,20 @@ def toggle_lobby(request, lobby_id):
 def delete_lobby(request, lobby_id):
         lobby = get_object_or_404(Lobby, id=lobby_id)
         lobby.delete()
-    return JsonResponse({'status': 'success'})
+        return JsonResponse({'status': 'success'})
 
 @require_POST
 def delete_team(request, team_id):
     try:
         team = get_object_or_404(Team, id=team_id)
-        
+       
         # Get lobby ID if team has any participating lobbies
         lobby = team.participating_lobbies.first()
         lobby_id = lobby.id if lobby else None
-        
+       
         team_name = team.name
         team.delete()
-        
+       
         # Broadcast update if lobby exists
         if lobby_id:
             channel_layer = get_channel_layer()
@@ -508,13 +508,13 @@ def delete_team(request, team_id):
                     'message': 'team_deleted'
                 }
             )
-        
+       
         messages.success(request, f'Team "{team_name}" has been deleted.')
-    return redirect('team_list')
-        
+        return redirect('team_list')
+   
     except Exception as e:
         messages.error(request, f'Error deleting team: {str(e)}')
-    return redirect('team_list')
+        return redirect('team_list')
 
 def edit_team(request, team_id):
     team = get_object_or_404(Team, id=team_id)
