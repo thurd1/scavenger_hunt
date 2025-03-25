@@ -273,30 +273,23 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         lobby = Lobby.objects.get(id=self.lobby_id)
         teams_data = []
         for team in lobby.teams.all().prefetch_related('members'):
+            members = list(team.members.all())
             teams_data.append({
                 'id': team.id,
                 'name': team.name,
                 'code': team.code,
-                'members': [{'id': m.id, 'role': m.role} for m in team.members.all()]
+                'members': [{'id': m.id, 'role': m.role} for m in members],
+                'member_count': len(members)
             })
-
-        # Get first question URL if hunt has started
-        redirect_url = None
-        if lobby.hunt_started and lobby.race:
-            first_zone = lobby.race.zones.first()
-            if first_zone:
-                first_question = first_zone.questions.first()
-                if first_question:
-                    redirect_url = f"{reverse('start_race', args=[lobby.id])}?question_id={first_question.id}"
 
         return {
             'teams': teams_data,
             'hunt_started': lobby.hunt_started,
             'race': {
                 'id': lobby.race.id,
-                'name': lobby.race.name
-            } if lobby.race else None,
-            'redirect_url': redirect_url
+                'name': lobby.race.name,
+                'time_limit_minutes': lobby.race.time_limit_minutes
+            } if lobby.race else None
         }
 
     async def send_lobby_state(self):
@@ -313,10 +306,18 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     async def race_started(self, event):
         """Handle race started event"""
-        await self.send(text_data=json.dumps({
-            'type': 'race_started',
-            'redirect_url': event['redirect_url']
-        }))
+        # Get the first question URL
+        lobby = await database_sync_to_async(Lobby.objects.get)(id=self.lobby_id)
+        first_zone = await database_sync_to_async(lambda: lobby.race.zones.first())()
+        first_question = await database_sync_to_async(lambda: first_zone.questions.first())() if first_zone else None
+        
+        if first_question:
+            redirect_url = f"/studentQuestion/{self.lobby_id}/{first_question.id}/"
+            await self.send(text_data=json.dumps({
+                'type': 'race_started',
+                'redirect_url': redirect_url
+            }))
+        
         # Also send updated lobby state
         await self.send_lobby_state()
 

@@ -120,9 +120,7 @@ def start_race(request, lobby_id):
             })
         
         # Get the URL for the first question
-        redirect_url = reverse('start_race', args=[lobby_id])
-        if first_question:
-            redirect_url = f"{redirect_url}?question_id={first_question.id}"
+        redirect_url = f"/studentQuestion/{lobby_id}/{first_question.id}/"
         
         # Notify all connected clients through WebSocket
         channel_layer = get_channel_layer()

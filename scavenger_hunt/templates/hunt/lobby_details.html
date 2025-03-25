@@ -627,11 +627,22 @@
 
     function updateTeamsDisplay(teams) {
         const teamsGrid = document.querySelector('.teams-grid');
-        if (!teamsGrid) return;
+        if (!teamsGrid) {
+            const teamsSection = document.querySelector('.teams-section');
+            if (teamsSection) {
+                teamsSection.innerHTML = `
+                    <h2>TEAMS</h2>
+                    <div class="teams-grid"></div>
+                `;
+                teamsGrid = teamsSection.querySelector('.teams-grid');
+            } else {
+                return;
+            }
+        }
         
         teamsGrid.innerHTML = '';
 
-        if (teams.length === 0) {
+        if (!teams || teams.length === 0) {
             teamsGrid.innerHTML = '<p class="no-teams">No teams have joined this lobby yet.</p>';
             return;
         }
@@ -646,6 +657,19 @@
                 </div>
                 <div class="team-info">
                     <p><i class="fas fa-users"></i> Players: ${team.members ? team.members.length : 0}</p>
+                </div>
+                <div class="team-members">
+                    <h4>Members</h4>
+                    ${team.members && team.members.length > 0 ? `
+                        <ul class="member-list">
+                            ${team.members.map(member => `
+                                <li>
+                                    <i class="fas fa-user"></i>
+                                    <span>${member.role}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    ` : '<p class="no-members">No members in this team yet</p>'}
                 </div>
             `;
             teamsGrid.appendChild(teamCard);
