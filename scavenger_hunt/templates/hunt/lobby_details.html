@@ -38,6 +38,33 @@
             </div>
         </div>
 
+        {% if not lobby.hunt_started %}
+        <div class="race-selection-section">
+            <h2>SELECT RACE</h2>
+            <form method="POST" class="race-form">
+                {% csrf_token %}
+                <select name="race_id" class="form-control" required>
+                    <option value="">Select a race...</option>
+                    {% for race in races %}
+                    <option value="{{ race.id }}">{{ race.name }} ({{ race.time_limit_minutes }} minutes)</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" name="start_race" class="btn btn-success start-race-btn">
+                    <i class="fas fa-play"></i> Start Race
+                </button>
+            </form>
+        </div>
+        {% else %}
+        <div class="race-info-section">
+            <h2>RACE IN PROGRESS</h2>
+            <div class="race-details">
+                <p><strong>Race:</strong> {{ lobby.race.name }}</p>
+                <p><strong>Started:</strong> {{ lobby.start_time|date:"F d, Y H:i" }}</p>
+                <p><strong>Time Limit:</strong> {{ lobby.race.time_limit_minutes }} minutes</p>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="teams-section">
             <h2>TEAMS</h2>
             {% if lobby.teams.all %}
@@ -53,11 +80,11 @@
                                 <p><i class="fas fa-clock"></i> Joined: {{ team.created_at|date:"F d, Y" }}</p>
                             </div>
                         </div>
-            {% endfor %}
+                    {% endfor %}
                 </div>
-        {% else %}
+            {% else %}
                 <p class="no-teams">No teams have joined this lobby yet.</p>
-        {% endif %}
+            {% endif %}
         </div>
 
         <div class="back-button-container">
@@ -465,6 +492,84 @@
 
 .cancel-btn:hover {
     background: rgba(255, 255, 255, 0.2);
+}
+
+.race-selection-section,
+.race-info-section {
+    margin: 30px 0;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    text-align: center;
+}
+
+.race-selection-section h2,
+.race-info-section h2 {
+    color: #90C83C;
+    margin-bottom: 20px;
+}
+
+.race-form {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.race-form select {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    color: white;
+    margin-bottom: 15px;
+    padding: 10px;
+    width: 100%;
+    border-radius: 8px;
+}
+
+.race-form select:focus {
+    outline: none;
+    border-color: #90C83C;
+    box-shadow: 0 0 0 2px rgba(144, 200, 60, 0.2);
+}
+
+.race-form option {
+    background: #212529;
+    color: white;
+}
+
+.start-race-btn {
+    width: 100%;
+    padding: 12px;
+    font-size: 1.1rem;
+    background-color: #90C83C;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.start-race-btn:hover {
+    background-color: #7BAF2F;
+    transform: translateY(-2px);
+}
+
+.race-details {
+    color: white;
+    text-align: left;
+    max-width: 500px;
+    margin: 0 auto;
+    background: rgba(33, 37, 41, 0.8);
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.race-details p {
+    margin: 10px 0;
+}
+
+.race-details strong {
+    color: #90C83C;
+    margin-right: 10px;
 }
 </style>
 

@@ -44,4 +44,9 @@ urlpatterns = [
     path('race/<int:race_id>/delete-zone/', views.delete_zone, name='delete_zone'),
     path('race/<int:race_id>/edit-question/', views.edit_question, name='edit_question'),
     path('race/<int:race_id>/delete-question/', views.delete_question, name='delete_question'),
+    
+    # New URLs for race gameplay
+    path('lobby/<int:lobby_id>/start-race/', views.start_race, name='start_race'),
+    path('lobby/<int:lobby_id>/question/<int:question_id>/check/', views.check_answer, name='check_answer'),
+    path('lobby/<int:lobby_id>/question/<int:question_id>/upload/', views.upload_photo, name='upload_photo'),
 ]

@@ -60,19 +60,52 @@ def create_lobby(request):
 def lobby_details(request, lobby_id):
     lobby = get_object_or_404(Lobby, id=lobby_id)
     teams = lobby.teams.all().prefetch_related('members')
+    races = Race.objects.filter(is_active=True).order_by('-created_at')
     
-    # Debug prints
-    for team in teams:
-        members = team.members.all()
-        print(f"Team {team.name} (ID: {team.id}) members:")
-        for member in members:
-            print(f"- {member.role}")
+    if request.method == 'POST':
+        if 'start_race' in request.POST:
+            race_id = request.POST.get('race_id')
+            if race_id:
+                race = get_object_or_404(Race, id=race_id)
+                lobby.race = race
+                lobby.hunt_started = True
+                lobby.start_time = timezone.now()
+                lobby.save()
+                
+                # Redirect teams to their first question
+                return redirect('start_race', lobby_id=lobby.id)
     
     context = {
         'lobby': lobby,
         'teams': teams,
+        'races': races,
     }
     return render(request, 'hunt/lobby_details.html', context)
+
+@login_required
+def start_race(request, lobby_id):
+    lobby = get_object_or_404(Lobby, id=lobby_id)
+    if not lobby.hunt_started or not lobby.race:
+        messages.error(request, 'Race has not been started yet.')
+        return redirect('lobby_details', lobby_id=lobby_id)
+    
+    # Get the first zone and its questions
+    first_zone = lobby.race.zones.first()
+    if not first_zone:
+        messages.error(request, 'No zones found in this race.')
+        return redirect('lobby_details', lobby_id=lobby_id)
+    
+    first_question = first_zone.questions.first()
+    if not first_question:
+        messages.error(request, 'No questions found in the first zone.')
+        return redirect('lobby_details', lobby_id=lobby_id)
+    
+    context = {
+        'lobby': lobby,
+        'zone': first_zone,
+        'question': first_question,
+    }
+    return render(request, 'hunt/studentQuestion.html', context)
 
 class LobbyDetailsView(DetailView):
     model = Lobby
@@ -799,3 +832,137 @@ def add_question(request, race_id):
             messages.error(request, f'Error adding question: {str(e)}')
             
     return redirect('race_detail', race_id=race_id)
+
+@require_http_methods(["POST"])
+def check_answer(request, lobby_id, question_id):
+    """Check if the submitted answer is correct."""
+    try:
+        data = json.loads(request.body)
+        answer = data.get('answer', '').strip()
+        
+        lobby = get_object_or_404(Lobby, id=lobby_id)
+        question = get_object_or_404(Question, id=question_id)
+        
+        if not lobby.hunt_started or not lobby.race:
+            return JsonResponse({
+                'correct': False,
+                'error': 'Race has not started.'
+            })
+            
+        # Check if time is up
+        time_elapsed = timezone.now() - lobby.start_time
+        if time_elapsed.total_seconds() > (lobby.race.time_limit_minutes * 60):
+            return JsonResponse({
+                'correct': False,
+                'error': 'Time is up!'
+            })
+        
+        is_correct = answer.lower() == question.answer.lower()
+        
+        if is_correct:
+            # Get next question in the same zone
+            next_question = Question.objects.filter(
+                zone=question.zone,
+                created_at__gt=question.created_at
+            ).first()
+            
+            # If no more questions in this zone, get first question of next zone
+            if not next_question:
+                next_zone = Zone.objects.filter(
+                    race=lobby.race,
+                    created_at__gt=question.zone.created_at
+                ).first()
+                
+                if next_zone:
+                    next_question = next_zone.questions.first()
+            
+            next_url = reverse('start_race', args=[lobby_id])
+            if next_question:
+                next_url = f"{next_url}?question_id={next_question.id}"
+            
+            return JsonResponse({
+                'correct': True,
+                'next_question_url': next_url
+            })
+        
+        return JsonResponse({
+            'correct': False
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'correct': False,
+            'error': 'Invalid request format'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'correct': False,
+            'error': str(e)
+        })
+
+@require_http_methods(["POST"])
+def upload_photo(request, lobby_id, question_id):
+    """Handle photo upload for a question."""
+    try:
+        lobby = get_object_or_404(Lobby, id=lobby_id)
+        question = get_object_or_404(Question, id=question_id)
+        
+        if not lobby.hunt_started or not lobby.race:
+            return JsonResponse({
+                'success': False,
+                'error': 'Race has not started.'
+            })
+        
+        # Check if time is up
+        time_elapsed = timezone.now() - lobby.start_time
+        if time_elapsed.total_seconds() > (lobby.race.time_limit_minutes * 60):
+            return JsonResponse({
+                'success': False,
+                'error': 'Time is up!'
+            })
+        
+        if 'photo' not in request.FILES:
+            return JsonResponse({
+                'success': False,
+                'error': 'No photo uploaded'
+            })
+        
+        # Save the photo submission
+        photo = request.FILES['photo']
+        submission = Submission.objects.create(
+            user=request.user,
+            question=question,
+            photo=photo,
+            is_correct=False  # Admin will review later
+        )
+        
+        # Get next question
+        next_question = Question.objects.filter(
+            zone=question.zone,
+            created_at__gt=question.created_at
+        ).first()
+        
+        # If no more questions in this zone, get first question of next zone
+        if not next_question:
+            next_zone = Zone.objects.filter(
+                race=lobby.race,
+                created_at__gt=question.zone.created_at
+            ).first()
+            
+            if next_zone:
+                next_question = next_zone.questions.first()
+        
+        next_url = reverse('start_race', args=[lobby_id])
+        if next_question:
+            next_url = f"{next_url}?question_id={next_question.id}"
+        
+        return JsonResponse({
+            'success': True,
+            'next_question_url': next_url
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })

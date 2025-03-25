@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="question-header">
+        <h1>{{ zone.name }} - Question {{ question.id }}</h1>
+        <div class="timer" id="timer">Time Remaining: <span id="time">00:00</span></div>
+    </div>
+
+    <div class="question-container">
+        <div class="question-text">
+            <p>{{ question.text }}</p>
+        </div>
+        
+        <div class="answer-section">
+            <input type="text" id="answer" placeholder="Your answer..." class="form-control" />
+            <button onclick="checkAnswer()" class="btn btn-primary">Submit Answer</button>
+        </div>
+        
+        <div id="message" class="alert" style="display: none;"></div>
+        
+        <div id="photo-upload" style="display: none;">
+            <p>Out of attempts? Upload a photo to complete the challenge!</p>
+            <input type="file" id="file-input" accept="image/*" class="form-control" />
+            <button onclick="uploadPhoto()" class="btn btn-secondary">Upload Photo</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.question-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid rgba(144, 200, 60, 0.3);
+}
+
+.question-header h1 {
+    color: #90C83C;
+    margin-bottom: 1rem;
+}
+
+.timer {
+    color: #FFA500;
+    font-size: 1.2rem;
+}
+
+.question-container {
+    background: rgba(33, 37, 41, 0.8);
+    padding: 2rem;
+    border-radius: 8px;
+    margin-top: 2rem;
+}
+
+.question-text {
+    color: white;
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+}
+
+.answer-section {
+    margin-bottom: 2rem;
+}
+
+.form-control {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    color: white;
+    margin-bottom: 1rem;
+}
+
+.form-control:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: #90C83C;
+    color: white;
+    box-shadow: 0 0 0 0.2rem rgba(144, 200, 60, 0.25);
+}
+
+.btn {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.btn-primary {
+    background-color: #90C83C;
+    border-color: #90C83C;
+}
+
+.btn-primary:hover {
+    background-color: #7BAF2F;
+    border-color: #7BAF2F;
+}
+
+.btn-secondary {
+    background-color: #6C757D;
+    border-color: #6C757D;
+}
+
+.btn-secondary:hover {
+    background-color: #5A6268;
+    border-color: #545B62;
+}
+
+.alert {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.alert-success {
+    background-color: rgba(144, 200, 60, 0.2);
+    border-color: #90C83C;
+    color: #90C83C;
+}
+
+.alert-danger {
+    background-color: rgba(220, 53, 69, 0.2);
+    border-color: #DC3545;
+    color: #DC3545;
+}
+</style>
+
+<script>
+let attempts = 0;
+let points = 3;
+let photoUploaded = false;
+
+// Set up timer
+const startTime = new Date('{{ lobby.start_time|date:"c" }}');
+const timeLimit = {{ lobby.race.time_limit_minutes }};
+const endTime = new Date(startTime.getTime() + timeLimit * 60000);
+
+function updateTimer() {
+    const now = new Date();
+    const timeLeft = endTime - now;
+    
+    if (timeLeft <= 0) {
+        document.getElementById('timer').innerHTML = 'Time\'s up!';
+        document.getElementById('answer').disabled = true;
+        document.getElementById('photo-upload').style.display = 'block';
+        return;
+    }
+    
+    const minutes = Math.floor(timeLeft / 60000);
+    const seconds = Math.floor((timeLeft % 60000) / 1000);
+    document.getElementById('time').innerHTML = 
+        minutes.toString().padStart(2, '0') + ':' + 
+        seconds.toString().padStart(2, '0');
+}
+
+setInterval(updateTimer, 1000);
+updateTimer();
+
+function showMessage(message, isSuccess) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.textContent = message;
+    messageDiv.className = 'alert ' + (isSuccess ? 'alert-success' : 'alert-danger');
+    messageDiv.style.display = 'block';
+}
+
+async function checkAnswer() {
+    if (photoUploaded) {
+        showMessage("Photo already uploaded. Please wait for the next question.", false);
+        return;
+    }
+
+    const userAnswer = document.getElementById('answer').value.trim();
+    
+    try {
+        const response = await fetch('{% url "check_answer" lobby.id question.id %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                answer: userAnswer
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.correct) {
+            showMessage(`Correct! You earned ${Math.max(points, 0)} points!`, true);
+            setTimeout(() => {
+                window.location.href = data.next_question_url;
+            }, 2000);
+        } else {
+            attempts++;
+            points--;
+            if (attempts < 3) {
+                showMessage(`Incorrect. You have ${3 - attempts} attempts left.`, false);
+            } else {
+                showMessage("No more attempts left. Please upload a photo to proceed.", false);
+                document.getElementById('photo-upload').style.display = 'block';
+            }
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showMessage("An error occurred. Please try again.", false);
+    }
+}
+
+async function uploadPhoto() {
+    const fileInput = document.getElementById('file-input');
+    if (!fileInput.files.length) {
+        showMessage("Please select a photo to upload.", false);
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('photo', fileInput.files[0]);
+    
+    try {
+        const response = await fetch('{% url "upload_photo" lobby.id question.id %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            photoUploaded = true;
+            showMessage("Photo uploaded successfully!", true);
+            setTimeout(() => {
+                window.location.href = data.next_question_url;
+            }, 2000);
+        } else {
+            showMessage("Failed to upload photo. Please try again.", false);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showMessage("An error occurred. Please try again.", false);
+    }
+}
+</script>
+{% endblock %}
