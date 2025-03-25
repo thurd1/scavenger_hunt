@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Race Manager{% endblock %}
+
+{% block welcome_text %}
+    <p style="color: #90C83C">Create and Manage Race Questions</p>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Manage Races</h1>
+    </div>
+
+    <div class="races-section">
+        <div class="section-header">
+            <h2>Active Races</h2>
+            <button class="create-btn" onclick="showCreateForm()">
+                <i class="fas fa-plus"></i> Create New Race
+            </button>
+    </div>
+
+        <div class="races-grid">
+                                {% for race in races %}
+            <div class="race-card">
+                <button class="delete-race-btn" onclick="deleteRace({{ race.id }})">
+                    <i class="fas fa-times"></i>
+                                                    </button>
+                <div class="race-header">
+                    <h3>{{ race.name }}</h3>
+                    <span class="race-status {% if race.is_active %}active{% else %}inactive{% endif %}">
+                        {{ race.is_active|yesno:"Active,Inactive" }}
+                    </span>
+                                        </div>
+                <div class="race-info">
+                    <p><i class="fas fa-clock"></i> Time Limit: {{ race.time_limit_minutes }} minutes</p>
+                    <p><i class="fas fa-map-marker-alt"></i> Start: {{ race.start_location }}</p>
+                    </div>
+                <div class="race-actions">
+                    <a href="{% url 'race_detail' race.id %}" class="view-btn">
+                        <i class="fas fa-eye"></i> View Details
+                    </a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="no-races">
+                <p>No races created yet</p>
+                                    </div>
+            {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+<div id="createRaceModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>Create New Race</h3>
+        <form method="POST" class="create-race-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="name">Race Name</label>
+                <input type="text" id="name" name="name" required class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="start_location">Start Location</label>
+                <input type="text" id="start_location" name="start_location" required class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="time_limit_minutes">Time Limit (minutes)</label>
+                <input type="number" id="time_limit_minutes" name="time_limit_minutes" required class="form-control">
+            </div>
+            <div class="modal-buttons">
+                <button type="submit" class="submit-btn">Create Race</button>
+                <button type="button" class="cancel-btn" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="back-button-container">
+    <a href="{% url 'leader_dashboard' %}" class="back-btn">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<style>
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.page-header h1 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.section-header h2 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.create-btn {
+    background: #90C83C;
+    color: #ffffff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.create-btn:hover {
+    background: #7ab32f;
+    transform: translateY(-2px);
+}
+
+.races-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.race-card {
+    position: relative;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.2s;
+}
+
+.race-card:hover {
+    transform: translateY(-5px);
+}
+
+.delete-race-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #ff4444;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 5px;
+    transition: transform 0.2s;
+    z-index: 1;
+}
+
+.delete-race-btn:hover {
+    transform: scale(1.2);
+    color: #ff0000;
+}
+
+.race-header {
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+
+.race-header h3 {
+    color: #90C83C;
+    margin: 0 0 10px 0;
+}
+
+.race-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.race-status.active {
+    background: rgba(144, 200, 60, 0.1);
+    color: #90C83C;
+}
+
+.race-status.inactive {
+    background: rgba(255, 68, 68, 0.1);
+    color: #ff4444;
+}
+
+.race-info {
+    margin-bottom: 20px;
+}
+
+.race-info p {
+    color: #ffffff;
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.race-info i {
+    color: #90C83C;
+}
+
+.race-actions {
+    text-align: center;
+}
+
+.view-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #90C83C;
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.view-btn:hover {
+    background: #7ab32f;
+    transform: translateY(-2px);
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 30px;
+    width: 90%;
+    max-width: 500px;
+}
+
+.modal-content h3 {
+    color: #90C83C;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    color: #90C83C;
+    margin-bottom: 8px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 6px;
+    color: #ffffff;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 25px;
+}
+
+.submit-btn, .cancel-btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.submit-btn {
+    background: #90C83C;
+    color: #ffffff;
+    border: none;
+}
+
+.cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.submit-btn:hover, .cancel-btn:hover {
+    transform: translateY(-2px);
+}
+
+.no-races {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    color: #ffffff;
+}
+
+.back-button-container {
+    text-align: center;
+    margin-top: 40px;
+    margin-bottom: 20px;
+}
+
+.back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(144, 200, 60, 0.1);
+    color: #90C83C;
+    padding: 12px 24px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.back-btn:hover {
+    background: rgba(144, 200, 60, 0.2);
+    transform: translateY(-2px);
+}
+</style>
+
+<script>
+function showCreateForm() {
+    document.getElementById('createRaceModal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('createRaceModal').style.display = 'none';
+}
+
+function deleteRace(raceId) {
+    if (confirm('Are you sure you want to delete this race?')) {
+        fetch(`/race/${raceId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Failed to delete race');
+            }
+        });
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target == document.getElementById('createRaceModal')) {
+        closeModal();
+    }
+}
+</script>
+{% endblock %}
