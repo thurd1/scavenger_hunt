@@ -238,7 +238,7 @@ def save_player_name(request):
         print(f"Attempting to save player name: {player_name}")  # Debug print
         
         if player_name:
-            request.session['player_name'] = player_name
+        request.session['player_name'] = player_name
             request.session.modified = True
             print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
         
@@ -315,7 +315,7 @@ def join_existing_team(request):
             'success': True,
             'redirect_url': reverse('view_team', args=[team.id])
         })
-    except Team.DoesNotExist:
+        except Team.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Team not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
@@ -537,7 +537,7 @@ def delete_team(request, team_id):
         
     except Exception as e:
         messages.error(request, f'Error deleting team: {str(e)}')
-        return redirect('team_list')
+    return redirect('team_list')
 
 def edit_team(request, team_id):
     team = get_object_or_404(Team, id=team_id)
