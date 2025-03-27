@@ -47,7 +47,7 @@
         <div class="create-team-section">
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
             
-            <a href="{% url 'create_standalone_team' %}" class="create-team-btn">Create Team</a>
+            <button onclick="showCreateTeamForm()" class="create-team-btn">Create Team</button>
         </div>
     </div>
 </div>
@@ -359,6 +359,15 @@ function submitJoinTeam(teamCode) {
         return;
     }
     
+    // Add loading message
+    const messageDiv = document.createElement('div');
+    messageDiv.id = 'loading-message';
+    messageDiv.innerHTML = 'Joining team...';
+    messageDiv.style = 'color: #90C83C; margin-top: 10px; text-align: center;';
+    document.querySelector('.modal-content').appendChild(messageDiv);
+    
+    console.log('Submitting join request for team:', teamCode, 'player:', playerName);
+    
     // Submit via POST request
     fetch('/join-existing-team/', {
         method: 'POST',
@@ -371,20 +380,48 @@ function submitJoinTeam(teamCode) {
             player_name: playerName
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return response.json();
+        } else {
+            // For non-JSON responses, get the text
+            return response.text().then(text => {
+                console.log('Response is not JSON:', text);
+                throw new Error('Unexpected response format');
+            });
+        }
+    })
     .then(data => {
+        console.log('Response data:', data);
         if (data.success) {
-            window.location.href = data.redirect_url;
+            // Store player name in session before redirect
+            sessionStorage.setItem('player_name', playerName);
+            
+            // Use setTimeout to ensure console logs appear
+            setTimeout(() => {
+                console.log('Redirecting to:', data.redirect_url);
+                window.location.href = data.redirect_url;
+            }, 100);
         } else {
             alert(data.error || 'Error joining team');
         }
     })
     .catch(error => {
-        console.error('Error:', error);
-        alert('Error joining team');
+        console.error('Error joining team:', error);
+        alert('Error joining team: ' + error.message);
+        
+        // Remove loading message
+        const loadingMsg = document.getElementById('loading-message');
+        if (loadingMsg) {
+            loadingMsg.remove();
+        }
     });
-    
-    closeJoinModal();
 }
 
 // Add styles for the modal
@@ -460,6 +497,118 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+function showCreateTeamForm() {
+    const createTeamModal = document.createElement('div');
+    createTeamModal.className = 'modal';
+    createTeamModal.style.display = 'flex';
+    
+    createTeamModal.innerHTML = `
+        <div class="modal-content">
+            <h3>Create New Team</h3>
+            <div class="form-group">
+                <label for="newTeamName">Team Name</label>
+                <input type="text" id="newTeamName" class="form-control" required placeholder="Enter team name">
+            </div>
+            <div class="form-group">
+                <label for="newPlayerName">Your Name</label>
+                <input type="text" id="newPlayerName" class="form-control" required placeholder="Enter your name">
+            </div>
+            <div class="modal-buttons">
+                <button onclick="submitCreateTeam()" class="join-btn">Create Team</button>
+                <button onclick="closeCreateModal()" class="btn-cancel">Cancel</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(createTeamModal);
+}
+
+function closeCreateModal() {
+    const modal = document.querySelector('.modal');
+    if (modal) {
+        document.body.removeChild(modal);
+    }
+}
+
+function submitCreateTeam() {
+    const teamName = document.getElementById('newTeamName').value.trim();
+    const playerName = document.getElementById('newPlayerName').value.trim();
+    
+    if (!teamName) {
+        alert('Please enter a team name');
+        return;
+    }
+    
+    if (!playerName) {
+        alert('Please enter your name');
+        return;
+    }
+    
+    // Add loading message
+    const messageDiv = document.createElement('div');
+    messageDiv.id = 'loading-message';
+    messageDiv.innerHTML = 'Creating team...';
+    messageDiv.style = 'color: #90C83C; margin-top: 10px; text-align: center;';
+    document.querySelector('.modal-content').appendChild(messageDiv);
+    
+    console.log('Creating team:', teamName, 'player:', playerName);
+    
+    // Submit via POST request
+    fetch('/create-standalone-team/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            team_name: teamName,
+            player_name: playerName
+        })
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return response.json();
+        } else {
+            // For non-JSON responses, get the text
+            return response.text().then(text => {
+                console.log('Response is not JSON:', text);
+                throw new Error('Unexpected response format');
+            });
+        }
+    })
+    .then(data => {
+        console.log('Response data:', data);
+        if (data.success) {
+            // Store player name in session before redirect
+            sessionStorage.setItem('player_name', playerName);
+            
+            // Use setTimeout to ensure console logs appear
+            setTimeout(() => {
+                console.log('Redirecting to:', data.redirect_url);
+                window.location.href = data.redirect_url;
+            }, 100);
+        } else {
+            alert(data.error || 'Error creating team');
+        }
+    })
+    .catch(error => {
+        console.error('Error creating team:', error);
+        alert('Error creating team: ' + error.message);
+        
+        // Remove loading message
+        const loadingMsg = document.getElementById('loading-message');
+        if (loadingMsg) {
+            loadingMsg.remove();
+        }
+    });
 }
 </script>
 {% endblock %} 
