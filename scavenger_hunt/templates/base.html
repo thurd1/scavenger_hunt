@@ -273,9 +273,9 @@
 <body>
     <div class="app-content">
         <header>
-            {% block header %}
-                <img src="{% static 'hunt/images/YoungLifeLogo.png' %}" alt="Young Life Logo">
-            {% endblock %}
+            <a href="/">
+                <img src="{% static 'hunt/images/YoungLifeLogo.png' %}" alt="Young Life Logo" class="logo-img">
+            </a>
         </header>
 
         <div class="welcome-text">
@@ -286,5 +286,7 @@
             {% block content %}{% endblock %}
         </div>
     </div>
+
+    {% block scripts %}{% endblock %}
 </body>
 </html>

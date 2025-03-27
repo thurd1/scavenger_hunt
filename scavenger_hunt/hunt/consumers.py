@@ -5,6 +5,9 @@ from .models import Team, TeamMember, Lobby
 import logging
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from asgiref.sync import sync_to_async
+from django.utils import timezone
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -363,4 +366,48 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 'name': lobby.race.name,
                 'time_limit_minutes': lobby.race.time_limit_minutes
             } if lobby.race else None
-        } 
+        }
+
+# Add this new consumer class
+class RaceConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.race_id = self.scope['url_route']['kwargs']['race_id']
+        self.race_group_name = f'race_{self.race_id}'
+
+        # Join race group
+        await self.channel_layer.group_add(
+            self.race_group_name,
+            self.channel_name
+        )
+        await self.accept()
+        print(f"Connected to race_{self.race_id}")
+
+    async def disconnect(self, close_code):
+        # Leave race group
+        await self.channel_layer.group_discard(
+            self.race_group_name,
+            self.channel_name
+        )
+        print(f"Disconnected from race_{self.race_id}")
+
+    # Handle race messages
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        await self.channel_layer.group_send(
+            self.race_group_name,
+            {
+                'type': 'race_update',
+                'message': data
+            }
+        )
+
+    async def race_update(self, event):
+        message = event['message']
+        await self.send(text_data=json.dumps(message))
+        
+    async def race_started(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'race_started',
+            'redirect_url': event.get('redirect_url', '')
+        })) 

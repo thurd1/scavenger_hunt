@@ -29,11 +29,14 @@ def create_lobby(request):
     if request.method == 'POST':
         race_id = request.POST.get('race')
         
-        # Generate a unique code
-        while True:
-            code = generate_lobby_code()
-            if not Lobby.objects.filter(code=code).exists():
-                break
+        # Get the code from the form if provided
+        code = request.POST.get('code')
+        if not code:
+            # Generate a unique code
+            while True:
+                code = generate_lobby_code()
+                if not Lobby.objects.filter(code=code).exists():
+                    break
         
         try:
             race = Race.objects.get(id=race_id)
@@ -226,7 +229,7 @@ def join_game_session(request):
         try:
             lobby = Lobby.objects.get(code=lobby_code, is_active=True)
             request.session['lobby_code'] = lobby_code
-            return render(request, 'team_options.html', {'lobby': lobby})
+            return render(request, 'hunt/team_options.html', {'lobby': lobby})
         except Lobby.DoesNotExist:
             messages.error(request, 'Invalid lobby code. Please try again.')
     return render(request, 'hunt/join_game_session.html')

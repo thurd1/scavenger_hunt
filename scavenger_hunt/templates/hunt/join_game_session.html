@@ -1,231 +1,118 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Join Game{% endblock %}
+{% block title %}Join Game Session{% endblock %}
 
 {% block content %}
 <div class="container">
-    <div class="join-header">
-        <h1>Welcome to The Scavenger Hunt!</h1>
-    </div>
-    
-    <div class="join-game-container">
-        <div class="form-section">
-            <h2>Join Existing Game</h2>
-            <form method="post" action="{% url 'join_game_session' %}">
-                {% csrf_token %}
-                <div class="form-group">
-                    <label for="lobby_code">Enter Lobby Code:</label>
-                    <input type="text" 
-                           name="lobby_code"
-                           id="lobby_code" 
-                           required 
-                           class="input-field" 
-                           maxlength="6"
-                           minlength="6"
-                           placeholder="123456">
-                </div>
-                <button type="submit" class="action-btn">Join Game</button>
-            </form>
+    <div class="join-box">
+        <h2 class="title">Join a Game Session</h2>
+        
+        {% if error %}
+        <div class="alert alert-danger">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="lobby_code">Enter Game Code</label>
+                <input type="text" name="lobby_code" id="lobby_code" class="form-control" required autocomplete="off" autofocus>
+            </div>
+            <button type="submit" class="btn btn-primary">Join Game</button>
+        </form>
+        
+        <div class="admin-login-link">
+            <a href="{% url 'login' %}">Are you an admin? Log in here</a>
         </div>
     </div>
-
-    {% if error %}
-    <div class="error-message">
-        {{ error }}
-    </div>
-    {% endif %}
 </div>
-
-<!-- Name prompt modal -->
-<div id="namePrompt" class="modal">
-    <div class="modal-content">
-        <h2>Enter Your Name</h2>
-        <p>Please enter your name to continue:</p>
-        <input type="text" id="playerName" placeholder="Your name" class="input-field">
-        <button onclick="submitName()" class="action-btn">Submit</button>
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (!sessionStorage.getItem('playerName')) {
-        document.getElementById('namePrompt').style.display = 'block';
-    }
-});
-
-function submitName() {
-    const name = document.getElementById('playerName').value.trim();
-    if (name) {
-        sessionStorage.setItem('playerName', name);
-        // Send name to server
-        fetch('/save_player_name/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({ player_name: name })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('namePrompt').style.display = 'none';
-            } else {
-                alert('Error saving name. Please try again.');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error saving name. Please try again.');
-        });
-    } else {
-        alert('Please enter a valid name');
-    }
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-</script>
 
 <style>
-.container {
-    max-width: 800px;
-    margin: 2rem auto;
-    padding: 1.5rem;
-}
-
-.join-header {
-    text-align: center;
-    margin-bottom: 2rem;
-    padding: 1.5rem;
-    background: rgba(33, 37, 41, 0.95);
-    border: 2px solid rgba(144, 200, 60, 0.3);
-    border-radius: 12px;
-}
-
-.join-header h1 {
-    color: #90C83C;
-    margin-bottom: 0;
-}
-
-.join-game-container {
-    background: rgba(33, 37, 41, 0.95);
-    border: 2px solid rgba(144, 200, 60, 0.3);
-    border-radius: 12px;
-    padding: 2rem;
-    margin-bottom: 1.5rem;
-}
-
-.form-section {
-    max-width: 400px;
-    margin: 0 auto;
-}
-
-.form-section h2 {
-    color: #90C83C;
-    margin-bottom: 1.5rem;
-    text-align: center;
-}
-
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-group label {
-    display: block;
-    color: #90C83C;
-    margin-bottom: 0.5rem;
-    font-size: 1rem;
-}
-
-.input-field {
-    width: 100%;
-    padding: 12px;
-    font-size: 16px;
-    border-radius: 8px;
-    border: 1px solid rgba(144, 200, 60, 0.3);
-    background-color: rgba(255, 255, 255, 0.1);
-    color: white;
-    text-align: center;
-    letter-spacing: 2px;
-}
-
-.input-field:focus {
-    outline: none;
-    border-color: #90C83C;
-    box-shadow: 0 0 0 2px rgba(144, 200, 60, 0.2);
-}
-
-.action-btn {
-    width: 100%;
-    padding: 0.8rem;
-    background: linear-gradient(135deg, #90C83C, #7BAF2F);
-    color: white;
-    border: none;
-    border-radius: 25px;
-    font-size: 1rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.action-btn:hover {
-    background: linear-gradient(135deg, #7BAF2F, #6A9E20);
-    transform: translateY(-2px);
-}
-
-.error-message {
-    background: rgba(255, 99, 71, 0.1);
-    border: 1px solid rgba(255, 99, 71, 0.3);
-    color: #ff6347;
-    padding: 1rem;
-    border-radius: 8px;
-    text-align: center;
-    margin-top: 1rem;
-}
-
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
-}
-
-.modal-content {
-    background-color: rgba(33, 37, 41, 0.95);
-    border: 2px solid rgba(144, 200, 60, 0.3);
-    margin: 15% auto;
-    padding: 2rem;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 400px;
-    text-align: center;
-}
-
-.modal-content h2 {
-    color: #90C83C;
-    margin-bottom: 1rem;
-}
-
-.modal-content p {
-    color: white;
-    margin-bottom: 1.5rem;
-}
+    .container {
+        max-width: 500px;
+        margin: 2rem auto;
+        padding: 1rem;
+    }
+    
+    .join-box {
+        background: rgba(0, 0, 0, 0.7);
+        border-radius: 10px;
+        padding: 2rem;
+    }
+    
+    .title {
+        color: #90C83C;
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    label {
+        display: block;
+        color: #fff;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 5px;
+        border: 1px solid #444;
+        background: rgba(0, 0, 0, 0.3);
+        color: #fff;
+    }
+    
+    .form-control:focus {
+        border-color: #90C83C;
+        outline: none;
+    }
+    
+    .btn {
+        display: block;
+        width: 100%;
+        padding: 0.75rem;
+        background: #90C83C;
+        color: #000;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: background 0.3s;
+    }
+    
+    .btn:hover {
+        background: #a1df3e;
+    }
+    
+    .alert {
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+        border-radius: 5px;
+        color: white;
+    }
+    
+    .alert-danger {
+        background: rgba(220, 53, 69, 0.7);
+    }
+    
+    .admin-login-link {
+        margin-top: 1.5rem;
+        text-align: center;
+    }
+    
+    .admin-login-link a {
+        color: #aaa;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+    
+    .admin-login-link a:hover {
+        color: #90C83C;
+    }
 </style>
 {% endblock %} 
