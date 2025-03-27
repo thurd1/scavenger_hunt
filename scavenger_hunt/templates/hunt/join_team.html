@@ -322,9 +322,130 @@ function updateTeamsDisplay(teams) {
 }
 
 function joinTeam(teamCode) {
-    // Redirect to join existing team with the team code
-    window.location.href = `/join-existing-team/?code=${teamCode}`;
+    // Create a modal popup to ask for player name
+    const playerNameModal = document.createElement('div');
+    playerNameModal.className = 'modal';
+    playerNameModal.style.display = 'flex';
+    
+    playerNameModal.innerHTML = `
+        <div class="modal-content">
+            <h3>Join Team</h3>
+            <div class="form-group">
+                <label for="playerNameInput">Your Name</label>
+                <input type="text" id="playerNameInput" class="form-control" required placeholder="Enter your name">
+            </div>
+            <div class="modal-buttons">
+                <button onclick="submitJoinTeam('${teamCode}')" class="join-btn">Join</button>
+                <button onclick="closeJoinModal()" class="btn-cancel">Cancel</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(playerNameModal);
 }
+
+function closeJoinModal() {
+    const modal = document.querySelector('.modal');
+    if (modal) {
+        document.body.removeChild(modal);
+    }
+}
+
+function submitJoinTeam(teamCode) {
+    const playerName = document.getElementById('playerNameInput').value.trim();
+    
+    if (!playerName) {
+        alert('Please enter your name');
+        return;
+    }
+    
+    // Submit via POST request
+    fetch('/join-existing-team/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            team_code: teamCode,
+            player_name: playerName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = data.redirect_url;
+        } else {
+            alert(data.error || 'Error joining team');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error joining team');
+    });
+    
+    closeJoinModal();
+}
+
+// Add styles for the modal
+document.addEventListener('DOMContentLoaded', function() {
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .modal-content {
+            background: rgba(33, 37, 41, 0.95);
+            border: 2px solid rgba(144, 200, 60, 0.3);
+            border-radius: 12px;
+            padding: 25px;
+            min-width: 300px;
+            max-width: 500px;
+        }
+        
+        .modal-content h3 {
+            color: #90C83C;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .btn-cancel {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            background: rgba(144, 200, 60, 0.1);
+            border: 1px solid rgba(144, 200, 60, 0.3);
+            border-radius: 4px;
+            color: white;
+            margin-top: 5px;
+        }
+    `;
+    document.head.appendChild(styleElement);
+});
 
 function getCookie(name) {
     let cookieValue = null;
