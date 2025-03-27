@@ -38,33 +38,6 @@
             </div>
         </div>
 
-        {% if not lobby.hunt_started %}
-        <div class="race-selection-section">
-            <h2>SELECT RACE</h2>
-            <form method="POST" class="race-form">
-                {% csrf_token %}
-                <select name="race_id" class="form-control" required>
-                    <option value="">Select a race...</option>
-                    {% for race in races %}
-                    <option value="{{ race.id }}">{{ race.name }} ({{ race.time_limit_minutes }} minutes)</option>
-            {% endfor %}
-                </select>
-                <button type="submit" name="start_race" class="btn btn-success start-race-btn">
-                    <i class="fas fa-play"></i> Start Race
-                </button>
-            </form>
-        </div>
-        {% else %}
-        <div class="race-info-section">
-            <h2>RACE IN PROGRESS</h2>
-            <div class="race-details">
-                <p><strong>Race:</strong> {{ lobby.race.name }}</p>
-                <p><strong>Started:</strong> {{ lobby.start_time|date:"F d, Y H:i" }}</p>
-                <p><strong>Time Limit:</strong> {{ lobby.race.time_limit_minutes }} minutes</p>
-            </div>
-        </div>
-        {% endif %}
-
         <div class="teams-section">
             <h2>TEAMS</h2>
             {% if lobby.teams.all %}
@@ -80,11 +53,11 @@
                                 <p><i class="fas fa-clock"></i> Joined: {{ team.created_at|date:"F d, Y" }}</p>
                             </div>
                         </div>
-                    {% endfor %}
+            {% endfor %}
                 </div>
-            {% else %}
+        {% else %}
                 <p class="no-teams">No teams have joined this lobby yet.</p>
-            {% endif %}
+        {% endif %}
         </div>
 
         <div class="back-button-container">
@@ -493,84 +466,6 @@
 .cancel-btn:hover {
     background: rgba(255, 255, 255, 0.2);
 }
-
-.race-selection-section,
-.race-info-section {
-    margin: 30px 0;
-    padding: 20px;
-    background: rgba(33, 37, 41, 0.95);
-    border: 2px solid rgba(144, 200, 60, 0.3);
-    border-radius: 12px;
-    text-align: center;
-}
-
-.race-selection-section h2,
-.race-info-section h2 {
-    color: #90C83C;
-    margin-bottom: 20px;
-}
-
-.race-form {
-    max-width: 500px;
-    margin: 0 auto;
-}
-
-.race-form select {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(144, 200, 60, 0.3);
-    color: white;
-    margin-bottom: 15px;
-    padding: 10px;
-    width: 100%;
-    border-radius: 8px;
-}
-
-.race-form select:focus {
-    outline: none;
-    border-color: #90C83C;
-    box-shadow: 0 0 0 2px rgba(144, 200, 60, 0.2);
-}
-
-.race-form option {
-    background: #212529;
-    color: white;
-}
-
-.start-race-btn {
-    width: 100%;
-    padding: 12px;
-    font-size: 1.1rem;
-    background-color: #90C83C;
-    border: none;
-    border-radius: 8px;
-    color: white;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.start-race-btn:hover {
-    background-color: #7BAF2F;
-    transform: translateY(-2px);
-}
-
-.race-details {
-    color: white;
-    text-align: left;
-    max-width: 500px;
-    margin: 0 auto;
-    background: rgba(33, 37, 41, 0.8);
-    padding: 20px;
-    border-radius: 8px;
-}
-
-.race-details p {
-    margin: 10px 0;
-}
-
-.race-details strong {
-    color: #90C83C;
-    margin-right: 10px;
-}
 </style>
 
 <!-- icons -->
@@ -585,12 +480,6 @@
     document.addEventListener('DOMContentLoaded', function() {
         connectWebSocket();
         setupRaceForm();
-        
-        // Set up race timer if race is in progress
-        if (raceInProgress) {
-            updateRaceTimer();
-            setInterval(updateRaceTimer, 1000);
-        }
     });
 
     function connectWebSocket() {
@@ -601,16 +490,8 @@
 
         socket.onmessage = function(e) {
             const data = JSON.parse(e.data);
-            console.log('Received WebSocket message:', data);
-            
             if (data.type === 'lobby_state') {
                 updateTeamsDisplay(data.teams);
-                if (data.hunt_started && data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                }
-            } else if (data.type === 'race_started') {
-                console.log('Race started, redirecting to:', data.redirect_url);
-                window.location.href = data.redirect_url;
             }
         };
 
@@ -625,45 +506,25 @@
 
         socket.onopen = function(e) {
             console.log('WebSocket connection established');
-            // Request initial state
-            socket.send(JSON.stringify({
-                'type': 'request_update'
-            }));
         };
     }
 
-    function updateTeamsDisplay(teams) {
-        const teamsGrid = document.querySelector('.teams-grid');
-        if (!teamsGrid) {
-            const teamsSection = document.querySelector('.teams-section');
-            if (teamsSection) {
-                teamsSection.innerHTML = `
-                    <h2>TEAMS</h2>
-                    <div class="teams-grid"></div>
-                `;
-                teamsGrid = teamsSection.querySelector('.teams-grid');
-            } else {
-                return;
-            }
-        }
-        
-        teamsGrid.innerHTML = '';
+    let currentTeamToDelete = null;
 
-        if (!teams || teams.length === 0) {
-            teamsGrid.innerHTML = '<p class="no-teams">No teams have joined this lobby yet.</p>';
-            return;
-        }
+    function updateTeamsDisplay(teams) {
+        const teamsGrid = document.getElementById('teamsGrid');
+        teamsGrid.innerHTML = '';
 
         teams.forEach(team => {
             const teamCard = document.createElement('div');
             teamCard.className = 'team-card';
             teamCard.innerHTML = `
+                <button class="delete-team-btn" onclick="showDeleteConfirm(${team.id})">
+                    <i class="fas fa-times"></i>
+                </button>
                 <div class="team-header">
                     <h3>${team.name}</h3>
                     <span class="team-code">Code: ${team.code}</span>
-                </div>
-                <div class="team-info">
-                    <p><i class="fas fa-users"></i> Players: ${team.members ? team.members.length : 0}</p>
                 </div>
                 <div class="team-members">
                     <h4>Members</h4>
@@ -683,42 +544,34 @@
         });
     }
 
-    function setupRaceForm() {
-        const raceForm = document.querySelector('.race-form');
-        if (raceForm) {
-            raceForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const raceId = document.querySelector('select[name="race_id"]').value;
-                if (!raceId) {
-                    alert('Please select a race');
-                    return;
-                }
+    function showDeleteConfirm(teamId) {
+        currentTeamToDelete = teamId;
+        document.getElementById('deleteConfirmModal').style.display = 'flex';
+    }
 
-                // Send the start race request via POST
-                fetch(`/lobby/${lobbyId}/start-race/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({
-                        race_id: raceId
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // The WebSocket will handle the redirect
-                        console.log('Race started successfully');
-                    } else {
-                        alert(data.error || 'Error starting race');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error starting race. Please try again.');
-                });
+    function closeModal() {
+        document.getElementById('deleteConfirmModal').style.display = 'none';
+        currentTeamToDelete = null;
+    }
+
+    function confirmDelete() {
+        if (currentTeamToDelete) {
+            fetch(`/team/${currentTeamToDelete}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to delete team');
+                }
+                closeModal();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to delete team');
+                closeModal();
             });
         }
     }

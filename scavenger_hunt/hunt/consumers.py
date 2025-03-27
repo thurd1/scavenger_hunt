@@ -5,7 +5,6 @@ from .models import Team, TeamMember, Lobby
 import logging
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from django.urls import reverse
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class TeamConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
-
+        
         # Send initial state
         await self.send_team_state()
 
@@ -246,7 +245,6 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
 
 class LobbyConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        """Handle connection to lobby websocket"""
         self.lobby_id = self.scope['url_route']['kwargs']['lobby_id']
         self.lobby_group_name = f'lobby_{self.lobby_id}'
         self.player_name = self.scope.get('session', {}).get('player_name')
@@ -266,10 +264,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         await self.send_lobby_state()
 
     async def disconnect(self, close_code):
-        """Handle disconnection from lobby"""
-        logger.info(f"WebSocket disconnected from lobby {self.lobby_id} for player {self.player_name}")
-        
-        # Leave the group
+        """Handle disconnection"""
         await self.channel_layer.group_discard(
             self.lobby_group_name,
             self.channel_name
@@ -277,60 +272,54 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_lobby_state(self):
-        """Get the current state of the lobby"""
-        try:
-            lobby = Lobby.objects.get(id=self.lobby_id)
-            teams = []
-            
-            for team in lobby.teams.all().prefetch_related('members'):
-                team_data = {
-                    'id': team.id,
-                    'name': team.name,
-                    'code': team.code,
-                    'members': list(team.members.all().values('name', 'role'))
-                }
-                teams.append(team_data)
-            
-            return {
-                'lobby_id': lobby.id,
-                'name': lobby.name,
-                'code': lobby.code,
-                'teams': teams,
-                'race_in_progress': lobby.race is not None and lobby.hunt_started,
-                'start_time': lobby.start_time.isoformat() if lobby.start_time else None,
-                'time_limit_minutes': lobby.race.time_limit_minutes if lobby.race else 60
-            }
-        except Lobby.DoesNotExist:
-            logger.error(f"Lobby {self.lobby_id} not found")
-            return {
-                'error': 'Lobby not found'
-            }
-        except Exception as e:
-            logger.error(f"Error getting lobby state: {e}")
-            return {
-                'error': str(e)
-            }
+        """Get current lobby state including teams and race status"""
+        lobby = Lobby.objects.get(id=self.lobby_id)
+        teams_data = []
+        for team in lobby.teams.all().prefetch_related('members'):
+            members = list(team.members.all())
+            teams_data.append({
+                'id': team.id,
+                'name': team.name,
+                'code': team.code,
+                'members': [{'id': m.id, 'role': m.role} for m in members],
+                'member_count': len(members)
+            })
+
+        return {
+            'teams': teams_data,
+            'hunt_started': lobby.hunt_started,
+            'race': {
+                'id': lobby.race.id,
+                'name': lobby.race.name,
+                'time_limit_minutes': lobby.race.time_limit_minutes
+            } if lobby.race else None
+        }
 
     async def send_lobby_state(self):
-        """Send the current state of the lobby"""
+        """Send current lobby state to the client"""
         state = await self.get_lobby_state()
         await self.send(text_data=json.dumps({
-            'type': 'lobby_update',
+            'type': 'lobby_state',
             **state
         }))
 
     async def lobby_update(self, event):
         """Handle lobby update event"""
-        # Forward the update to the WebSocket
-        await self.send(text_data=json.dumps(event))
+        await self.send_lobby_state()
 
     async def race_started(self, event):
         """Handle race started event"""
-        # Forward the race started event to the WebSocket
-        await self.send(text_data=json.dumps({
-            'type': 'race_started',
-            'redirect_url': event.get('redirect_url')
-        }))
+        # Get the first question URL
+        lobby = await database_sync_to_async(Lobby.objects.get)(id=self.lobby_id)
+        first_zone = await database_sync_to_async(lambda: lobby.race.zones.first())()
+        first_question = await database_sync_to_async(lambda: first_zone.questions.first())() if first_zone else None
+        
+        if first_question:
+            redirect_url = f"/studentQuestion/{self.lobby_id}/{first_question.id}/"
+            await self.send(text_data=json.dumps({
+                'type': 'race_started',
+                'redirect_url': redirect_url
+            }))
         
         # Also send updated lobby state
         await self.send_lobby_state()
@@ -339,15 +328,20 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         """Handle received messages"""
         try:
             data = json.loads(text_data)
-            logger.info(f"Received data in LobbyConsumer: {data}")
-            
             if data.get('type') == 'request_update':
                 await self.send_lobby_state()
-            
+            elif data.get('type') == 'team_update':
+                # Broadcast team update to all connected clients
+                await self.channel_layer.group_send(
+                    self.lobby_group_name,
+                    {
+                        'type': 'lobby_update'
+                    }
+                )
         except json.JSONDecodeError:
-            logger.error("Failed to decode JSON in LobbyConsumer")
+            logger.error("Invalid JSON received")
         except Exception as e:
-            logger.error(f"Error in LobbyConsumer receive: {e}")
+            logger.error(f"Error processing message: {e}")
 
     @database_sync_to_async
     def get_lobby_data(self):
