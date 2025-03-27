@@ -127,6 +127,8 @@ def start_race(request, lobby_id):
             
             # Notify all connected clients through WebSocket
             channel_layer = get_channel_layer()
+            
+            # Send to lobby channel
             async_to_sync(channel_layer.group_send)(
                 f'lobby_{lobby_id}',
                 {
@@ -134,6 +136,16 @@ def start_race(request, lobby_id):
                     'redirect_url': redirect_url
                 }
             )
+            
+            # Also send to race channel if the race exists
+            if lobby.race:
+                async_to_sync(channel_layer.group_send)(
+                    f'race_{lobby.race.id}',
+                    {
+                        'type': 'race_started',
+                        'redirect_url': redirect_url
+                    }
+                )
             
             return JsonResponse({
                 'success': True,

@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Scavenger Hunt{% endblock %}</title>
+    <script src="{% static 'hunt/js/race-websocket.js' %}"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -29,18 +30,6 @@
             align-items: center;
             padding: 20px;
             box-sizing: border-box;
-        }
-
-        header {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 0;
-        }
-
-        header img {
-            max-width: 400px;
-            height: auto;
-            margin: 10px 0 0 0;
         }
 
         .welcome-text {
@@ -272,12 +261,6 @@
 </head>
 <body>
     <div class="app-content">
-        <header>
-            <a href="/">
-                <img src="{% static 'hunt/images/YoungLifeLogo.png' %}" alt="Young Life Logo" class="logo-img">
-            </a>
-        </header>
-
         <div class="welcome-text">
             {% block welcome_text %}{% endblock %}
         </div>

@@ -9,7 +9,7 @@ websocket_urlpatterns = [
     re_path(r'^ws/team/(?P<team_id>\d+)/?$', TeamConsumer.as_asgi()),
     re_path(r'^ws/available-teams/?$', AvailableTeamsConsumer.as_asgi()),
     re_path(r'^ws/lobby/(?P<lobby_id>\d+)/?$', LobbyConsumer.as_asgi()),
-    re_path(r'^ws/race/(?P<race_id>\w+)/$', RaceConsumer.as_asgi()),
+    re_path(r'^ws/race/(?P<race_id>\d+)/?$', RaceConsumer.as_asgi()),
 ]
 
 application = ProtocolTypeRouter({
