@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Lobby Details{% endblock %}
+{% block title %}Lobby: {{ lobby.name }}{% endblock %}
 
 {% block welcome_text %}
     <p style="color: #90C83C">Game Lobby Management</p>
@@ -476,115 +476,126 @@
 <!-- icons -->
 <link rel="stylesheeit" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
+<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 <script>
     const lobbyId = {{ lobby.id }};
-    let socket;
-    let raceInProgress = {% if lobby.race %}true{% else %}false{% endif %};
-
-    // Initialize WebSocket connection when the page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        connectWebSocket();
-        setupRaceForm();
-    });
-
-    function connectWebSocket() {
-        const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        socket = new WebSocket(
-            `${wsScheme}://${window.location.host}/ws/lobby/${lobbyId}/`
-        );
-
-        socket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            if (data.type === 'race_started') {
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                }
-            } else if (data.type === 'lobby_update') {
-                // Handle lobby updates
-                updateTeamsDisplay(data.teams || []);
-            }
-        };
-
-        socket.onclose = function(e) {
-            console.error('Lobby socket closed unexpectedly');
-        };
-
-        socket.onerror = function(e) {
-            console.error('WebSocket error:', e);
-        };
-
-        socket.onopen = function(e) {
-            console.log('WebSocket connection established');
-        };
-    }
-
-    let currentTeamToDelete = null;
-
-    function updateTeamsDisplay(teams) {
-        const teamsGrid = document.getElementById('teamsGrid');
-        teamsGrid.innerHTML = '';
-
-        teams.forEach(team => {
-            const teamCard = document.createElement('div');
-            teamCard.className = 'team-card';
-            teamCard.innerHTML = `
-                <button class="delete-team-btn" onclick="showDeleteConfirm(${team.id})">
-                    <i class="fas fa-times"></i>
-                </button>
-                <div class="team-header">
-                    <h3>${team.name}</h3>
-                    <span class="team-code">Code: ${team.code}</span>
-                </div>
-                <div class="team-members">
-                    <h4>Members</h4>
-                    ${team.members && team.members.length > 0 ? `
-                        <ul class="member-list">
-                            ${team.members.map(member => `
-                                <li>
-                                    <i class="fas fa-user"></i>
-                                    <span>${member.role}</span>
-                                </li>
-                            `).join('')}
-                        </ul>
-                    ` : '<p class="no-members">No members in this team yet</p>'}
-                </div>
-            `;
-            teamsGrid.appendChild(teamCard);
-        });
-    }
-
-    function showDeleteConfirm(teamId) {
-        currentTeamToDelete = teamId;
+    let teamIdToDelete = null;
+    let lobbyToDelete = {{ lobby.id }};
+    
+    // Delete team confirmation modal
+    function showModal() {
         document.getElementById('deleteConfirmModal').style.display = 'flex';
     }
-
+    
     function closeModal() {
         document.getElementById('deleteConfirmModal').style.display = 'none';
-        currentTeamToDelete = null;
     }
-
+    
+    function confirmDeleteTeam(teamId) {
+        teamIdToDelete = teamId;
+        showModal();
+    }
+    
     function confirmDelete() {
-        if (currentTeamToDelete) {
-            fetch(`/team/${currentTeamToDelete}/delete/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to delete team');
-                }
-                closeModal();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to delete team');
-                closeModal();
-            });
+        if (teamIdToDelete) {
+            deleteTeam(teamIdToDelete);
+        }
+        closeModal();
+    }
+    
+    function confirmDeleteLobby(lobbyId) {
+        if (confirm('Are you sure you want to delete this lobby?')) {
+            deleteLobby(lobbyId);
         }
     }
-
+    
+    function deleteTeam(teamId) {
+        fetch(`/api/teams/${teamId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            } else {
+                alert('Error deleting team: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    }
+    
+    function deleteLobby(lobbyId) {
+        fetch(`/api/lobbies/${lobbyId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.href = '{% url "manage_lobbies" %}';
+            } else {
+                alert('Error deleting lobby: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    }
+    
+    function updateTimer() {
+        const timerDisplay = document.getElementById('timer');
+        if (!timerDisplay) {
+            return;
+        }
+        
+        const now = new Date().getTime();
+        const targetTime = new Date(timerDisplay.dataset.targetTime).getTime();
+        const remaining = targetTime - now;
+        
+        if (remaining <= 0) {
+            timerDisplay.textContent = "Time's up!";
+            return;
+        }
+        
+        const minutes = Math.floor(remaining / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        
+        timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    function startRace() {
+        const lobbyId = document.getElementById('start-race-btn').dataset.lobbyId;
+        
+        fetch(`/lobby/${lobbyId}/start-race/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                console.log('Race started');
+            } else {
+                console.error('Error starting race:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error starting race:', error);
+        });
+    }
+    
+    // Get CSRF token from cookies
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -599,88 +610,5 @@
         }
         return cookieValue;
     }
-
-    let lobbyToDelete = {{ lobby.id }};
-
-    function confirmDeleteLobby(lobbyId) {
-        document.getElementById('deleteModal').style.display = 'block';
-    }
-
-    function closeDeleteModal() {
-        document.getElementById('deleteModal').style.display = 'none';
-    }
-
-    function deleteLobby() {
-        fetch(`/lobby/${lobbyToDelete}/delete/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                window.location.href = "{% url 'manage_lobbies' %}";
-            } else {
-                alert('Failed to delete lobby');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to delete lobby');
-        });
-    }
-
-    function updateRaceTimer(startTime) {
-        if (!raceInProgress) return;
-        
-        const timerDisplay = document.getElementById('timerDisplay');
-        if (!timerDisplay) return;
-        
-        const start = startTime || new Date('{{ lobby.race.start_time|date:"c" }}');
-        const timeLimit = {{ lobby.race.time_limit_minutes|default:60 }} * 60 * 1000; // convert to milliseconds
-        
-        const now = new Date();
-        const elapsed = now - start;
-        const remaining = timeLimit - elapsed;
-        
-        if (remaining <= 0) {
-            timerDisplay.textContent = 'Time is up!';
-            timerDisplay.classList.add('time-up');
-            return;
-        }
-        
-        const minutes = Math.floor(remaining / 60000);
-        const seconds = Math.floor((remaining % 60000) / 1000);
-        
-        timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-
-    // Add race WebSocket connection
-    function connectToRace(raceId) {
-        const raceSocket = new WebSocket(
-            'ws://' + window.location.host + '/ws/race/' + raceId + '/'
-        );
-
-        raceSocket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            if (data.type === 'race_started') {
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                }
-            }
-        };
-
-        raceSocket.onclose = function(e) {
-            console.log('Race socket closed');
-        };
-    }
-
-    // Connect to race socket if needed
-    document.addEventListener('DOMContentLoaded', function() {
-        const raceId = document.getElementById('start-race-btn')?.dataset.raceId;
-        if (raceId) {
-            connectToRace(raceId);
-        }
-    });
 </script>
 {% endblock %}
