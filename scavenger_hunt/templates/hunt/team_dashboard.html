@@ -8,7 +8,6 @@
             <h1>Team Dashboard</h1>
             <div class="team-details">
                 <h2>Team: {{ team.name }}</h2>
-                <p class="team-code">{{ team.code }}</p>
             </div>
 
             <div class="members-section">
@@ -24,13 +23,6 @@
         </div>
 
         <div class="navigation-buttons">
-            {% with lobby=team.participating_lobbies.first %}
-                {% if lobby %}
-                    <a href="{% url 'join_existing_team' lobby_id=lobby.id %}" class="btn home-btn">
-                        <i class="fas fa-users"></i> Join Team
-                    </a>
-                {% endif %}
-            {% endwith %}
             <a href="{% url 'join_game_session' %}" class="btn change-team-btn">
                 <i class="fas fa-home"></i> Back to Home
             </a>
@@ -62,15 +54,6 @@
 .team-details h2 {
     color: #ffffff;
     margin-bottom: 10px;
-}
-
-.team-code {
-    display: inline-block;
-    background: rgba(144, 200, 60, 0.1);
-    padding: 8px 16px;
-    border-radius: 6px;
-    color: #90C83C;
-    font-size: 1.1rem;
 }
 
 .members-section {
@@ -133,11 +116,6 @@
     transform: translateY(-2px);
 }
 
-.home-btn {
-    background: #90C83C;
-    color: #ffffff;
-}
-
 .change-team-btn {
     background: rgba(255, 255, 255, 0.1);
     color: #ffffff;
@@ -173,7 +151,7 @@
             membersList.innerHTML = members.map(member => `
                 <div class="member-item">
                     <i class="fas fa-user"></i>
-                    <span>${member.role}</span>
+                    <span>${member.name || member.role}</span>
                 </div>
             `).join('');
         } else {
