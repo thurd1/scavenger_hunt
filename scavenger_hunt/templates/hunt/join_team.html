@@ -10,21 +10,6 @@
     </div>
 
     <div class="join-team-form-container">
-        <!-- Player name input section -->
-        <div class="player-name-section">
-            <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Your Information</h3>
-            <div class="form-group">
-                <label for="playerName">Your Name</label>
-                <input type="text" 
-                       id="playerName" 
-                       name="player_name" 
-                       class="form-control" 
-                       required 
-                       value="{{ request.session.player_name|default:'' }}"
-                       placeholder="Enter your name">
-            </div>
-        </div>
-
         <!-- Existing teams section -->
         <div class="existing-teams-section">
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Available Teams</h3>
@@ -58,20 +43,11 @@
             <span>OR</span>
         </div>
         
-        <!-- Create team section -->
+        <!-- Create team section - simplified -->
         <div class="create-team-section">
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
-            <div class="form-group">
-                <label for="teamName">Team Name</label>
-                <input type="text" 
-                       id="teamName" 
-                       name="team_name" 
-                       class="form-control"
-                       required 
-                       placeholder="Enter team name">
-            </div>
             
-            <button onclick="createTeam()" class="create-team-btn">Create Team</button>
+            <a href="{% url 'create_team' %}" class="create-team-btn">Create Team</a>
         </div>
     </div>
 </div>
@@ -103,10 +79,6 @@
     border: 2px solid rgba(144, 200, 60, 0.3);
     border-radius: 12px;
     padding: 2rem;
-}
-
-.player-name-section {
-    margin-bottom: 2rem;
 }
 
 .existing-teams-section {
@@ -215,39 +187,13 @@
 .create-team-section {
     max-width: 500px;
     margin: 0 auto;
-}
-
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-group label {
-    display: block;
-    color: #90C83C;
-    margin-bottom: 0.5rem;
-}
-
-.form-control {
-    width: 100%;
-    padding: 0.75rem;
-    background: rgba(144, 200, 60, 0.1);
-    border: 1px solid rgba(144, 200, 60, 0.3);
-    border-radius: 4px;
-    color: #ffffff;
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: #90C83C;
-    box-shadow: 0 0 0 2px rgba(144, 200, 60, 0.2);
-}
-
-.form-control::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
 }
 
 .create-team-btn {
+    display: inline-block;
     width: 100%;
+    max-width: 300px;
     background: rgba(144, 200, 60, 0.1);
     color: #90C83C;
     border: 1px solid rgba(144, 200, 60, 0.3);
@@ -256,6 +202,8 @@
     cursor: pointer;
     transition: all 0.2s;
     font-size: 1rem;
+    text-decoration: none;
+    text-align: center;
 }
 
 .create-team-btn:hover {
@@ -295,33 +243,9 @@
 
 <script>
 let socket = null;
-let lobbyId = {{ lobby.id }};
 
 document.addEventListener("DOMContentLoaded", function() {
     setupWebSocket();
-    
-    // Save player name when changed
-    document.getElementById('playerName').addEventListener('change', function() {
-        const playerName = this.value.trim();
-        if (playerName) {
-            sessionStorage.setItem('playerName', playerName);
-            // Send player name to server
-            fetch('/save_player_name/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({ player_name: playerName })
-            });
-        }
-    });
-    
-    // Initialize player name from session storage
-    const storedName = sessionStorage.getItem('playerName');
-    if (storedName) {
-        document.getElementById('playerName').value = storedName;
-    }
 });
 
 function setupWebSocket() {
@@ -368,27 +292,25 @@ function updateTeamsDisplay(teams) {
     
     if (teams && teams.length > 0) {
         teams.forEach(team => {
-            if (team.lobby_id === lobbyId) {
-                const teamCard = document.createElement('div');
-                teamCard.className = 'team-card';
-                
-                teamCard.innerHTML = `
-                    <div class="team-header">
-                        <h4>${team.name}</h4>
-                        <span class="member-count">${team.members.length} member(s)</span>
-                    </div>
-                    <div class="team-members">
-                        <ul class="members-list">
-                            ${team.members.map(member => `
-                                <li><i class="fas fa-user"></i> ${member.name}</li>
-                            `).join('')}
-                        </ul>
-                        <button onclick="joinTeam(${team.id})" class="join-btn">Join Team</button>
-                    </div>
-                `;
-                
-                teamsContainer.appendChild(teamCard);
-            }
+            const teamCard = document.createElement('div');
+            teamCard.className = 'team-card';
+            
+            teamCard.innerHTML = `
+                <div class="team-header">
+                    <h4>${team.name}</h4>
+                    <span class="member-count">${team.members.length} member(s)</span>
+                </div>
+                <div class="team-members">
+                    <ul class="members-list">
+                        ${team.members.map(member => `
+                            <li><i class="fas fa-user"></i> ${member.name || member.role}</li>
+                        `).join('')}
+                    </ul>
+                    <button onclick="joinTeam('${team.code}')" class="join-btn">Join Team</button>
+                </div>
+            `;
+            
+            teamsContainer.appendChild(teamCard);
         });
     } else {
         teamsContainer.innerHTML = `
@@ -399,74 +321,9 @@ function updateTeamsDisplay(teams) {
     }
 }
 
-function joinTeam(teamId) {
-    const playerName = document.getElementById('playerName').value.trim();
-    
-    if (!playerName) {
-        alert('Please enter your name first!');
-        return;
-    }
-    
-    fetch(`/lobby/${lobbyId}/join-team/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            team_id: teamId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.href = data.redirect_url;
-        } else {
-            alert(data.error || 'Error joining team');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error joining team');
-    });
-}
-
-function createTeam() {
-    const playerName = document.getElementById('playerName').value.trim();
-    const teamName = document.getElementById('teamName').value.trim();
-    
-    if (!playerName) {
-        alert('Please enter your name first!');
-        return;
-    }
-    
-    if (!teamName) {
-        alert('Please enter a team name!');
-        return;
-    }
-    
-    fetch(`/lobby/${lobbyId}/create-team/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            team_name: teamName
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.href = data.redirect_url;
-        } else {
-            alert(data.error || 'Error creating team');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error creating team');
-    });
+function joinTeam(teamCode) {
+    // For now, we'll redirect to a page where they can enter their name
+    window.location.href = `/join-team/${teamCode}/`;
 }
 
 function getCookie(name) {
