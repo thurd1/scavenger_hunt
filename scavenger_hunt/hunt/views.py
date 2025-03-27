@@ -294,40 +294,63 @@ def join_team(request):
 
 @require_http_methods(["POST"])
 def join_existing_team(request):
-    data = json.loads(request.body)
-    team_code = data.get('team_code')
-    player_name = data.get('player_name')
-
-    if not team_code or not player_name:
-        return JsonResponse({'success': False, 'error': 'Missing team code or player name'})
-
     try:
-        team = Team.objects.get(code=team_code)
-        # Check if player already exists in team
-        if TeamMember.objects.filter(team=team, role=player_name).exists():
-            return JsonResponse({'success': False, 'error': 'You are already in this team'})
+        # Try to parse JSON data first
+        if request.content_type == 'application/json':
+            if request.body:
+                data = json.loads(request.body)
+            else:
+                return JsonResponse({'success': False, 'error': 'Empty request body'})
+        else:
+            # Fall back to form data
+            data = request.POST
             
-        # Create team member
-        TeamMember.objects.create(team=team, role=player_name, name=player_name)
-        
-        # Store player name in session
-        request.session['player_name'] = player_name
-        request.session.modified = True
-        
-        return JsonResponse({
-            'success': True,
-            'redirect_url': reverse('view_team', args=[team.id])
-        })
-    except Team.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Team not found'})
+        team_code = data.get('team_code')
+        player_name = data.get('player_name')
+
+        if not team_code or not player_name:
+            return JsonResponse({'success': False, 'error': 'Missing team code or player name'})
+
+        try:
+            team = Team.objects.get(code=team_code)
+            # Check if player already exists in team
+            if TeamMember.objects.filter(team=team, role=player_name).exists():
+                return JsonResponse({'success': False, 'error': 'You are already in this team'})
+                
+            # Create team member
+            TeamMember.objects.create(team=team, role=player_name, name=player_name)
+            
+            # Store player name in session
+            request.session['player_name'] = player_name
+            request.session.modified = True
+            
+            return JsonResponse({
+                'success': True,
+                'redirect_url': reverse('view_team', args=[team.id])
+            })
+        except Team.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Team not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON data'})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        return JsonResponse({'success': False, 'error': f'Server error: {str(e)}'})
 
 @require_http_methods(["POST"])
 def create_standalone_team(request):
     """Create a new team with the current player as a member."""
     try:
-        data = json.loads(request.body)
+        # Try to parse JSON data first
+        if request.content_type == 'application/json':
+            if request.body:
+                data = json.loads(request.body)
+            else:
+                return JsonResponse({'success': False, 'error': 'Empty request body'})
+        else:
+            # Fall back to form data
+            data = request.POST
+            
         team_name = data.get('team_name')
         player_name = data.get('player_name')
         
