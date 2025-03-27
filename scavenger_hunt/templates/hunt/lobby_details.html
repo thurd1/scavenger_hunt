@@ -476,6 +476,9 @@
 <!-- icons -->
 <link rel="stylesheeit" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
+{% endblock %}
+
+{% block scripts %}
 <script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 <script>
     const lobbyId = {{ lobby.id }};

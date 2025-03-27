@@ -1,4 +1,4 @@
-// Race WebSocket connection handler
+js_content = """// Race WebSocket connection handler
 function connectToRaceWebsocket(raceId) {
     const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const raceSocket = new WebSocket(
@@ -44,4 +44,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (pathMatch && pathMatch[1]) {
         connectToRaceWebsocket(pathMatch[1]);
     }
-}); 
+});"""
+
+with open("static/hunt/js/race-websocket.js", "w") as f:
+    f.write(js_content)
+
+print("File created successfully!")
