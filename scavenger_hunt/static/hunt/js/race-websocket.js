@@ -4,48 +4,75 @@
  * @returns {WebSocket} - The WebSocket connection
  */
 function connectToRaceWebsocket(raceId) {
-    const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const raceSocket = new WebSocket(
-        wsScheme + '://' + window.location.host + '/ws/race/' + raceId + '/'
-    );
+    // Determine if we're using a secure connection
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/race/${raceId}/`;
     
-    raceSocket.onopen = function(e) {
-        console.log('Race socket connected');
-    };
+    console.log(`Connecting to race WebSocket at: ${wsUrl}`);
+    const socket = new WebSocket(wsUrl);
     
-    raceSocket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        console.log('Race socket message:', data);
-        
-        if (data.type === 'race_started') {
-            if (data.redirect_url) {
-                window.location.href = data.redirect_url;
-            }
+    socket.onopen = function(e) {
+        console.log('Race WebSocket connection established');
+        const statusElement = document.getElementById('connection-status');
+        if (statusElement) {
+            statusElement.textContent = 'Connected';
+            statusElement.classList.remove('text-danger');
+            statusElement.classList.add('text-success');
         }
     };
     
-    raceSocket.onclose = function(e) {
-        console.log('Race socket closed');
+    socket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        console.log('Race WebSocket message received:', data);
+        
+        // Handle different types of messages
+        if (data.type === 'race_started') {
+            console.log('Race started, redirecting to:', data.redirect_url);
+            window.location.href = data.redirect_url;
+        }
     };
     
-    raceSocket.onerror = function(e) {
-        console.error('Race socket error:', e);
+    socket.onclose = function(e) {
+        console.log('Race WebSocket connection closed');
+        const statusElement = document.getElementById('connection-status');
+        if (statusElement) {
+            statusElement.textContent = 'Disconnected';
+            statusElement.classList.remove('text-success');
+            statusElement.classList.add('text-danger');
+        }
     };
     
-    return raceSocket;
+    socket.onerror = function(e) {
+        console.error('Race WebSocket error:', e);
+        const statusElement = document.getElementById('connection-status');
+        if (statusElement) {
+            statusElement.textContent = 'Connection Error';
+            statusElement.classList.remove('text-success');
+            statusElement.classList.add('text-danger');
+        }
+    };
+    
+    return socket;
 }
 
-// Initialize race websocket if race ID is available
+// Initialize WebSocket connection when DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // For lobby details page
+    // Check if we have a race ID (either from a button or from URL)
     const startRaceBtn = document.getElementById('start-race-btn');
+    let raceId = null;
+    
     if (startRaceBtn && startRaceBtn.dataset.raceId) {
-        connectToRaceWebsocket(startRaceBtn.dataset.raceId);
+        raceId = startRaceBtn.dataset.raceId;
+    } else {
+        // Try to get race ID from URL path (e.g., /race/123/)
+        const pathMatch = window.location.pathname.match(/\/race\/(\d+)\//);
+        if (pathMatch && pathMatch[1]) {
+            raceId = pathMatch[1];
+        }
     }
     
-    // For race page with ID in URL
-    const pathMatch = window.location.pathname.match(/\/race\/(\d+)\//);
-    if (pathMatch && pathMatch[1]) {
-        connectToRaceWebsocket(pathMatch[1]);
+    if (raceId) {
+        console.log(`Found race ID: ${raceId}`);
+        window.raceSocket = connectToRaceWebsocket(raceId);
     }
 });

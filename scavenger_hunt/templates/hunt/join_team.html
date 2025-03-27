@@ -368,60 +368,39 @@ function submitJoinTeam(teamCode) {
     
     console.log('Submitting join request for team:', teamCode, 'player:', playerName);
     
-    // Submit via POST request
-    fetch('/join-existing-team/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            team_code: teamCode,
-            player_name: playerName
-        })
-    })
-    .then(response => {
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-        }
-        // Check if response is JSON
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            return response.json();
-        } else {
-            // For non-JSON responses, get the text
-            return response.text().then(text => {
-                console.log('Response is not JSON:', text);
-                throw new Error('Unexpected response format');
-            });
-        }
-    })
-    .then(data => {
-        console.log('Response data:', data);
-        if (data.success) {
-            // Store player name in session before redirect
-            sessionStorage.setItem('player_name', playerName);
-            
-            // Use setTimeout to ensure console logs appear
-            setTimeout(() => {
-                console.log('Redirecting to:', data.redirect_url);
-                window.location.href = data.redirect_url;
-            }, 100);
-        } else {
-            alert(data.error || 'Error joining team');
-        }
-    })
-    .catch(error => {
-        console.error('Error joining team:', error);
-        alert('Error joining team: ' + error.message);
-        
-        // Remove loading message
-        const loadingMsg = document.getElementById('loading-message');
-        if (loadingMsg) {
-            loadingMsg.remove();
-        }
-    });
+    // Store values in sessionStorage
+    sessionStorage.setItem('player_name', playerName);
+    
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/join-existing-team/';
+    form.style.display = 'none';
+    
+    // Add CSRF token
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = getCookie('csrftoken');
+    form.appendChild(csrfInput);
+    
+    // Add team code
+    const teamCodeInput = document.createElement('input');
+    teamCodeInput.type = 'hidden';
+    teamCodeInput.name = 'team_code';
+    teamCodeInput.value = teamCode;
+    form.appendChild(teamCodeInput);
+    
+    // Add player name
+    const playerNameInput = document.createElement('input');
+    playerNameInput.type = 'hidden';
+    playerNameInput.name = 'player_name';
+    playerNameInput.value = playerName;
+    form.appendChild(playerNameInput);
+    
+    // Add form to document and submit
+    document.body.appendChild(form);
+    form.submit();
 }
 
 // Add styles for the modal
@@ -555,60 +534,39 @@ function submitCreateTeam() {
     
     console.log('Creating team:', teamName, 'player:', playerName);
     
-    // Submit via POST request
-    fetch('/create-standalone-team/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            team_name: teamName,
-            player_name: playerName
-        })
-    })
-    .then(response => {
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-        }
-        // Check if response is JSON
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            return response.json();
-        } else {
-            // For non-JSON responses, get the text
-            return response.text().then(text => {
-                console.log('Response is not JSON:', text);
-                throw new Error('Unexpected response format');
-            });
-        }
-    })
-    .then(data => {
-        console.log('Response data:', data);
-        if (data.success) {
-            // Store player name in session before redirect
-            sessionStorage.setItem('player_name', playerName);
-            
-            // Use setTimeout to ensure console logs appear
-            setTimeout(() => {
-                console.log('Redirecting to:', data.redirect_url);
-                window.location.href = data.redirect_url;
-            }, 100);
-        } else {
-            alert(data.error || 'Error creating team');
-        }
-    })
-    .catch(error => {
-        console.error('Error creating team:', error);
-        alert('Error creating team: ' + error.message);
-        
-        // Remove loading message
-        const loadingMsg = document.getElementById('loading-message');
-        if (loadingMsg) {
-            loadingMsg.remove();
-        }
-    });
+    // Store values in sessionStorage
+    sessionStorage.setItem('player_name', playerName);
+    
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/create-standalone-team/';
+    form.style.display = 'none';
+    
+    // Add CSRF token
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = getCookie('csrftoken');
+    form.appendChild(csrfInput);
+    
+    // Add team name
+    const teamNameInput = document.createElement('input');
+    teamNameInput.type = 'hidden';
+    teamNameInput.name = 'team_name';
+    teamNameInput.value = teamName;
+    form.appendChild(teamNameInput);
+    
+    // Add player name
+    const playerNameInput = document.createElement('input');
+    playerNameInput.type = 'hidden';
+    playerNameInput.name = 'player_name';
+    playerNameInput.value = playerName;
+    form.appendChild(playerNameInput);
+    
+    // Add form to document and submit
+    document.body.appendChild(form);
+    form.submit();
 }
 </script>
 {% endblock %} 
