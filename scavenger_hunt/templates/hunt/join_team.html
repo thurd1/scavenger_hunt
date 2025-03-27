@@ -39,7 +39,7 @@
                             <div class="team-members">
                                 <ul class="members-list">
                                     {% for member in team.members.all %}
-                                        <li><i class="fas fa-user"></i> {{ member.role }}</li>
+                                        <li><i class="fas fa-user"></i> {{ member.name }}</li>
                                     {% endfor %}
                                 </ul>
                                 <button onclick="joinTeam('{{ team.code }}')" class="join-btn">Join Team</button>

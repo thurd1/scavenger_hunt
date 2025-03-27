@@ -308,7 +308,7 @@ def join_existing_team(request):
             return JsonResponse({'success': False, 'error': 'You are already in this team'})
             
         # Create team member
-        TeamMember.objects.create(team=team, role=player_name)
+        TeamMember.objects.create(team=team, role=player_name, name=player_name)
         
         # Store player name in session
         request.session['player_name'] = player_name
@@ -359,7 +359,8 @@ def create_standalone_team(request):
         # Create the team member
         TeamMember.objects.create(
             team=team,
-            role=player_name
+            role=player_name,
+            name=player_name
         )
         
         # Store in session
@@ -460,7 +461,8 @@ def create_team(request, lobby_id):
                 if not existing_member:
                     team_member = TeamMember.objects.create(
                         team=team,
-                        role=player_name
+                        role=player_name,
+                        name=player_name
                     )
             
             request.session['team_id'] = team.id
