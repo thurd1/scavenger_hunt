@@ -53,11 +53,11 @@
                                 <p><i class="fas fa-clock"></i> Joined: {{ team.created_at|date:"F d, Y" }}</p>
                             </div>
                         </div>
-            {% endfor %}
+                    {% endfor %}
                 </div>
-        {% else %}
+            {% else %}
                 <p class="no-teams">No teams have joined this lobby yet.</p>
-        {% endif %}
+            {% endif %}
         </div>
 
         <div class="back-button-container">

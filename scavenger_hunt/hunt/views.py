@@ -20,6 +20,7 @@ import random
 import string
 import json
 from django.core.serializers.json import DjangoJSONEncoder
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -97,27 +98,47 @@ def start_race(request, lobby_id):
                 return JsonResponse({'success': False, 'error': 'Race has already started'})
             
             # Get or create race
-            race = Race.objects.create(
-                lobby=lobby,
-                start_time=timezone.now(),
-                time_limit_minutes=60  # Set default time limit
-            )
+            if not lobby.race:
+                race = Race.objects.filter(is_active=True).first()
+                if not race:
+                    return JsonResponse({'success': False, 'error': 'No active race available'})
+                lobby.race = race
             
-            # Load questions for the race
-            questions = Question.objects.all()[:5]  # Get first 5 questions for now
-            race.questions.set(questions)
+            # Update lobby state
+            lobby.hunt_started = True
+            lobby.start_time = timezone.now()
+            lobby.save()
+            
+            # Load questions for the race if not already loaded
+            if not lobby.race.questions.exists():
+                questions = Question.objects.all()[:5]  # Get first 5 questions for now
+                lobby.race.questions.set(questions)
             
             # Get the first question
-            first_question = questions.first()
+            first_question = lobby.race.questions.first()
             if not first_question:
                 return JsonResponse({'success': False, 'error': 'No questions available'})
             
+            # Build the redirect URL
+            redirect_url = f'/studentQuestion/{lobby_id}/{first_question.id}/'
+            
+            # Notify all connected clients through WebSocket
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'lobby_{lobby_id}',
+                {
+                    'type': 'race_started',
+                    'redirect_url': redirect_url
+                }
+            )
+            
             return JsonResponse({
                 'success': True,
-                'redirect_url': f'/studentQuestion/{lobby_id}/{first_question.id}/'
+                'redirect_url': redirect_url
             })
             
         except Exception as e:
+            logger.error(f"Error starting race: {e}")
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
@@ -847,3 +868,266 @@ def add_question(request, race_id):
             messages.error(request, f'Error adding question: {str(e)}')
             
     return redirect('race_detail', race_id=race_id)
+
+def student_question(request, lobby_id, question_id):
+    """Display a question to the student"""
+    # Check if the player has a name
+    player_name = request.session.get('player_name')
+    if not player_name:
+        return redirect('join_game_session')
+    
+    try:
+        lobby = Lobby.objects.get(id=lobby_id)
+        question = Question.objects.get(id=question_id)
+        
+        # Check if race has started
+        if not lobby.hunt_started:
+            return render(request, 'hunt/error.html', {
+                'error': 'Race has not started yet. Please wait for the leader to start the race.'
+            })
+        
+        # Check if time limit is exceeded
+        time_elapsed = timezone.now() - lobby.start_time
+        if time_elapsed > timedelta(minutes=lobby.time_limit):
+            return render(request, 'hunt/error.html', {
+                'error': 'Race time limit has been exceeded.'
+            })
+        
+        # Get the team for this player
+        try:
+            team_member = TeamMember.objects.get(name=player_name, team__lobby=lobby)
+            team = team_member.team
+            
+            # Prepare the context
+            context = {
+                'lobby': lobby,
+                'question': question,
+                'player_name': player_name,
+                'team': team,
+                'requires_photo': question.requires_photo
+            }
+            
+            return render(request, 'hunt/student_question.html', context)
+            
+        except TeamMember.DoesNotExist:
+            return render(request, 'hunt/error.html', {
+                'error': 'You are not a member of any team in this lobby.'
+            })
+            
+    except Lobby.DoesNotExist:
+        return render(request, 'hunt/error.html', {
+            'error': 'Lobby not found.'
+        })
+    except Question.DoesNotExist:
+        return render(request, 'hunt/error.html', {
+            'error': 'Question not found.'
+        })
+
+def check_answer(request, lobby_id, question_id):
+    """Check if the answer submitted by a student is correct"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+    
+    # Check if player has a name
+    player_name = request.session.get('player_name')
+    if not player_name:
+        return JsonResponse({'error': 'No player name found'}, status=400)
+    
+    try:
+        lobby = Lobby.objects.get(id=lobby_id)
+        question = Question.objects.get(id=question_id)
+        
+        # Check if race has started
+        if not lobby.hunt_started:
+            return JsonResponse({'error': 'Race has not started yet'}, status=400)
+        
+        # Check if time limit is exceeded
+        time_elapsed = timezone.now() - lobby.start_time
+        if time_elapsed > timedelta(minutes=lobby.time_limit):
+            return JsonResponse({'error': 'Race time limit exceeded'}, status=400)
+        
+        # Get the submitted answer
+        answer = request.POST.get('answer', '').strip().lower()
+        
+        # Get the correct answer and convert to lowercase for case-insensitive comparison
+        correct_answer = question.answer.lower()
+        
+        # Check if the answer is correct
+        is_correct = answer == correct_answer
+        
+        # Update progress if correct
+        if is_correct:
+            # Find the team for this player
+            try:
+                team_member = TeamMember.objects.get(name=player_name, team__lobby=lobby)
+                team = team_member.team
+                
+                # Mark this question as completed for the team
+                team_progress, created = TeamProgress.objects.get_or_create(team=team, question=question)
+                if created or not team_progress.completed:
+                    team_progress.completed = True
+                    team_progress.completion_time = timezone.now()
+                    team_progress.save()
+                    
+                    # Send WebSocket update
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        f'team_{team.id}',
+                        {
+                            'type': 'team_update',
+                            'message': {
+                                'type': 'question_completed',
+                                'question_id': question_id,
+                                'team_id': team.id
+                            }
+                        }
+                    )
+                    
+                    # Send update to lobby
+                    async_to_sync(channel_layer.group_send)(
+                        f'lobby_{lobby.id}',
+                        {
+                            'type': 'lobby_update',
+                            'message': {
+                                'type': 'team_progress',
+                                'team_id': team.id,
+                                'question_id': question_id,
+                                'completed': True
+                            }
+                        }
+                    )
+                    
+                # Check if all questions are completed
+                total_questions = Question.objects.filter(race=lobby.race).count()
+                completed_questions = TeamProgress.objects.filter(team=team, completed=True).count()
+                
+                all_completed = total_questions <= completed_questions
+                
+                return JsonResponse({
+                    'correct': True,
+                    'message': 'Correct answer!',
+                    'all_completed': all_completed,
+                    'next_url': reverse('race_complete') if all_completed else ''
+                })
+                
+            except TeamMember.DoesNotExist:
+                return JsonResponse({'error': 'Player not found in any team'}, status=400)
+        
+        return JsonResponse({
+            'correct': False,
+            'message': 'Incorrect answer. Try again!'
+        })
+        
+    except Lobby.DoesNotExist:
+        return JsonResponse({'error': 'Lobby not found'}, status=404)
+    except Question.DoesNotExist:
+        return JsonResponse({'error': 'Question not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+def upload_photo(request, lobby_id, question_id):
+    """Handle photo upload for a question"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+    
+    # Check if player has a name
+    player_name = request.session.get('player_name')
+    if not player_name:
+        return JsonResponse({'error': 'No player name found'}, status=400)
+    
+    try:
+        lobby = Lobby.objects.get(id=lobby_id)
+        question = Question.objects.get(id=question_id)
+        
+        # Check if race has started
+        if not lobby.hunt_started:
+            return JsonResponse({'error': 'Race has not started yet'}, status=400)
+        
+        # Check if the question requires a photo
+        if not question.requires_photo:
+            return JsonResponse({'error': 'This question does not require a photo'}, status=400)
+        
+        # Check if time limit is exceeded
+        time_elapsed = timezone.now() - lobby.start_time
+        if time_elapsed > timedelta(minutes=lobby.time_limit):
+            return JsonResponse({'error': 'Race time limit exceeded'}, status=400)
+        
+        # Check if a photo was uploaded
+        if 'photo' not in request.FILES:
+            return JsonResponse({'error': 'No photo uploaded'}, status=400)
+        
+        photo = request.FILES['photo']
+        
+        # Find the team for this player
+        try:
+            team_member = TeamMember.objects.get(name=player_name, team__lobby=lobby)
+            team = team_member.team
+            
+            # Save the photo
+            team_progress, created = TeamProgress.objects.get_or_create(team=team, question=question)
+            team_progress.photo = photo
+            team_progress.completed = True
+            team_progress.completion_time = timezone.now()
+            team_progress.save()
+            
+            # Send WebSocket update
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'team_{team.id}',
+                {
+                    'type': 'team_update',
+                    'message': {
+                        'type': 'question_completed',
+                        'question_id': question_id,
+                        'team_id': team.id
+                    }
+                }
+            )
+            
+            # Send update to lobby
+            async_to_sync(channel_layer.group_send)(
+                f'lobby_{lobby.id}',
+                {
+                    'type': 'lobby_update',
+                    'message': {
+                        'type': 'team_progress',
+                        'team_id': team.id,
+                        'question_id': question_id,
+                        'completed': True
+                    }
+                }
+            )
+            
+            # Check if all questions are completed
+            total_questions = Question.objects.filter(race=lobby.race).count()
+            completed_questions = TeamProgress.objects.filter(team=team, completed=True).count()
+            
+            all_completed = total_questions <= completed_questions
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Photo uploaded successfully!',
+                'all_completed': all_completed,
+                'next_url': reverse('race_complete') if all_completed else ''
+            })
+            
+        except TeamMember.DoesNotExist:
+            return JsonResponse({'error': 'Player not found in any team'}, status=400)
+        
+    except Lobby.DoesNotExist:
+        return JsonResponse({'error': 'Lobby not found'}, status=404)
+    except Question.DoesNotExist:
+        return JsonResponse({'error': 'Question not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+def race_complete(request):
+    """Display race completion page"""
+    player_name = request.session.get('player_name')
+    
+    if not player_name:
+        return redirect('join_game_session')
+    
+    return render(request, 'hunt/race_complete.html', {
+        'player_name': player_name
+    })

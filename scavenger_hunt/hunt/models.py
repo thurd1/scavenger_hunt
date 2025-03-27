@@ -151,9 +151,25 @@ class Question(models.Model):
     text = models.TextField()
     answer = models.CharField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)
+    requires_photo = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Question for {self.zone.name}"
 
     class Meta:
         ordering = ['created_at']
+
+class TeamProgress(models.Model):
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='progress')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='progress')
+    completed = models.BooleanField(default=False)
+    completion_time = models.DateTimeField(null=True, blank=True)
+    photo = models.ImageField(upload_to='question_photos/', null=True, blank=True)
+    
+    class Meta:
+        unique_together = ('team', 'question')
+        ordering = ['completion_time']
+    
+    def __str__(self):
+        status = "Completed" if self.completed else "Not completed"
+        return f"{self.team.name} - {self.question} - {status}"
