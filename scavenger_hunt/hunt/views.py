@@ -104,27 +104,47 @@ def start_race(request, lobby_id):
                 return JsonResponse({'success': False, 'error': 'Race has already started'})
             
             # Get or create race
-            race = Race.objects.create(
-                lobby=lobby,
-                start_time=timezone.now(),
-                time_limit_minutes=60  # Set default time limit
-            )
+            if not lobby.race:
+                race = Race.objects.filter(is_active=True).first()
+                if not race:
+                    return JsonResponse({'success': False, 'error': 'No active race available'})
+                lobby.race = race
             
-            # Load questions for the race
-            questions = Question.objects.all()[:5]  # Get first 5 questions for now
-            race.questions.set(questions)
+            # Update lobby state
+            lobby.hunt_started = True
+            lobby.start_time = timezone.now()
+            lobby.save()
+            
+            # Load questions for the race if not already loaded
+            if not lobby.race.questions.exists():
+                questions = Question.objects.all()[:5]  # Get first 5 questions for now
+                lobby.race.questions.set(questions)
             
             # Get the first question
-            first_question = questions.first()
+            first_question = lobby.race.questions.first()
             if not first_question:
                 return JsonResponse({'success': False, 'error': 'No questions available'})
             
+            # Build the redirect URL
+            redirect_url = f'/studentQuestion/{lobby_id}/{first_question.id}/'
+            
+            # Notify all connected clients through WebSocket
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'lobby_{lobby_id}',
+                {
+                    'type': 'race_started',
+                    'redirect_url': redirect_url
+                }
+            )
+            
             return JsonResponse({
                 'success': True,
-                'redirect_url': f'/studentQuestion/{lobby_id}/{first_question.id}/'
+                'redirect_url': redirect_url
             })
             
         except Exception as e:
+            logger.error(f"Error starting race: {e}")
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})

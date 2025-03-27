@@ -4,6 +4,9 @@
 <div class="container">
     <div class="join-header">
         <h1>Join or Create a Team</h1>
+        <a href="{% url 'join_game_session' %}" class="home-btn">
+            <i class="fas fa-home"></i> Back to Home
+        </a>
     </div>
 
     <div class="join-team-form-container">
@@ -87,6 +90,7 @@
     background: rgba(33, 37, 41, 0.95);
     border: 2px solid rgba(144, 200, 60, 0.3);
     border-radius: 12px;
+    position: relative;
 }
 
 .join-header h1 {
@@ -267,78 +271,111 @@
     background: rgba(33, 37, 41, 0.8);
     border-radius: 8px;
 }
+
+.home-btn {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(144, 200, 60, 0.2);
+    color: #90C83C;
+    padding: 8px 15px;
+    border-radius: 20px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.home-btn:hover {
+    background: rgba(144, 200, 60, 0.3);
+    transform: translateY(-2px);
+}
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const teamsContainer = document.getElementById('teamsContainer');
-    const playerNameInput = document.getElementById('playerName');
+let socket = null;
+let lobbyId = {{ lobby.id }};
+
+document.addEventListener("DOMContentLoaded", function() {
+    setupWebSocket();
     
-    // Get player name from session storage or input
-    let playerName = sessionStorage.getItem('playerName');
-    if (!playerName && playerNameInput.value) {
-        playerName = playerNameInput.value;
-        sessionStorage.setItem('playerName', playerName);
+    // Save player name when changed
+    document.getElementById('playerName').addEventListener('change', function() {
+        const playerName = this.value.trim();
+        if (playerName) {
+            sessionStorage.setItem('playerName', playerName);
+            // Send player name to server
+            fetch('/save_player_name/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ player_name: playerName })
+            });
+        }
+    });
+    
+    // Initialize player name from session storage
+    const storedName = sessionStorage.getItem('playerName');
+    if (storedName) {
+        document.getElementById('playerName').value = storedName;
+    }
+});
+
+function setupWebSocket() {
+    // Close any existing connection
+    if (socket) {
+        socket.close();
     }
     
-    // WebSocket setup
-    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
-    let teamsSocket = new WebSocket(
-        ws_scheme + '://' + window.location.host + '/ws/available-teams/'
-    );
+    // Create new WebSocket connection
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/available-teams/`;
     
-    console.log('Attempting WebSocket connection to:', ws_scheme + '://' + window.location.host + '/ws/available-teams/');
+    socket = new WebSocket(wsUrl);
     
-    teamsSocket.onopen = function(e) {
-        console.log('WebSocket connection established');
+    socket.onopen = function(e) {
+        console.log("WebSocket connection established");
         // Request initial state
-        teamsSocket.send(JSON.stringify({
+        socket.send(JSON.stringify({
             'type': 'request_update'
         }));
     };
     
-    teamsSocket.onmessage = function(e) {
-        console.log('WebSocket message received:', e.data);
+    socket.onmessage = function(e) {
         const data = JSON.parse(e.data);
+        console.log("WebSocket message received:", data);
+        
         if (data.type === 'teams_update') {
             updateTeamsDisplay(data.teams);
         }
     };
     
-    teamsSocket.onerror = function(e) {
-        console.error('WebSocket error:', e);
+    socket.onerror = function(error) {
+        console.error("WebSocket error:", error);
     };
     
-    teamsSocket.onclose = function(e) {
-        console.log('WebSocket connection closed');
-        // Send leave message for all teams
-        if (playerName) {
-            teamsSocket.send(JSON.stringify({
-                'action': 'leave_all_teams',
-                'player_name': playerName
-            }));
-        }
+    socket.onclose = function(e) {
+        console.log("WebSocket connection closed:", e);
     };
+}
+
+function updateTeamsDisplay(teams) {
+    const teamsContainer = document.getElementById('teamsContainer');
+    teamsContainer.innerHTML = '';
     
-    // Update player name when input changes
-    playerNameInput.addEventListener('change', function() {
-        playerName = this.value;
-        sessionStorage.setItem('playerName', playerName);
-    });
-    
-    function updateTeamsDisplay(teams) {
-        if (!teamsContainer) return;
-        
-        teamsContainer.innerHTML = '';
-        
-        if (teams && teams.length > 0) {
-            teams.forEach(team => {
+    if (teams && teams.length > 0) {
+        teams.forEach(team => {
+            if (team.lobby_id === lobbyId) {
                 const teamCard = document.createElement('div');
                 teamCard.className = 'team-card';
+                
                 teamCard.innerHTML = `
                     <div class="team-header">
                         <h4>${team.name}</h4>
-                        <span class="member-count">${team.member_count} member(s)</span>
+                        <span class="member-count">${team.members.length} member(s)</span>
                     </div>
                     <div class="team-members">
                         <ul class="members-list">
@@ -346,118 +383,105 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <li><i class="fas fa-user"></i> ${member}</li>
                             `).join('')}
                         </ul>
-                        <button onclick="joinTeam('${team.code}')" class="join-btn">Join Team</button>
+                        <button onclick="joinTeam(${team.id})" class="join-btn">Join Team</button>
                     </div>
                 `;
+                
                 teamsContainer.appendChild(teamCard);
-            });
+            }
+        });
+    } else {
+        teamsContainer.innerHTML = `
+            <div class="no-teams-message">
+                <p>No teams available. Create one below!</p>
+            </div>
+        `;
+    }
+}
+
+function joinTeam(teamId) {
+    const playerName = document.getElementById('playerName').value.trim();
+    
+    if (!playerName) {
+        alert('Please enter your name first!');
+        return;
+    }
+    
+    fetch(`/lobby/${lobbyId}/join-team/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            team_id: teamId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = data.redirect_url;
         } else {
-            teamsContainer.innerHTML = `
-                <div class="no-teams-message">
-                    <p>No teams available. Create one below!</p>
-                </div>
-            `;
+            alert(data.error || 'Error joining team');
         }
-    }
-    
-    // Make these functions global
-    window.joinTeam = async function(teamCode) {
-        if (!playerName) {
-            alert('Please enter your name first!');
-            playerNameInput.focus();
-            return;
-        }
-        
-        try {
-            const response = await fetch('/join-existing-team/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({
-                    team_code: teamCode,
-                    player_name: playerName
-                })
-            });
-            
-            const data = await response.json();
-            if (data.success) {
-                window.location.href = data.redirect_url;
-            } else {
-                alert(data.error || 'Failed to join team');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to join team');
-        }
-    };
-    
-    window.createTeam = async function() {
-        const teamName = document.getElementById('teamName').value;
-        
-        if (!playerName) {
-            alert('Please enter your name first!');
-            playerNameInput.focus();
-            return;
-        }
-        
-        if (!teamName) {
-            alert('Please enter a team name!');
-            document.getElementById('teamName').focus();
-            return;
-        }
-        
-        try {
-            const response = await fetch('/create-team-standalone/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({
-                    team_name: teamName,
-                    player_name: playerName
-                })
-            });
-            
-            const data = await response.json();
-            if (data.success) {
-                window.location.href = data.redirect_url;
-            } else {
-                alert(data.error || 'Failed to create team');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to create team');
-        }
-    };
-    
-    // Helper function to get CSRF token
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-    
-    // Handle page unload
-    window.addEventListener('beforeunload', function() {
-        if (playerName && teamsSocket.readyState === WebSocket.OPEN) {
-            teamsSocket.send(JSON.stringify({
-                'action': 'leave_all_teams',
-                'player_name': playerName
-            }));
-        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error joining team');
     });
-});
+}
+
+function createTeam() {
+    const playerName = document.getElementById('playerName').value.trim();
+    const teamName = document.getElementById('teamName').value.trim();
+    
+    if (!playerName) {
+        alert('Please enter your name first!');
+        return;
+    }
+    
+    if (!teamName) {
+        alert('Please enter a team name!');
+        return;
+    }
+    
+    fetch(`/lobby/${lobbyId}/create-team/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            team_name: teamName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = data.redirect_url;
+        } else {
+            alert(data.error || 'Error creating team');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating team');
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 </script>
 {% endblock %} 

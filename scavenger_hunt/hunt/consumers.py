@@ -190,7 +190,7 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
     def remove_player_from_all_teams(self):
         """Remove the player from all teams they're in"""
         try:
-            deleted_count = TeamMember.objects.filter(role=self.player_name).delete()[0]
+            deleted_count = TeamMember.objects.filter(name=self.player_name).delete()[0]
             logger.info(f"Removed player {self.player_name} from {deleted_count} teams")
         except Exception as e:
             logger.error(f"Error removing player from teams: {e}")
@@ -198,25 +198,26 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_available_teams(self):
         """Get all teams with their members"""
-        teams = Team.objects.all().prefetch_related('members')
         teams_data = []
+        # Get all teams
+        teams = Team.objects.prefetch_related('members', 'participating_lobbies').all()
         
         for team in teams:
-            # Get unique members
-            members = list(TeamMember.objects.filter(team=team).values_list('role', flat=True).distinct())
+            lobbies = list(team.participating_lobbies.values_list('id', flat=True))
+            members = list(team.members.all().values('name', 'role'))
             
             teams_data.append({
                 'id': team.id,
                 'name': team.name,
                 'code': team.code,
                 'members': members,
-                'member_count': len(members)
+                'lobby_id': lobbies[0] if lobbies else None,
             })
         
         return teams_data
 
     async def send_teams_state(self):
-        """Send current teams state to the client"""
+        """Send the current state of all teams"""
         teams = await self.get_available_teams()
         await self.send(text_data=json.dumps({
             'type': 'teams_update',
@@ -225,23 +226,22 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
 
     async def teams_update(self, event):
         """Handle teams update event"""
-        await self.send_teams_state()
+        # Forward the update to the WebSocket
+        await self.send(text_data=json.dumps(event))
 
     async def receive(self, text_data):
-        """Handle messages from client"""
+        """Handle received messages"""
         try:
             data = json.loads(text_data)
-            logger.info(f"Received WebSocket message: {data}")
+            logger.info(f"Received data in AvailableTeamsConsumer: {data}")
             
             if data.get('type') == 'request_update':
                 await self.send_teams_state()
-            elif data.get('action') == 'leave_all_teams' and self.player_name:
-                await self.remove_player_from_all_teams()
-                await self.send_teams_state()
+            
         except json.JSONDecodeError:
-            logger.error("Invalid JSON received")
+            logger.error("Failed to decode JSON in AvailableTeamsConsumer")
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
+            logger.error(f"Error in AvailableTeamsConsumer receive: {e}")
 
 
 class LobbyConsumer(AsyncWebsocketConsumer):
@@ -249,19 +249,27 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         """Handle connection to lobby websocket"""
         self.lobby_id = self.scope['url_route']['kwargs']['lobby_id']
         self.lobby_group_name = f'lobby_{self.lobby_id}'
-
-        # Join lobby group
+        self.player_name = self.scope.get('session', {}).get('player_name')
+        
+        logger.info(f"WebSocket connecting for lobby {self.lobby_id} with player {self.player_name}")
+        
+        # Join the group
         await self.channel_layer.group_add(
             self.lobby_group_name,
             self.channel_name
         )
+        
+        # Accept the connection
         await self.accept()
         
         # Send initial state
         await self.send_lobby_state()
 
     async def disconnect(self, close_code):
-        """Handle disconnection"""
+        """Handle disconnection from lobby"""
+        logger.info(f"WebSocket disconnected from lobby {self.lobby_id} for player {self.player_name}")
+        
+        # Leave the group
         await self.channel_layer.group_discard(
             self.lobby_group_name,
             self.channel_name
@@ -269,54 +277,60 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_lobby_state(self):
-        """Get current lobby state including teams and race status"""
-        lobby = Lobby.objects.get(id=self.lobby_id)
-        teams_data = []
-        for team in lobby.teams.all().prefetch_related('members'):
-            members = list(team.members.all())
-            teams_data.append({
-                'id': team.id,
-                'name': team.name,
-                'code': team.code,
-                'members': [{'id': m.id, 'role': m.role} for m in members],
-                'member_count': len(members)
-            })
-
-        return {
-            'teams': teams_data,
-            'hunt_started': lobby.hunt_started,
-            'race': {
-                'id': lobby.race.id,
-                'name': lobby.race.name,
-                'time_limit_minutes': lobby.race.time_limit_minutes
-            } if lobby.race else None
-        }
+        """Get the current state of the lobby"""
+        try:
+            lobby = Lobby.objects.get(id=self.lobby_id)
+            teams = []
+            
+            for team in lobby.teams.all().prefetch_related('members'):
+                team_data = {
+                    'id': team.id,
+                    'name': team.name,
+                    'code': team.code,
+                    'members': list(team.members.all().values('name', 'role'))
+                }
+                teams.append(team_data)
+            
+            return {
+                'lobby_id': lobby.id,
+                'name': lobby.name,
+                'code': lobby.code,
+                'teams': teams,
+                'race_in_progress': lobby.race is not None and lobby.hunt_started,
+                'start_time': lobby.start_time.isoformat() if lobby.start_time else None,
+                'time_limit_minutes': lobby.race.time_limit_minutes if lobby.race else 60
+            }
+        except Lobby.DoesNotExist:
+            logger.error(f"Lobby {self.lobby_id} not found")
+            return {
+                'error': 'Lobby not found'
+            }
+        except Exception as e:
+            logger.error(f"Error getting lobby state: {e}")
+            return {
+                'error': str(e)
+            }
 
     async def send_lobby_state(self):
-        """Send current lobby state to the client"""
+        """Send the current state of the lobby"""
         state = await self.get_lobby_state()
         await self.send(text_data=json.dumps({
-            'type': 'lobby_state',
+            'type': 'lobby_update',
             **state
         }))
 
     async def lobby_update(self, event):
         """Handle lobby update event"""
-        await self.send_lobby_state()
+        # Forward the update to the WebSocket
+        await self.send(text_data=json.dumps(event))
 
     async def race_started(self, event):
         """Handle race started event"""
-        # Get the first question URL
-        lobby = await database_sync_to_async(Lobby.objects.get)(id=self.lobby_id)
-        first_zone = await database_sync_to_async(lambda: lobby.race.zones.first())()
-        first_question = await database_sync_to_async(lambda: first_zone.questions.first())() if first_zone else None
-        
-        if first_question:
-            redirect_url = f"/studentQuestion/{self.lobby_id}/{first_question.id}/"
-            await self.send(text_data=json.dumps({
-                'type': 'race_started',
-                'redirect_url': redirect_url
-            }))
+        # Forward the race started event to the WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'race_started',
+            'redirect_url': event.get('redirect_url')
+        }))
         
         # Also send updated lobby state
         await self.send_lobby_state()
@@ -325,30 +339,29 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         """Handle received messages"""
         try:
             data = json.loads(text_data)
+            logger.info(f"Received data in LobbyConsumer: {data}")
+            
             if data.get('type') == 'request_update':
                 await self.send_lobby_state()
-            elif data.get('type') == 'team_update':
-                # Broadcast team update to all connected clients
-                await self.channel_layer.group_send(
-                    self.lobby_group_name,
-                    {
-                        'type': 'lobby_update'
-                    }
-                )
+            
         except json.JSONDecodeError:
-            logger.error("Invalid JSON received")
+            logger.error("Failed to decode JSON in LobbyConsumer")
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
+            logger.error(f"Error in LobbyConsumer receive: {e}")
 
     @database_sync_to_async
     def get_lobby_data(self):
-        lobby = Lobby.objects.prefetch_related('teams__members').get(id=self.lobby_id)
-        teams = []
-        for team in lobby.teams.all():
-            members = list(team.members.values_list('role', flat=True))
-            teams.append({
-                'id': team.id,
-                'name': team.name,
-                'members': members
-            })
-        return teams 
+        """Get detailed lobby data"""
+        lobby = Lobby.objects.get(id=self.lobby_id)
+        return {
+            'id': lobby.id,
+            'name': lobby.name,
+            'code': lobby.code,
+            'hunt_started': lobby.hunt_started,
+            'start_time': lobby.start_time.isoformat() if lobby.start_time else None,
+            'race': {
+                'id': lobby.race.id,
+                'name': lobby.race.name,
+                'time_limit_minutes': lobby.race.time_limit_minutes
+            } if lobby.race else None
+        } 

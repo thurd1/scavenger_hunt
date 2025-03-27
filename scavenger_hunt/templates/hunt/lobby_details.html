@@ -579,11 +579,18 @@
 <script>
     const lobbyId = {{ lobby.id }};
     let socket;
+    let raceInProgress = {% if lobby.race %}true{% else %}false{% endif %};
 
     // Initialize WebSocket connection when the page loads
     document.addEventListener('DOMContentLoaded', function() {
         connectWebSocket();
         setupRaceForm();
+        
+        // Set up race timer if race is in progress
+        if (raceInProgress) {
+            updateRaceTimer();
+            setInterval(updateRaceTimer, 1000);
+        }
     });
 
     function connectWebSocket() {
@@ -759,6 +766,31 @@
             console.error('Error:', error);
             alert('Failed to delete lobby');
         });
+    }
+
+    function updateRaceTimer(startTime) {
+        if (!raceInProgress) return;
+        
+        const timerDisplay = document.getElementById('timerDisplay');
+        if (!timerDisplay) return;
+        
+        const start = startTime || new Date('{{ lobby.race.start_time|date:"c" }}');
+        const timeLimit = {{ lobby.race.time_limit_minutes|default:60 }} * 60 * 1000; // convert to milliseconds
+        
+        const now = new Date();
+        const elapsed = now - start;
+        const remaining = timeLimit - elapsed;
+        
+        if (remaining <= 0) {
+            timerDisplay.textContent = 'Time is up!';
+            timerDisplay.classList.add('time-up');
+            return;
+        }
+        
+        const minutes = Math.floor(remaining / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        
+        timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }
 </script>
 {% endblock %}

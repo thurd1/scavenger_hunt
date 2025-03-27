@@ -1,52 +1,48 @@
 {% extends "base.html" %}
 
+{% block title %}Join Game{% endblock %}
+
 {% block content %}
 <div class="container">
-    <h1 style="color: #90C83C">Welcome to The Scavenger Hunt!</h1>
+    <div class="join-header">
+        <h1>Welcome to The Scavenger Hunt!</h1>
+    </div>
     
-    <div class="join-options">
-        <div class="option-box">
-            <h2 style="color: #90C83C">Join Game</h2>
-            <form method="post" action="{% url 'home' %}">
+    <div class="join-game-container">
+        <div class="form-section">
+            <h2>Join Existing Game</h2>
+            <form method="post" action="{% url 'join_game_session' %}">
                 {% csrf_token %}
                 <div class="form-group">
-                    <label for="invite_code" style="color: #90C83C">Enter Game Code:</label>
+                    <label for="lobby_code">Enter Lobby Code:</label>
                     <input type="text" 
-                           name="code"
-                           id="invite_code" 
+                           name="lobby_code"
+                           id="lobby_code" 
                            required 
                            class="input-field" 
                            maxlength="6"
                            minlength="6"
-                           pattern="[A-Za-z0-9]{6}"
-                           style="text-transform: uppercase;" 
-                           placeholder="XXXXXX">
+                           placeholder="123456">
                 </div>
-                <button type="submit" class="btn">Join Game</button>
+                <button type="submit" class="action-btn">Join Game</button>
             </form>
-            <div class="admin-link">
-                <a href="{% url 'login' %}">Are you an Admin? Log in here</a>
-            </div>
         </div>
     </div>
-</div>
 
-{% if messages %}
-<div class="messages">
-    {% for message in messages %}
-    <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">
-        {{ message }}
+    {% if error %}
+    <div class="error-message">
+        {{ error }}
     </div>
-    {% endfor %}
+    {% endif %}
 </div>
-{% endif %}
 
 <!-- Name prompt modal -->
 <div id="namePrompt" class="modal">
     <div class="modal-content">
-        <h2 style="color: #90C83C">Enter Your Name</h2>
+        <h2>Enter Your Name</h2>
+        <p>Please enter your name to continue:</p>
         <input type="text" id="playerName" placeholder="Your name" class="input-field">
-        <button onclick="submitName()" class="btn">Submit</button>
+        <button onclick="submitName()" class="action-btn">Submit</button>
     </div>
 </div>
 
@@ -61,10 +57,45 @@ function submitName() {
     const name = document.getElementById('playerName').value.trim();
     if (name) {
         sessionStorage.setItem('playerName', name);
-        document.getElementById('namePrompt').style.display = 'none';
+        // Send name to server
+        fetch('/save_player_name/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ player_name: name })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('namePrompt').style.display = 'none';
+            } else {
+                alert('Error saving name. Please try again.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error saving name. Please try again.');
+        });
     } else {
         alert('Please enter a valid name');
     }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 </script>
 
@@ -72,108 +103,97 @@ function submitName() {
 .container {
     max-width: 800px;
     margin: 2rem auto;
-    padding: 1rem;
-}
-
-.join-options {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-    margin-top: 2rem;
-}
-
-.option-box {
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 10px;
     padding: 1.5rem;
 }
 
+.join-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.join-header h1 {
+    color: #90C83C;
+    margin-bottom: 0;
+}
+
+.join-game-container {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+.form-section {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.form-section h2 {
+    color: #90C83C;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
 .form-group {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .form-group label {
     display: block;
     color: #90C83C;
     margin-bottom: 0.5rem;
+    font-size: 1rem;
 }
 
 .input-field {
     width: 100%;
-    padding: 0.8rem;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    background-color: #fff;
+    padding: 12px;
     font-size: 16px;
-}
-
-.btn {
-    display: block;
-    width: 100%;
-    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
     text-align: center;
-    background: linear-gradient(135deg, #FFA500, #FF7F00);
+    letter-spacing: 2px;
+}
+
+.input-field:focus {
+    outline: none;
+    border-color: #90C83C;
+    box-shadow: 0 0 0 2px rgba(144, 200, 60, 0.2);
+}
+
+.action-btn {
+    width: 100%;
+    padding: 0.8rem;
+    background: linear-gradient(135deg, #90C83C, #7BAF2F);
     color: white;
-    text-decoration: none;
-    border-radius: 25px;
-    font-weight: bold;
-    transition: all 0.3s ease;
     border: none;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: bold;
     cursor: pointer;
-    margin-bottom: 1rem;
+    transition: all 0.3s ease;
 }
 
-.btn:hover {
-    background: linear-gradient(135deg, #FF7F00, #FF4500);
-    transform: scale(1.05);
-    text-decoration: none;
-    color: white;
+.action-btn:hover {
+    background: linear-gradient(135deg, #7BAF2F, #6A9E20);
+    transform: translateY(-2px);
 }
 
-.admin-link {
+.error-message {
+    background: rgba(255, 99, 71, 0.1);
+    border: 1px solid rgba(255, 99, 71, 0.3);
+    color: #ff6347;
+    padding: 1rem;
+    border-radius: 8px;
     text-align: center;
     margin-top: 1rem;
-    font-size: 0.9rem;
-}
-
-.admin-link a {
-    color: #90C83C;
-    text-decoration: none;
-    opacity: 0.8;
-    transition: all 0.3s ease;
-}
-
-.admin-link a:hover {
-    opacity: 1;
-    text-decoration: underline;
-}
-
-h1 {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-h2 {
-    text-align: center;
-    margin-bottom: 1.5rem;
-}
-
-.alert {
-    margin: 1rem auto;
-    padding: 1rem;
-    border-radius: 8px;
-    text-align: center;
-    max-width: 600px;
-}
-
-.alert-error {
-    background-color: rgba(255, 99, 71, 0.2);
-    color: #ff6347;
-}
-
-.alert-success {
-    background-color: rgba(144, 200, 60, 0.2);
-    color: #90C83C;
 }
 
 .modal {
@@ -188,26 +208,24 @@ h2 {
 }
 
 .modal-content {
-    background-color: rgba(33, 37, 41, 0.9);
-    border: 1px solid rgba(144, 200, 60, 0.3);
+    background-color: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
     margin: 15% auto;
-    padding: 20px;
-    border-radius: 10px;
-    width: 80%;
+    padding: 2rem;
+    border-radius: 12px;
+    width: 90%;
     max-width: 400px;
     text-align: center;
 }
 
 .modal-content h2 {
-    margin-bottom: 20px;
+    color: #90C83C;
+    margin-bottom: 1rem;
 }
 
-.modal-content .input-field {
-    margin-bottom: 20px;
-}
-
-.modal-content .btn {
-    margin-top: 10px;
+.modal-content p {
+    color: white;
+    margin-bottom: 1.5rem;
 }
 </style>
 {% endblock %} 

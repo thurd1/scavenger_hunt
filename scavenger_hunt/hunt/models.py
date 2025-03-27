@@ -93,13 +93,14 @@ class CustomUser(AbstractUser):
 
 class TeamMember(models.Model):
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='members')
+    name = models.CharField(max_length=100)
     role = models.CharField(max_length=100)
 
     class Meta:
         unique_together = ('team', 'role')  # Prevent duplicate members in a team
 
     def __str__(self):
-        return f"{self.role} - {self.team.name}"
+        return f"{self.name} ({self.role}) - {self.team.name}"
 
 class Submission(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="submissions")
