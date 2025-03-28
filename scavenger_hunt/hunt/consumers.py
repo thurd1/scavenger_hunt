@@ -23,7 +23,7 @@ class TeamConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
-        
+
         # Send initial state
         await self.send_team_state()
 

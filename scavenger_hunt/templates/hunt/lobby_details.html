@@ -45,20 +45,24 @@
                     {% for team in lobby.teams.all %}
                         <div class="team-card">
                             <div class="team-header">
-                                <button class="team-delete-btn" onclick="deleteTeam({{ team.id }})" data-team-id="{{ team.id }}">
-                                    <i class="fas fa-times"></i>
-                                </button>
                                 <h3>{{ team.name }}</h3>
+                                <span class="team-code">Code: {{ team.code }}</span>
                             </div>
                             <div class="team-info">
                                 <p><i class="fas fa-users"></i> Players: {{ team.players.count }}</p>
+                                <p><i class="fas fa-clock"></i> Joined: {{ team.created_at|date:"F d, Y" }}</p>
+                            </div>
+                            <div class="team-actions">
+                                <button class="action-btn delete-btn" onclick="deleteTeam({{ team.id }})" data-team-id="{{ team.id }}">
+                                    <i class="fas fa-trash"></i> Delete Team
+                                </button>
                             </div>
                         </div>
-                    {% endfor %}
+            {% endfor %}
                 </div>
-            {% else %}
+        {% else %}
                 <p class="no-teams">No teams have joined this lobby yet.</p>
-            {% endif %}
+        {% endif %}
         </div>
 
         <div class="back-button-container">
@@ -504,29 +508,6 @@
     border-radius: 8px;
     padding: 15px;
     transition: transform 0.2s;
-}
-
-.team-delete-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: rgba(220, 53, 69, 0.2);
-    color: #dc3545;
-    border: none;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.team-delete-btn:hover {
-    background: rgba(220, 53, 69, 0.4);
-    transform: scale(1.1);
 }
 </style>
 

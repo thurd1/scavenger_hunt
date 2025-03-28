@@ -255,13 +255,13 @@ def save_player_name(request):
             request.session['player_name'] = player_name
             request.session.modified = True
             print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
-            
-            lobby_code = request.session.get('lobby_code')
-            print(f"Lobby code in session: {lobby_code}")  # Debug print
-            
+        
+        lobby_code = request.session.get('lobby_code')
+        print(f"Lobby code in session: {lobby_code}")  # Debug print
+        
             if lobby_code:
-                lobby = get_object_or_404(Lobby, code=lobby_code)
-                return render(request, 'hunt/team_options.html', {'lobby': lobby})
+        lobby = get_object_or_404(Lobby, code=lobby_code)
+        return render(request, 'hunt/team_options.html', {'lobby': lobby})
             
         print("No player name provided or lobby code missing")  # Debug print
     return redirect('join_game_session')
@@ -269,15 +269,15 @@ def save_player_name(request):
 def broadcast_team_update(team_id):
     channel_layer = get_channel_layer()
     team = Team.objects.prefetch_related('team_members').get(id=team_id)
-    members = list(team.team_members.values_list('role', flat=True))
-    
-    async_to_sync(channel_layer.group_send)(
+                    members = list(team.team_members.values_list('role', flat=True))
+                    
+                    async_to_sync(channel_layer.group_send)(
         f'team_{team_id}',
-        {
-            'type': 'team_update',
-            'members': members
-        }
-    )
+                        {
+                            'type': 'team_update',
+                            'members': members
+                        }
+                    )
 
 def join_team(request):
     """Render the join team page with available teams and forms to join or create teams."""
@@ -301,7 +301,7 @@ def join_existing_team(request):
                 data = json.loads(request.body)
             else:
                 return JsonResponse({'success': False, 'error': 'Empty request body'})
-        else:
+                else:
             # Fall back to form data
             data = request.POST
             
@@ -533,8 +533,8 @@ def toggle_lobby(request, lobby_id):
 
 @require_POST
 def delete_lobby(request, lobby_id):
-    lobby = get_object_or_404(Lobby, id=lobby_id)
-    lobby.delete()
+        lobby = get_object_or_404(Lobby, id=lobby_id)
+        lobby.delete()
     return JsonResponse({'status': 'success'})
 
 @require_POST
@@ -561,7 +561,7 @@ def delete_team(request, team_id):
             )
         
         messages.success(request, f'Team "{team_name}" has been deleted.')
-        return redirect('team_list')
+    return redirect('team_list')
         
     except Exception as e:
         messages.error(request, f'Error deleting team: {str(e)}')

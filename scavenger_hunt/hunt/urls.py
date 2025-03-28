@@ -1,8 +1,6 @@
 from django.urls import path
 from hunt import views
 
-app_name = 'hunt'
-
 urlpatterns = [
     path('', views.home, name='home'),
     path('join-lobby/', views.join_lobby, name='join_lobby'),
