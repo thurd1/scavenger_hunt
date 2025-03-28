@@ -34,6 +34,9 @@
                         {% else %}
                             <a href="{% url 'hunt:activate_race' race.id %}" class="btn btn-info">Activate Race</a>
                         {% endif %}
+                        <a href="{% url 'hunt:delete_race' race.id %}" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this race? This action cannot be undone.');">
+                            <i class="fas fa-trash"></i> Delete Race
+                        </a>
                     </div>
                 </div>
                 <div class="race-info">
