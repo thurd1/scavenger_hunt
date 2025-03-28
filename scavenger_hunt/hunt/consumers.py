@@ -8,6 +8,7 @@ from asgiref.sync import async_to_sync
 from asgiref.sync import sync_to_async
 from django.utils import timezone
 import asyncio
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -371,43 +372,55 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 # Add this new consumer class
 class RaceConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        # Get race ID from URL
         self.race_id = self.scope['url_route']['kwargs']['race_id']
         self.race_group_name = f'race_{self.race_id}'
-
+        
         # Join race group
         await self.channel_layer.group_add(
             self.race_group_name,
             self.channel_name
         )
+        
         await self.accept()
-        print(f"Connected to race_{self.race_id}")
-
+        logging.info(f"WebSocket connected to race {self.race_id}")
+    
     async def disconnect(self, close_code):
         # Leave race group
         await self.channel_layer.group_discard(
             self.race_group_name,
             self.channel_name
         )
-        print(f"Disconnected from race_{self.race_id}")
-
-    # Handle race messages
+        logging.info(f"WebSocket disconnected from race {self.race_id} with code {close_code}")
+    
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        await self.channel_layer.group_send(
-            self.race_group_name,
-            {
-                'type': 'race_update',
-                'message': data
-            }
-        )
-
-    async def race_update(self, event):
-        message = event['message']
-        await self.send(text_data=json.dumps(message))
-        
+        try:
+            text_data_json = json.loads(text_data)
+            message_type = text_data_json.get('type')
+            
+            if message_type == 'ping':
+                await self.send(text_data=json.dumps({
+                    'type': 'pong',
+                    'timestamp': datetime.now().isoformat()
+                }))
+            
+            logging.info(f"Received message in race {self.race_id}: {text_data_json}")
+        except json.JSONDecodeError:
+            logging.error(f"Failed to decode JSON in race {self.race_id}: {text_data}")
+        except Exception as e:
+            logging.error(f"Error in race {self.race_id} receive: {str(e)}")
+    
     async def race_started(self, event):
+        """Event handler for when a race starts"""
+        # Construct redirect URL
+        redirect_url = f"/race/{self.race_id}/questions/"
+        
         # Send message to WebSocket
         await self.send(text_data=json.dumps({
             'type': 'race_started',
-            'redirect_url': event.get('redirect_url', '')
-        })) 
+            'race_id': self.race_id,
+            'redirect_url': redirect_url,
+            'message': 'Race has started! Get ready to answer questions.'
+        }))
+        
+        logging.info(f"Sent race_started event to client in race {self.race_id}") 

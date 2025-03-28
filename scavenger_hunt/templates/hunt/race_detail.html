@@ -1156,10 +1156,14 @@ function deleteRace(raceId) {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
-            }
+            },
+            body: JSON.stringify({})
         })
         .then(response => {
-            if (response.ok) {
+            console.log('Delete response status:', response.status);
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else if (response.ok) {
                 // Redirect to manage_riddles page after successful deletion
                 window.location.href = "{% url 'manage_riddles' %}";
             } else {
@@ -1168,7 +1172,7 @@ function deleteRace(raceId) {
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while deleting the race.');
+            alert('An error occurred while deleting the race: ' + error);
         });
     }
 }

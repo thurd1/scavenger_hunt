@@ -427,6 +427,11 @@ function showCreateForm() {
 }
 
 function startRace(lobbyId) {
+    // Confirm start race
+    if (!confirm('Are you sure you want to start this race? All team members will be redirected to the question page.')) {
+        return;
+    }
+    
     // Add a visual indicator
     const notificationEl = document.createElement('div');
     notificationEl.style.position = 'fixed';
@@ -444,7 +449,7 @@ function startRace(lobbyId) {
     console.log('Starting race for lobby:', lobbyId);
     
     // Disable the button to prevent double clicking
-    const button = event.target;
+    const button = event.currentTarget;
     button.disabled = true;
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
     
@@ -455,7 +460,7 @@ function startRace(lobbyId) {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCookie('csrftoken')
         },
-        body: JSON.stringify({lobby_id: lobbyId}) // Add lobby_id to JSON body
+        body: JSON.stringify({lobby_id: lobbyId})
     })
     .then(response => {
         console.log('Response status:', response.status);
@@ -473,24 +478,14 @@ function startRace(lobbyId) {
             // Update the lobby status in the UI
             const lobbyEl = document.querySelector(`[data-lobby-id="${lobbyId}"]`);
             if (lobbyEl) {
-                const statusEl = lobbyEl.querySelector('.lobby-status');
-                if (statusEl) {
-                    statusEl.innerHTML = '<span class="badge bg-success">Race Active</span>';
-                }
-                
                 // Find and update the start race button
                 const startBtn = lobbyEl.querySelector('.start-race-btn');
                 if (startBtn) {
-                    startBtn.innerHTML = 'Race Started';
+                    startBtn.innerHTML = '<i class="fas fa-check"></i> Race Started';
                     startBtn.disabled = true;
-                    startBtn.classList.add('btn-secondary');
-                    startBtn.classList.remove('btn-success');
+                    startBtn.style.backgroundColor = 'rgba(144, 200, 60, 0.3)';
                 }
             }
-            
-            // Re-enable the button but keep it in "started" state
-            button.innerHTML = '<i class="fas fa-check"></i> Race Started';
-            button.classList.add('race-started');
             
             // Remove notification after 3 seconds
             setTimeout(() => {

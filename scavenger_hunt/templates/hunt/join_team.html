@@ -326,65 +326,15 @@ function updateTeamsDisplay(teams) {
 }
 
 function joinTeam(teamCode) {
-    // Get player name from session or localStorage
-    let playerName = '{{ request.session.player_name }}';
-    
-    // If player name is not in session, check localStorage
-    if (!playerName || playerName === '') {
-        playerName = localStorage.getItem('player_name');
-    }
-    
-    // If player name is still not available, prompt the user
-    if (!playerName || playerName === '') {
-        // Create modal for name input
-        const nameModal = document.createElement('div');
-        nameModal.className = 'modal';
-        nameModal.style.display = 'flex';
-        
-        nameModal.innerHTML = `
-            <div class="modal-content">
-                <h3>Enter Your Name</h3>
-                <p>Please enter your name to join the team:</p>
-                <div class="form-group">
-                    <input type="text" id="playerNameInput" class="form-control" required placeholder="Your name">
-                </div>
-                <div class="modal-buttons">
-                    <button onclick="submitNameAndJoinTeam('${teamCode}')" class="join-btn">Continue</button>
-                    <button onclick="closeNameModal()" class="btn-cancel">Cancel</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(nameModal);
-        return;
-    }
-    
-    // If we have a player name, proceed with joining
-    submitJoinRequest(teamCode, playerName);
-}
-
-function closeNameModal() {
-    const modal = document.querySelector('.modal');
-    if (modal) {
-        document.body.removeChild(modal);
-    }
-}
-
-function submitNameAndJoinTeam(teamCode) {
-    const playerName = document.getElementById('playerNameInput').value.trim();
+    // Get player name from session
+    const playerName = '{{ request.session.player_name }}';
     
     if (!playerName) {
-        alert('Please enter your name');
+        alert('Player name not found in session. Please go back to the home page.');
         return;
     }
     
-    // Save the name to localStorage
-    localStorage.setItem('player_name', playerName);
-    
-    // Close the modal
-    closeNameModal();
-    
-    // Submit the join request
+    // Submit the join request directly without opening modal
     submitJoinRequest(teamCode, playerName);
 }
 
@@ -470,6 +420,14 @@ function submitCreateTeam() {
         return;
     }
     
+    // Get player name from session
+    const playerName = '{{ request.session.player_name }}';
+    
+    if (!playerName) {
+        alert('Player name not found in session. Please go back to the home page.');
+        return;
+    }
+    
     // Use player name from session
     fetch('/create-standalone-team/', {
         method: 'POST',
@@ -479,7 +437,7 @@ function submitCreateTeam() {
         },
         body: JSON.stringify({
             team_name: teamName,
-            player_name: '{{ request.session.player_name }}'
+            player_name: playerName
         })
     })
     .then(response => response.json())

@@ -51,4 +51,6 @@ urlpatterns = [
     path('lobby/<int:lobby_id>/question/<int:question_id>/check/', views.check_answer, name='check_answer'),
     path('lobby/<int:lobby_id>/question/<int:question_id>/upload/', views.upload_photo, name='upload_photo'),
     path('race-complete/', views.race_complete, name='race_complete'),
+    path('race/<int:race_id>/questions/', views.race_questions, name='race_questions'),
+    path('check-answer/', views.check_answer, name='check_answer'),
 ]

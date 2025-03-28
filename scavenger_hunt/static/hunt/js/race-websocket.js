@@ -21,6 +21,9 @@ function connectToRaceWebsocket(raceId) {
                 statusElement.classList.remove('text-danger');
                 statusElement.classList.add('text-success');
             }
+            
+            // Show connected message on screen for debugging
+            showMessage('WebSocket connected!', 'success');
         };
         
         socket.onmessage = function(e) {
@@ -32,32 +35,33 @@ function connectToRaceWebsocket(raceId) {
                 if (data.type === 'race_started') {
                     console.log('Race started event received with data:', data);
                     
+                    // Show a notification that we received the race started event
+                    showMessage('Race started event received! Redirecting...', 'info');
+                    
                     if (data.redirect_url) {
                         console.log('Redirecting to:', data.redirect_url);
                         
-                        // Add a visual indicator for debugging
-                        const statusEl = document.createElement('div');
-                        statusEl.style.position = 'fixed';
-                        statusEl.style.top = '10px';
-                        statusEl.style.left = '10px';
-                        statusEl.style.padding = '10px';
-                        statusEl.style.background = 'rgba(0,0,0,0.8)';
-                        statusEl.style.color = '#fff';
-                        statusEl.style.zIndex = '9999';
-                        statusEl.innerHTML = 'Redirecting to: ' + data.redirect_url;
-                        document.body.appendChild(statusEl);
-                        
-                        // Delay redirect slightly to let the user see the message
+                        // Redirect with a small delay to allow the message to be seen
                         setTimeout(() => {
                             window.location.href = data.redirect_url;
-                        }, 500);
+                        }, 1000);
                     } else {
+                        // If redirect URL is missing, try a fallback
                         console.error('Missing redirect_url in race_started event');
-                        alert('Race started but no redirect URL provided!');
+                        showMessage('Race started but no redirect URL provided! Trying fallback...', 'warning');
+                        
+                        // Try to build a fallback URL based on the race ID
+                        const fallbackUrl = `/race/${raceId}/questions/`;
+                        console.log('Using fallback URL:', fallbackUrl);
+                        
+                        setTimeout(() => {
+                            window.location.href = fallbackUrl;
+                        }, 2000);
                     }
                 }
             } catch (error) {
                 console.error('Error parsing WebSocket message:', error);
+                showMessage('Error parsing message: ' + error.message, 'error');
             }
         };
         
@@ -69,6 +73,12 @@ function connectToRaceWebsocket(raceId) {
                 statusElement.classList.remove('text-success');
                 statusElement.classList.add('text-danger');
             }
+            
+            // Try to reconnect after a delay
+            showMessage('WebSocket disconnected. Attempting to reconnect...', 'warning');
+            setTimeout(() => {
+                window.raceSocket = connectToRaceWebsocket(raceId);
+            }, 3000);
         };
         
         socket.onerror = function(e) {
@@ -79,13 +89,75 @@ function connectToRaceWebsocket(raceId) {
                 statusElement.classList.remove('text-success');
                 statusElement.classList.add('text-danger');
             }
+            showMessage('WebSocket error. Check console for details.', 'error');
         };
         
         return socket;
     } catch (error) {
         console.error('Error creating WebSocket connection:', error);
+        showMessage('Failed to create WebSocket: ' + error.message, 'error');
         return null;
     }
+}
+
+/**
+ * Display a message on the screen for debugging/user feedback
+ */
+function showMessage(message, type = 'info') {
+    // Create or reuse message container
+    let container = document.getElementById('ws-message-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'ws-message-container';
+        container.style.position = 'fixed';
+        container.style.top = '10px';
+        container.style.right = '10px';
+        container.style.zIndex = '10000';
+        container.style.maxWidth = '300px';
+        document.body.appendChild(container);
+    }
+    
+    // Create message element
+    const msgEl = document.createElement('div');
+    msgEl.style.margin = '5px';
+    msgEl.style.padding = '10px';
+    msgEl.style.borderRadius = '5px';
+    msgEl.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+    msgEl.style.wordBreak = 'break-word';
+    
+    // Set colors based on message type
+    switch (type) {
+        case 'success':
+            msgEl.style.backgroundColor = 'rgba(40, 167, 69, 0.9)';
+            break;
+        case 'warning':
+            msgEl.style.backgroundColor = 'rgba(255, 193, 7, 0.9)';
+            msgEl.style.color = '#000';
+            break;
+        case 'error':
+            msgEl.style.backgroundColor = 'rgba(220, 53, 69, 0.9)';
+            break;
+        default: // info
+            msgEl.style.backgroundColor = 'rgba(23, 162, 184, 0.9)';
+    }
+    
+    msgEl.style.color = type === 'warning' ? '#000' : '#fff';
+    msgEl.textContent = message;
+    
+    // Add to container
+    container.appendChild(msgEl);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        if (container.contains(msgEl)) {
+            container.removeChild(msgEl);
+        }
+        
+        // Remove container if empty
+        if (container.children.length === 0) {
+            document.body.removeChild(container);
+        }
+    }, 5000);
 }
 
 // Initialize WebSocket connection when DOM is fully loaded
@@ -126,5 +198,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     } catch (error) {
         console.error('Error initializing WebSocket:', error);
+        showMessage('Error initializing WebSocket: ' + error.message, 'error');
     }
 });

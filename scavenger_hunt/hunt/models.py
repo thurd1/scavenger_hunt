@@ -173,3 +173,18 @@ class TeamProgress(models.Model):
     def __str__(self):
         status = "Completed" if self.completed else "Not completed"
         return f"{self.team.name} - {self.question} - {status}"
+
+class TeamAnswer(models.Model):
+    """Tracks team answers to questions"""
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='answers')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='team_answers')
+    answered_correctly = models.BooleanField(default=False)
+    answered_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('team', 'question')
+        ordering = ['answered_at']
+    
+    def __str__(self):
+        status = "correct" if self.answered_correctly else "incorrect"
+        return f"{self.team.name} - {self.question.text[:20]} - {status}"
