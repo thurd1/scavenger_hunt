@@ -326,7 +326,7 @@ function updateTeamsDisplay(teams) {
 }
 
 function joinTeam(teamCode) {
-    // Get player name from session, local storage, or prompt the user
+    // Get player name from session or localStorage
     let playerName = '{{ request.session.player_name }}';
     
     // If player name is not in session, check localStorage
@@ -336,16 +336,59 @@ function joinTeam(teamCode) {
     
     // If player name is still not available, prompt the user
     if (!playerName || playerName === '') {
-        playerName = prompt("Please enter your name to join the team:", "");
-        if (playerName) {
-            // Save to localStorage for future use
-            localStorage.setItem('player_name', playerName);
-        } else {
-            // User canceled the prompt
-            return;
-        }
+        // Create modal for name input
+        const nameModal = document.createElement('div');
+        nameModal.className = 'modal';
+        nameModal.style.display = 'flex';
+        
+        nameModal.innerHTML = `
+            <div class="modal-content">
+                <h3>Enter Your Name</h3>
+                <p>Please enter your name to join the team:</p>
+                <div class="form-group">
+                    <input type="text" id="playerNameInput" class="form-control" required placeholder="Your name">
+                </div>
+                <div class="modal-buttons">
+                    <button onclick="submitNameAndJoinTeam('${teamCode}')" class="join-btn">Continue</button>
+                    <button onclick="closeNameModal()" class="btn-cancel">Cancel</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(nameModal);
+        return;
     }
     
+    // If we have a player name, proceed with joining
+    submitJoinRequest(teamCode, playerName);
+}
+
+function closeNameModal() {
+    const modal = document.querySelector('.modal');
+    if (modal) {
+        document.body.removeChild(modal);
+    }
+}
+
+function submitNameAndJoinTeam(teamCode) {
+    const playerName = document.getElementById('playerNameInput').value.trim();
+    
+    if (!playerName) {
+        alert('Please enter your name');
+        return;
+    }
+    
+    // Save the name to localStorage
+    localStorage.setItem('player_name', playerName);
+    
+    // Close the modal
+    closeNameModal();
+    
+    // Submit the join request
+    submitJoinRequest(teamCode, playerName);
+}
+
+function submitJoinRequest(teamCode, playerName) {
     console.log('Joining team with code:', teamCode);
     console.log('Player name:', playerName);
     
