@@ -44,9 +44,6 @@
                 <div class="teams-grid">
                     {% for team in lobby.teams.all %}
                         <div class="team-card">
-                            <button class="action-btn delete-btn" onclick="deleteTeam({{ team.id }})" data-team-id="{{ team.id }}">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
                             <div class="team-header">
                                 <h3>{{ team.name }}</h3>
                                 <span class="team-code">Code: {{ team.code }}</span>
@@ -54,6 +51,11 @@
                             <div class="team-info">
                                 <p><i class="fas fa-users"></i> Players: {{ team.players.count }}</p>
                                 <p><i class="fas fa-clock"></i> Joined: {{ team.created_at|date:"F d, Y" }}</p>
+                            </div>
+                            <div class="team-actions">
+                                <button class="action-btn delete-btn" onclick="deleteTeam({{ team.id }})" data-team-id="{{ team.id }}">
+                                    <i class="fas fa-trash"></i> Delete Team
+                                </button>
                             </div>
                         </div>
                     {% endfor %}
@@ -556,16 +558,29 @@
                 'X-CSRFToken': getCookie('csrftoken')
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.status === 'success') {
-                location.reload();
+                // Remove the team card from the DOM
+                const teamElement = document.querySelector(`[data-team-id="${teamId}"]`);
+                if (teamElement && teamElement.parentElement) {
+                    teamElement.parentElement.removeChild(teamElement);
+                } else {
+                    // If we can't find the team element, just reload the page
+                    location.reload();
+                }
             } else {
-                alert('Error deleting team: ' + data.message);
+                alert('Error deleting team: ' + (data.message || 'Unknown error'));
             }
         })
         .catch(error => {
             console.error('Error:', error);
+            alert('Error deleting team: ' + error.message);
         });
     }
     

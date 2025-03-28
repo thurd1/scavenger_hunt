@@ -29,6 +29,9 @@
                     <button class="action-btn edit-btn" onclick="showEditRaceModal()">
                         <i class="fas fa-edit"></i> Edit
                     </button>
+                    <button class="action-btn delete-btn" onclick="confirmDeleteRace({{ race.id }})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
                 </div>
             </div>
             <div class="card-content">
@@ -1109,6 +1112,29 @@ function startRace(raceId) {
     raceSocket.onclose = function(e) {
         console.log('Race WebSocket connection closed');
     };
+}
+
+function confirmDeleteRace(raceId) {
+    if (confirm('Are you sure you want to delete this race? This action cannot be undone.')) {
+        fetch(`/race/${raceId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.href = "{% url 'manage_riddles' %}";
+            } else {
+                alert('Failed to delete race');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete race');
+        });
+    }
 }
 </script>
 {% endblock %}

@@ -326,17 +326,27 @@ function updateTeamsDisplay(teams) {
 }
 
 function joinTeam(teamCode) {
-    // No need to ask for name - use the one from session
-    console.log('Joining team with code:', teamCode);
+    // Get player name from session, local storage, or prompt the user
+    let playerName = '{{ request.session.player_name }}';
     
-    // Get player name from session or from hidden element
-    const playerName = '{{ request.session.player_name }}';
-    
-    if (!playerName) {
-        alert('Session error: Your player name is not set. Please go back and enter your name.');
-        return;
+    // If player name is not in session, check localStorage
+    if (!playerName || playerName === '') {
+        playerName = localStorage.getItem('player_name');
     }
     
+    // If player name is still not available, prompt the user
+    if (!playerName || playerName === '') {
+        playerName = prompt("Please enter your name to join the team:", "");
+        if (playerName) {
+            // Save to localStorage for future use
+            localStorage.setItem('player_name', playerName);
+        } else {
+            // User canceled the prompt
+            return;
+        }
+    }
+    
+    console.log('Joining team with code:', teamCode);
     console.log('Player name:', playerName);
     
     fetch('/join-existing-team/', {

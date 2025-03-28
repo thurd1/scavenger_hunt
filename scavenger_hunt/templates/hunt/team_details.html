@@ -24,11 +24,6 @@
     <div class="dashboard-box p-4">
         <div class="lobby-header">
             <h1>{{ team.name }}</h1>
-            <div class="lobby-info">
-                <p><strong>Team Code:</strong> {{ team.code }}</p>
-                <p><strong>Created:</strong> {{ team.created_at|date:"F d, Y" }}</p>
-                <p><strong>Status:</strong> {% if team.is_active %}Active{% else %}Inactive{% endif %}</p>
-            </div>
         </div>
 
         <div class="members-section">

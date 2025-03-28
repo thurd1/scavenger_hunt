@@ -31,9 +31,6 @@
                 {% for team in teams %}
                 <div class="team-card">
                     <div class="team-header">
-                        <button class="action-btn delete-btn" onclick="deleteTeam({{ team.id }})" data-team-id="{{ team.id }}">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
                         <h3>{{ team.name }}</h3>
                     </div>
                     <div class="team-members">
@@ -55,9 +52,14 @@
                             <a href="{% url 'edit_team' team.id %}" class="action-btn edit-btn">
                                 <i class="fas fa-edit"></i> Edit Team
                             </a>
-                            <a href="{% url 'view_team' team.id %}" class="action-btn view-btn">
+                            <a href="{% url 'view_team' team.id %}" class="action-btn btn btn-primary">
                                 <i class="fas fa-users"></i> View Team Page
                             </a>
+                        </div>
+                        <div class="delete-action mt-2">
+                            <button class="action-btn delete-btn btn-block" onclick="deleteTeam({{ team.id }})" data-team-id="{{ team.id }}">
+                                <i class="fas fa-trash"></i> Delete Team
+                            </button>
                         </div>
                     </div>
                 </div>
