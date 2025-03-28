@@ -24,9 +24,9 @@
         <div class="races-grid">
                                 {% for race in races %}
             <div class="race-card">
-                <button class="delete-race-btn" onclick="deleteRace({{ race.id }})">
-                    <i class="fas fa-times"></i>
-                                                    </button>
+                <button class="action-btn delete-btn" onclick="deleteRace({{ race.id }})">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
                 <div class="race-header">
                     <h3>{{ race.name }}</h3>
                     <span class="race-status {% if race.is_active %}active{% else %}inactive{% endif %}">

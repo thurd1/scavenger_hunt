@@ -44,7 +44,7 @@
         <div class="create-team-section">
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
             
-            <a href="{% url 'create_team' lobby.id %}" class="create-team-btn">Create Team</a>
+            <button onclick="showCreateTeamForm()" class="create-team-btn">Create Team</button>
         </div>
         
         <!-- Back to Home button moved to bottom -->
@@ -379,5 +379,128 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+function showCreateTeamForm() {
+    const createTeamModal = document.createElement('div');
+    createTeamModal.className = 'modal';
+    createTeamModal.style.display = 'flex';
+    
+    createTeamModal.innerHTML = `
+        <div class="modal-content">
+            <h3>Create New Team</h3>
+            <div class="form-group">
+                <label for="newTeamName">Team Name</label>
+                <input type="text" id="newTeamName" class="form-control" required placeholder="Enter team name">
+            </div>
+            <div class="modal-buttons">
+                <button onclick="submitCreateTeam()" class="join-btn">Create Team</button>
+                <button onclick="closeCreateModal()" class="btn-cancel">Cancel</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(createTeamModal);
+}
+
+function closeCreateModal() {
+    const modal = document.querySelector('.modal');
+    if (modal) {
+        document.body.removeChild(modal);
+    }
+}
+
+function submitCreateTeam() {
+    const teamName = document.getElementById('newTeamName').value.trim();
+    
+    if (!teamName) {
+        alert('Please enter a team name');
+        return;
+    }
+    
+    // Use player name from session
+    fetch('/create-standalone-team/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            team_name: teamName,
+            player_name: '{{ request.session.player_name }}'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = data.redirect_url;
+        } else {
+            alert(data.error || 'Error creating team');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating team: ' + error);
+    });
+}
+
+// Add modal styles
+document.addEventListener('DOMContentLoaded', function() {
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .modal-content {
+            background: rgba(33, 37, 41, 0.95);
+            border: 2px solid rgba(144, 200, 60, 0.3);
+            border-radius: 12px;
+            padding: 25px;
+            min-width: 300px;
+            max-width: 500px;
+        }
+        
+        .modal-content h3 {
+            color: #90C83C;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .btn-cancel {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            background: rgba(144, 200, 60, 0.1);
+            border: 1px solid rgba(144, 200, 60, 0.3);
+            border-radius: 4px;
+            color: white;
+            margin-top: 5px;
+        }
+    `;
+    document.head.appendChild(styleElement);
+});
 </script>
 {% endblock %} 

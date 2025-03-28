@@ -443,6 +443,11 @@ function startRace(lobbyId) {
     
     console.log('Starting race for lobby:', lobbyId);
     
+    // Disable the button to prevent double clicking
+    const button = event.target;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+    
     // Make API call to start the race
     fetch(`/lobby/${lobbyId}/start-race/`, {
         method: 'POST',
@@ -450,10 +455,13 @@ function startRace(lobbyId) {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCookie('csrftoken')
         },
-        body: JSON.stringify({}) // Add empty JSON body to ensure proper content type
+        body: JSON.stringify({lobby_id: lobbyId}) // Add lobby_id to JSON body
     })
     .then(response => {
         console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
+        }
         return response.json();
     })
     .then(data => {
@@ -480,6 +488,10 @@ function startRace(lobbyId) {
                 }
             }
             
+            // Re-enable the button but keep it in "started" state
+            button.innerHTML = '<i class="fas fa-check"></i> Race Started';
+            button.classList.add('race-started');
+            
             // Remove notification after 3 seconds
             setTimeout(() => {
                 notificationEl.remove();
@@ -487,6 +499,10 @@ function startRace(lobbyId) {
         } else {
             notificationEl.innerHTML = `Error: ${data.error || 'Failed to start race'}`;
             notificationEl.style.background = 'rgba(220, 53, 69, 0.9)';
+            
+            // Re-enable the button
+            button.innerHTML = '<i class="fas fa-play"></i> Start Race';
+            button.disabled = false;
             
             // Remove notification after 3 seconds
             setTimeout(() => {
@@ -498,6 +514,10 @@ function startRace(lobbyId) {
         console.error('Error starting race:', error);
         notificationEl.innerHTML = 'Error starting race. Please try again.';
         notificationEl.style.background = 'rgba(220, 53, 69, 0.9)';
+        
+        // Re-enable the button
+        button.innerHTML = '<i class="fas fa-play"></i> Start Race';
+        button.disabled = false;
         
         // Remove notification after 3 seconds
         setTimeout(() => {
