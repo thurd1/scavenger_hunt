@@ -41,6 +41,9 @@
                     <a href="{% url 'race_detail' race.id %}" class="view-btn">
                         <i class="fas fa-eye"></i> View Details
                     </a>
+                    <a href="{% url 'edit_race' race.id %}" class="action-btn edit-btn">
+                        <i class="fas fa-edit"></i> Edit Race
+                    </a>
                 </div>
             </div>
             {% empty %}

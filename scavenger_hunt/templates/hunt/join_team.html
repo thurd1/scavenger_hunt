@@ -44,12 +44,12 @@
         <div class="create-team-section">
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
             
-            <button onclick="showCreateTeamForm()" class="create-team-btn">Create Team</button>
+            <a href="{% url 'create_team' lobby.id %}" class="create-team-btn">Create Team</a>
         </div>
         
         <!-- Back to Home button moved to bottom -->
         <div class="back-button-container" style="margin-top: 2rem; text-align: center;">
-            <a href="{% url 'join_game_session' %}" class="btn btn-success">
+            <a href="{% url 'join_game_session' %}" class="btn btn-success" style="background: linear-gradient(135deg, #90C83C, #7AAF2F); border: none;">
                 <i class="fas fa-home"></i> Back to Home
             </a>
         </div>
@@ -329,6 +329,16 @@ function joinTeam(teamCode) {
     // No need to ask for name - use the one from session
     console.log('Joining team with code:', teamCode);
     
+    // Get player name from session or from hidden element
+    const playerName = '{{ request.session.player_name }}';
+    
+    if (!playerName) {
+        alert('Session error: Your player name is not set. Please go back and enter your name.');
+        return;
+    }
+    
+    console.log('Player name:', playerName);
+    
     fetch('/join-existing-team/', {
         method: 'POST',
         headers: {
@@ -337,7 +347,7 @@ function joinTeam(teamCode) {
         },
         body: JSON.stringify({
             team_code: teamCode,
-            player_name: '{{ request.session.player_name }}'
+            player_name: playerName
         })
     })
     .then(response => response.json())
@@ -352,69 +362,6 @@ function joinTeam(teamCode) {
     .catch(error => {
         console.error('Error:', error);
         alert('Error joining team: ' + error);
-    });
-}
-
-function showCreateTeamForm() {
-    const createTeamModal = document.createElement('div');
-    createTeamModal.className = 'modal';
-    createTeamModal.style.display = 'flex';
-    
-    createTeamModal.innerHTML = `
-        <div class="modal-content">
-            <h3>Create New Team</h3>
-            <div class="form-group">
-                <label for="newTeamName">Team Name</label>
-                <input type="text" id="newTeamName" class="form-control" required placeholder="Enter team name">
-            </div>
-            <div class="modal-buttons">
-                <button onclick="submitCreateTeam()" class="join-btn">Create Team</button>
-                <button onclick="closeCreateModal()" class="btn-cancel">Cancel</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(createTeamModal);
-}
-
-function closeCreateModal() {
-    const modal = document.querySelector('.modal');
-    if (modal) {
-        document.body.removeChild(modal);
-    }
-}
-
-function submitCreateTeam() {
-    const teamName = document.getElementById('newTeamName').value.trim();
-    
-    if (!teamName) {
-        alert('Please enter a team name');
-        return;
-    }
-    
-    // Use player name from session
-    fetch('/create-standalone-team/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            team_name: teamName,
-            player_name: '{{ request.session.player_name }}'
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.href = data.redirect_url;
-        } else {
-            alert(data.error || 'Error creating team');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error creating team: ' + error);
     });
 }
 

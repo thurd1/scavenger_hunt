@@ -65,19 +65,14 @@
                 <i class="fas fa-arrow-left"></i> Back to Lobbies
             </a>
         </div>
-
-        <!-- Find the start race button and update it to include race ID -->
-        <button id="start-race-btn" class="action-btn start-btn" data-lobby-id="{{ lobby.id }}" data-race-id="{{ lobby.race.id }}" onclick="startRace()">
-            <i class="fas fa-flag-checkered"></i> Start Race
-        </button>
     </div>
 </div>
 
 <template id="teamCardTemplate">
     <div class="team-card">
         <div class="team-header">
-            <button class="delete-team-btn" onclick="deleteTeam(this.dataset.teamId)">
-                <i class="fas fa-times"></i>
+            <button class="action-btn delete-btn" onclick="deleteTeam(this.dataset.teamId)">
+                <i class="fas fa-trash"></i> Delete
             </button>
             <h3></h3>
             <span class="team-code"></span>

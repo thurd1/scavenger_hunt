@@ -11,7 +11,7 @@
         <h2 class="section-title">Active Lobbies</h2>
         <div class="lobbies-grid">
             {% for lobby in lobbies %}
-            <div class="lobby-card">
+            <div class="lobby-card" data-lobby-id="{{ lobby.id }}">
                 <button class="delete-lobby-btn" onclick="confirmDeleteLobby({{ lobby.id }})">
                     <i class="fas fa-times"></i>
                 </button>
@@ -441,16 +441,23 @@ function startRace(lobbyId) {
     notificationEl.innerHTML = 'Starting race...';
     document.body.appendChild(notificationEl);
     
+    console.log('Starting race for lobby:', lobbyId);
+    
     // Make API call to start the race
     fetch(`/lobby/${lobbyId}/start-race/`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCookie('csrftoken')
-        }
+        },
+        body: JSON.stringify({}) // Add empty JSON body to ensure proper content type
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('Response data:', data);
         if (data.success) {
             notificationEl.innerHTML = 'Race started! Players will be redirected.';
             notificationEl.style.background = 'rgba(144, 200, 60, 0.9)';
