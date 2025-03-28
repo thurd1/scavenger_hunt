@@ -4,9 +4,6 @@
 <div class="container">
     <div class="join-header">
         <h1>Join or Create a Team</h1>
-        <a href="{% url 'join_game_session' %}" class="home-btn">
-            <i class="fas fa-home"></i> Back to Home
-        </a>
     </div>
 
     <div class="join-team-form-container">
@@ -48,6 +45,13 @@
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
             
             <button onclick="showCreateTeamForm()" class="create-team-btn">Create Team</button>
+        </div>
+        
+        <!-- Back to Home button moved to bottom -->
+        <div class="back-button-container" style="margin-top: 2rem; text-align: center;">
+            <a href="{% url 'join_game_session' %}" class="btn btn-success">
+                <i class="fas fa-home"></i> Back to Home
+            </a>
         </div>
     </div>
 </div>
@@ -322,56 +326,9 @@ function updateTeamsDisplay(teams) {
 }
 
 function joinTeam(teamCode) {
-    // Create a modal popup to ask for player name
-    const playerNameModal = document.createElement('div');
-    playerNameModal.className = 'modal';
-    playerNameModal.style.display = 'flex';
+    // No need to ask for name - use the one from session
+    console.log('Joining team with code:', teamCode);
     
-    playerNameModal.innerHTML = `
-        <div class="modal-content">
-            <h3>Join Team</h3>
-            <div class="form-group">
-                <label for="playerNameInput">Your Name</label>
-                <input type="text" id="playerNameInput" class="form-control" required placeholder="Enter your name">
-            </div>
-            <div class="modal-buttons">
-                <button onclick="submitJoinTeam('${teamCode}')" class="join-btn">Join</button>
-                <button onclick="closeJoinModal()" class="btn-cancel">Cancel</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(playerNameModal);
-}
-
-function closeJoinModal() {
-    const modal = document.querySelector('.modal');
-    if (modal) {
-        document.body.removeChild(modal);
-    }
-}
-
-function submitJoinTeam(teamCode) {
-    const playerName = document.getElementById('playerNameInput').value.trim();
-    
-    if (!playerName) {
-        alert('Please enter your name');
-        return;
-    }
-    
-    // Add loading message
-    const messageDiv = document.createElement('div');
-    messageDiv.id = 'loading-message';
-    messageDiv.innerHTML = 'Joining team...';
-    messageDiv.style = 'color: #90C83C; margin-top: 10px; text-align: center;';
-    document.querySelector('.modal-content').appendChild(messageDiv);
-    
-    console.log('Submitting join request for team:', teamCode, 'player:', playerName);
-    
-    // Store values in sessionStorage
-    sessionStorage.setItem('player_name', playerName);
-    
-    // Use fetch to submit JSON data
     fetch('/join-existing-team/', {
         method: 'POST',
         headers: {
@@ -380,28 +337,12 @@ function submitJoinTeam(teamCode) {
         },
         body: JSON.stringify({
             team_code: teamCode,
-            player_name: playerName
+            player_name: '{{ request.session.player_name }}'
         })
     })
-    .then(response => {
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-        }
-        // Check if response is JSON
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            return response.json();
-        } else {
-            // For non-JSON responses, get the text
-            return response.text().then(text => {
-                console.log('Response is not JSON:', text);
-                throw new Error('Unexpected response format');
-            });
-        }
-    })
+    .then(response => response.json())
     .then(data => {
-        console.log('Response data:', data);
+        console.log('Response:', data);
         if (data.success) {
             window.location.href = data.redirect_url;
         } else {
@@ -409,90 +350,9 @@ function submitJoinTeam(teamCode) {
         }
     })
     .catch(error => {
-        console.error('Error joining team:', error);
-        alert('Error joining team: ' + error.message);
-        
-        // Remove loading message
-        const loadingMsg = document.getElementById('loading-message');
-        if (loadingMsg) {
-            loadingMsg.remove();
-        }
+        console.error('Error:', error);
+        alert('Error joining team: ' + error);
     });
-}
-
-// Add styles for the modal
-document.addEventListener('DOMContentLoaded', function() {
-    const styleElement = document.createElement('style');
-    styleElement.textContent = `
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-        }
-        
-        .modal-content {
-            background: rgba(33, 37, 41, 0.95);
-            border: 2px solid rgba(144, 200, 60, 0.3);
-            border-radius: 12px;
-            padding: 25px;
-            min-width: 300px;
-            max-width: 500px;
-        }
-        
-        .modal-content h3 {
-            color: #90C83C;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .modal-buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-        }
-        
-        .btn-cancel {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        
-        .form-control {
-            width: 100%;
-            padding: 10px;
-            background: rgba(144, 200, 60, 0.1);
-            border: 1px solid rgba(144, 200, 60, 0.3);
-            border-radius: 4px;
-            color: white;
-            margin-top: 5px;
-        }
-    `;
-    document.head.appendChild(styleElement);
-});
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
 }
 
 function showCreateTeamForm() {
@@ -506,10 +366,6 @@ function showCreateTeamForm() {
             <div class="form-group">
                 <label for="newTeamName">Team Name</label>
                 <input type="text" id="newTeamName" class="form-control" required placeholder="Enter team name">
-            </div>
-            <div class="form-group">
-                <label for="newPlayerName">Your Name</label>
-                <input type="text" id="newPlayerName" class="form-control" required placeholder="Enter your name">
             </div>
             <div class="modal-buttons">
                 <button onclick="submitCreateTeam()" class="join-btn">Create Team</button>
@@ -530,31 +386,13 @@ function closeCreateModal() {
 
 function submitCreateTeam() {
     const teamName = document.getElementById('newTeamName').value.trim();
-    const playerName = document.getElementById('newPlayerName').value.trim();
     
     if (!teamName) {
         alert('Please enter a team name');
         return;
     }
     
-    if (!playerName) {
-        alert('Please enter your name');
-        return;
-    }
-    
-    // Add loading message
-    const messageDiv = document.createElement('div');
-    messageDiv.id = 'loading-message';
-    messageDiv.innerHTML = 'Creating team...';
-    messageDiv.style = 'color: #90C83C; margin-top: 10px; text-align: center;';
-    document.querySelector('.modal-content').appendChild(messageDiv);
-    
-    console.log('Creating team:', teamName, 'player:', playerName);
-    
-    // Store values in sessionStorage
-    sessionStorage.setItem('player_name', playerName);
-    
-    // Use fetch to submit JSON data
+    // Use player name from session
     fetch('/create-standalone-team/', {
         method: 'POST',
         headers: {
@@ -563,28 +401,11 @@ function submitCreateTeam() {
         },
         body: JSON.stringify({
             team_name: teamName,
-            player_name: playerName
+            player_name: '{{ request.session.player_name }}'
         })
     })
-    .then(response => {
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-        }
-        // Check if response is JSON
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            return response.json();
-        } else {
-            // For non-JSON responses, get the text
-            return response.text().then(text => {
-                console.log('Response is not JSON:', text);
-                throw new Error('Unexpected response format');
-            });
-        }
-    })
+    .then(response => response.json())
     .then(data => {
-        console.log('Response data:', data);
         if (data.success) {
             window.location.href = data.redirect_url;
         } else {
@@ -592,15 +413,24 @@ function submitCreateTeam() {
         }
     })
     .catch(error => {
-        console.error('Error creating team:', error);
-        alert('Error creating team: ' + error.message);
-        
-        // Remove loading message
-        const loadingMsg = document.getElementById('loading-message');
-        if (loadingMsg) {
-            loadingMsg.remove();
-        }
+        console.error('Error:', error);
+        alert('Error creating team: ' + error);
     });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 </script>
 {% endblock %} 

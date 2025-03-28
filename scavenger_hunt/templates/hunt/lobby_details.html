@@ -576,8 +576,15 @@
     }
     
     function startRace() {
-        const lobbyId = document.getElementById('start-race-btn').dataset.lobbyId;
+        const raceBtn = document.getElementById('start-race-btn');
+        const lobbyId = raceBtn.dataset.lobbyId;
+        const raceId = raceBtn.dataset.raceId;
         
+        // Add loading indicator
+        raceBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+        raceBtn.disabled = true;
+        
+        // First make the API call to start the race
         fetch(`/lobby/${lobbyId}/start-race/`, {
             method: 'POST',
             headers: {
@@ -587,14 +594,43 @@
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success') {
-                console.log('Race started');
+            if (data.success) {
+                console.log('Race start API call successful:', data);
+                // Notification for the leader that the race started successfully
+                const notification = document.createElement('div');
+                notification.className = 'race-notification';
+                notification.innerHTML = 'Race started successfully! Players will be redirected.';
+                notification.style.position = 'fixed';
+                notification.style.top = '20px';
+                notification.style.left = '50%';
+                notification.style.transform = 'translateX(-50%)';
+                notification.style.padding = '15px 25px';
+                notification.style.background = 'rgba(144, 200, 60, 0.9)';
+                notification.style.color = 'white';
+                notification.style.borderRadius = '8px';
+                notification.style.zIndex = '9999';
+                document.body.appendChild(notification);
+                
+                // Remove notification after 5 seconds
+                setTimeout(() => {
+                    notification.remove();
+                }, 5000);
+                
+                // Reset button
+                raceBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> Race Started';
+                raceBtn.classList.add('race-active');
             } else {
-                console.error('Error starting race:', data.message);
+                console.error('Error starting race:', data.error);
+                raceBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> Start Race';
+                raceBtn.disabled = false;
+                alert('Error starting race: ' + data.error);
             }
         })
         .catch(error => {
             console.error('Error starting race:', error);
+            raceBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> Start Race';
+            raceBtn.disabled = false;
+            alert('Error starting race. Please try again.');
         });
     }
     

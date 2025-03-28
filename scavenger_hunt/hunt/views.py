@@ -490,7 +490,7 @@ def create_team(request, lobby_id):
             
             request.session['team_id'] = team.id
             messages.success(request, f'Team created! Your team code is: {team.code}')
-            return redirect('team_dashboard', team_id=team.id)
+            return redirect('view_team', team_id=team.id)
     else:
         form = TeamForm()
     

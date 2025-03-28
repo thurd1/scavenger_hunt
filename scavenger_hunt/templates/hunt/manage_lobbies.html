@@ -427,36 +427,76 @@ function showCreateForm() {
 }
 
 function startRace(lobbyId) {
-    // Create WebSocket connection
-    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const raceSocket = new WebSocket(
-        ws_scheme + '://' + window.location.host + '/ws/race/' + lobbyId + '/'
-    );
-
-    raceSocket.onopen = function(e) {
-        console.log('Race WebSocket connection established');
-        // Send message to start the race
-        raceSocket.send(JSON.stringify({
-            'type': 'start_race',
-            'lobby_id': lobbyId
-        }));
-    };
-
-    raceSocket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        if (data.type === 'race_started') {
-            alert('Race has started! Players can now join.');
+    // Add a visual indicator
+    const notificationEl = document.createElement('div');
+    notificationEl.style.position = 'fixed';
+    notificationEl.style.top = '10px';
+    notificationEl.style.left = '50%';
+    notificationEl.style.transform = 'translateX(-50%)';
+    notificationEl.style.padding = '10px 20px';
+    notificationEl.style.background = 'rgba(144, 200, 60, 0.9)';
+    notificationEl.style.color = '#fff';
+    notificationEl.style.borderRadius = '5px';
+    notificationEl.style.zIndex = '9999';
+    notificationEl.innerHTML = 'Starting race...';
+    document.body.appendChild(notificationEl);
+    
+    // Make API call to start the race
+    fetch(`/lobby/${lobbyId}/start-race/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
         }
-    };
-
-    raceSocket.onerror = function(e) {
-        console.error('WebSocket error:', e);
-        alert('Error starting race. Please try again.');
-    };
-
-    raceSocket.onclose = function(e) {
-        console.log('Race WebSocket connection closed');
-    };
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            notificationEl.innerHTML = 'Race started! Players will be redirected.';
+            notificationEl.style.background = 'rgba(144, 200, 60, 0.9)';
+            
+            // Update the lobby status in the UI
+            const lobbyEl = document.querySelector(`[data-lobby-id="${lobbyId}"]`);
+            if (lobbyEl) {
+                const statusEl = lobbyEl.querySelector('.lobby-status');
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="badge bg-success">Race Active</span>';
+                }
+                
+                // Find and update the start race button
+                const startBtn = lobbyEl.querySelector('.start-race-btn');
+                if (startBtn) {
+                    startBtn.innerHTML = 'Race Started';
+                    startBtn.disabled = true;
+                    startBtn.classList.add('btn-secondary');
+                    startBtn.classList.remove('btn-success');
+                }
+            }
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notificationEl.remove();
+            }, 3000);
+        } else {
+            notificationEl.innerHTML = `Error: ${data.error || 'Failed to start race'}`;
+            notificationEl.style.background = 'rgba(220, 53, 69, 0.9)';
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notificationEl.remove();
+            }, 3000);
+        }
+    })
+    .catch(error => {
+        console.error('Error starting race:', error);
+        notificationEl.innerHTML = 'Error starting race. Please try again.';
+        notificationEl.style.background = 'rgba(220, 53, 69, 0.9)';
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+            notificationEl.remove();
+        }, 3000);
+    });
 }
 
 // Close modal when clicking outside

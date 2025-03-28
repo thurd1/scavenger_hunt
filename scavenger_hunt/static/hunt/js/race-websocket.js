@@ -27,8 +27,31 @@ function connectToRaceWebsocket(raceId) {
         
         // Handle different types of messages
         if (data.type === 'race_started') {
-            console.log('Race started, redirecting to:', data.redirect_url);
-            window.location.href = data.redirect_url;
+            console.log('Race started event received with data:', data);
+            
+            if (data.redirect_url) {
+                console.log('Redirecting to:', data.redirect_url);
+                
+                // Add a visual indicator for debugging
+                const statusEl = document.createElement('div');
+                statusEl.style.position = 'fixed';
+                statusEl.style.top = '10px';
+                statusEl.style.left = '10px';
+                statusEl.style.padding = '10px';
+                statusEl.style.background = 'rgba(0,0,0,0.8)';
+                statusEl.style.color = '#fff';
+                statusEl.style.zIndex = '9999';
+                statusEl.innerHTML = 'Redirecting to: ' + data.redirect_url;
+                document.body.appendChild(statusEl);
+                
+                // Delay redirect slightly to let the user see the message
+                setTimeout(() => {
+                    window.location.href = data.redirect_url;
+                }, 500);
+            } else {
+                console.error('Missing redirect_url in race_started event');
+                alert('Race started but no redirect URL provided!');
+            }
         }
     };
     
