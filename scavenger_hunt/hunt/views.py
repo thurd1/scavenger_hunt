@@ -256,16 +256,26 @@ def broadcast_team_update(team_id):
                     )
 
 def join_team(request):
-    """Render the join team page with available teams and forms to join or create teams."""
+    # Make sure player name is in session
+    if 'player_name' not in request.session or not request.session['player_name']:
+        # Debug log for troubleshooting
+        print("Session data:", dict(request.session))
+        
+        # Get player name from POST if available
+        if request.method == 'POST' and 'player_name' in request.POST:
+            request.session['player_name'] = request.POST.get('player_name')
+            request.session.modified = True
+        else:
+            # Default fallback
+            request.session['player_name'] = 'Player'
+            request.session.modified = True
+    
     # Get all active teams
     teams = Team.objects.all().prefetch_related('members')
     
-    # Get player name from session
-    player_name = request.session.get('player_name', '')
-    
     return render(request, 'hunt/join_team.html', {
         'teams': teams,
-        'player_name': player_name
+        'player_name': request.session['player_name']
     })
 
 @require_http_methods(["POST"])

@@ -123,8 +123,7 @@
 }
 
 .team-card {
-    position: relative;
-    background-color: #f8f9fa;
+    background-color: white;
     border-radius: 10px;
     padding: 15px;
     margin-bottom: 20px;
@@ -145,9 +144,8 @@
 
 .team-header h3 {
     color: #90C83C;
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 600;
+    text-align: center;
+    margin-bottom: 15px;
 }
 
 .team-code {
@@ -161,38 +159,31 @@
 }
 
 .team-members h4 {
-    color: #ffffff;
-    font-size: 1.1rem;
     margin-bottom: 10px;
 }
 
 .member-list {
     list-style: none;
     padding: 0;
-    margin: 0;
+    margin-bottom: 20px;
+    color: #6c757d;
+    font-style: italic;
 }
 
 .member-list li {
-    display: flex;
-    align-items: center;
-    padding: 8px;
     margin-bottom: 5px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
-    transition: background 0.2s;
 }
 
-.member-list li:hover {
-    background: rgba(144, 200, 60, 0.1);
+.team-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
-.member-list li i {
-    color: #90C83C;
-    margin-right: 10px;
-}
-
-.member-list li span {
-    color: #ffffff;
+.team-actions .btn {
+    width: 100%;
+    text-align: center;
+    border-radius: 5px;
 }
 
 .no-members {
@@ -202,28 +193,6 @@
     padding: 10px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 6px;
-}
-
-.team-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    margin-top: 10px;
-}
-
-.action-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-decoration: none;
-    margin: 5px;
-    width: calc(100% - 10px);
-    text-align: center;
 }
 
 .delete-action {
@@ -386,16 +355,18 @@ function deleteTeam(teamId) {
             body: JSON.stringify({})
         })
         .then(response => {
-            if (response.ok || response.redirected) {
-                // Refresh the page to reflect the deleted team
-                window.location.reload();
-            } else {
-                alert('Failed to delete team');
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
+            return response.json().catch(() => ({})); // Handle if not JSON
+        })
+        .then(data => {
+            // Success - reload or redirect
+            window.location.reload();
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while deleting the team');
+            alert('Error deleting team: ' + error.message);
         });
     }
 }
