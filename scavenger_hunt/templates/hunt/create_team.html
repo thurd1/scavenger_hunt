@@ -39,12 +39,36 @@
         </div>
 
         <div class="back-button-container">
-            <a href="{% url 'lobby_details' lobby.id %}" class="btn btn-success back-btn">
-                <i class="fas fa-arrow-left"></i> Back to Lobby
+            <a href="{% url 'join_team' %}" class="btn btn-success back-btn">
+                <i class="fas fa-arrow-left"></i> Back to Teams
             </a>
         </div>
     </div>
 </div>
+
+<script>
+// Clear Django messages after displaying them
+document.addEventListener('DOMContentLoaded', function() {
+    // Find all message alerts
+    const messageAlerts = document.querySelectorAll('.alert');
+    
+    // If there are messages, set a timeout to fade them out
+    if (messageAlerts.length > 0) {
+        setTimeout(function() {
+            messageAlerts.forEach(function(alert) {
+                // Add fade-out effect
+                alert.style.transition = 'opacity 1s';
+                alert.style.opacity = '0';
+                
+                // Remove from DOM after fade completes
+                setTimeout(function() {
+                    alert.remove();
+                }, 1000);
+            });
+        }, 5000); // Display for 5 seconds before fading
+    }
+});
+</script>
 
 <style>
 .dashboard-box {
