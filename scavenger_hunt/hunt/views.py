@@ -654,6 +654,31 @@ def start_hunt(request, lobby_id):
     lobby.start_time = timezone.now()
     lobby.save()
 
+    # Get race ID if available
+    race_id = lobby.race.id if lobby.race else None
+    
+    # Send WebSocket message to notify all clients that the race has started
+    if race_id:
+        channel_layer = get_channel_layer()
+        race_group_name = f'race_{race_id}'
+        
+        # Log that we're sending the race_started event
+        print(f"Sending race_started event to group {race_group_name}")
+        
+        try:
+            # Send to the race group
+            async_to_sync(channel_layer.group_send)(
+                race_group_name,
+                {
+                    'type': 'race_started',
+                    'race_id': race_id,
+                    'message': 'Race has started! Redirecting to questions page.'
+                }
+            )
+            print(f"Successfully sent race_started event to group {race_group_name}")
+        except Exception as e:
+            print(f"Error sending race_started event: {str(e)}")
+
     # Return success sending them to the first zone
     return JsonResponse({
         'success': True,

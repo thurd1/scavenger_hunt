@@ -38,25 +38,34 @@ function connectToRaceWebsocket(raceId) {
                     // Show a notification that we received the race started event
                     showMessage('Race started event received! Redirecting...', 'info');
                     
-                    if (data.redirect_url) {
-                        console.log('Redirecting to:', data.redirect_url);
-                        
-                        // Redirect with a small delay to allow the message to be seen
-                        setTimeout(() => {
-                            window.location.href = data.redirect_url;
-                        }, 1000);
+                    // Check if there's a custom handler defined in the page
+                    if (typeof window.handleRaceStarted === 'function') {
+                        // Use the custom handler from the page
+                        console.log('Using custom race_started handler from page');
+                        window.handleRaceStarted(data);
                     } else {
-                        // If redirect URL is missing, try a fallback
-                        console.error('Missing redirect_url in race_started event');
-                        showMessage('Race started but no redirect URL provided! Trying fallback...', 'warning');
-                        
-                        // Try to build a fallback URL based on the race ID
-                        const fallbackUrl = `/race/${raceId}/questions/`;
-                        console.log('Using fallback URL:', fallbackUrl);
-                        
-                        setTimeout(() => {
-                            window.location.href = fallbackUrl;
-                        }, 2000);
+                        // Use the default handler in this file
+                        console.log('Using default race_started handler');
+                        if (data.redirect_url) {
+                            console.log('Redirecting to:', data.redirect_url);
+                            
+                            // Redirect with a small delay to allow the message to be seen
+                            setTimeout(() => {
+                                window.location.href = data.redirect_url;
+                            }, 1000);
+                        } else {
+                            // If redirect URL is missing, try a fallback
+                            console.error('Missing redirect_url in race_started event');
+                            showMessage('Race started but no redirect URL provided! Trying fallback...', 'warning');
+                            
+                            // Try to build a fallback URL based on the race ID
+                            const fallbackUrl = `/race/${raceId}/questions/`;
+                            console.log('Using fallback URL:', fallbackUrl);
+                            
+                            setTimeout(() => {
+                                window.location.href = fallbackUrl;
+                            }, 2000);
+                        }
                     }
                 }
             } catch (error) {

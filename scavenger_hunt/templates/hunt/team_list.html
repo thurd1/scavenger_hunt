@@ -85,14 +85,6 @@
     </div>
 </div>
 
-<!-- Debug info - can be removed in production -->
-<div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa;">
-    <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
-    <p class="mb-1">Lobby: {{ lobby.name|default:"None" }}</p>
-    <p class="mb-1">Race ID: {{ race.id|default:request.GET.get.race_id|default:"None" }}</p>
-    <p class="mb-0">Members count: {{ members|length }}</p>
-</div>
-
 <style>
 .container {
     max-width: 1200px;

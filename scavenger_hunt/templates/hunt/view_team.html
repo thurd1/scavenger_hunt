@@ -6,6 +6,10 @@
     <div class="dashboard-box p-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 style="color: #90C83C">Team: {{ team.name }}</h2>
+            <div id="connection-status" class="connection-status text-white px-2 py-1 rounded">
+                <span id="race-connection-status" class="badge bg-secondary">Race Connection: Connecting...</span>
+                <span id="team-connection-status" class="badge bg-secondary">Team Connection: Connecting...</span>
+            </div>
         </div>
 
         <!-- Debug info - can be removed in production -->
@@ -41,6 +45,12 @@
                 <i class="fas fa-arrow-left"></i> Back to Teams
             </a>
         </div>
+        
+        <!-- Race status notification area -->
+        <div id="race-status-area" class="race-status-area mt-4 p-3 rounded" style="display: none;">
+            <h5 class="text-center" id="race-status-title">Race Status</h5>
+            <p id="race-status-message" class="text-center mb-0"></p>
+        </div>
     </div>
 </div>
 
@@ -49,6 +59,14 @@
     background-color: rgba(33, 37, 41, 0.9);
     border-radius: 15px;
     border: 1px solid rgba(144, 200, 60, 0.2);
+}
+
+.connection-status {
+    font-size: 0.8rem;
+}
+
+.badge {
+    margin-left: 5px;
 }
 
 .members-section {
@@ -80,12 +98,33 @@
     background: linear-gradient(135deg, #7AAF2F, #90C83C);
     transform: translateY(-2px);
 }
+
+.race-status-area {
+    background-color: rgba(33, 37, 41, 0.7);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+}
+
+.race-status-area.active {
+    background-color: rgba(144, 200, 60, 0.2);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(144, 200, 60, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0); }
+}
 </style>
 <script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
     const urlParams = new URLSearchParams(window.location.search);
+    const raceConnectionStatus = document.getElementById('race-connection-status');
+    const teamConnectionStatus = document.getElementById('team-connection-status');
+    const raceStatusArea = document.getElementById('race-status-area');
+    const raceStatusMessage = document.getElementById('race-status-message');
+    
     // Check race ID from multiple sources
     let raceId = '{{ race.id|default:"" }}';
     if (!raceId) {
@@ -100,13 +139,68 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const membersContainer = document.getElementById('members-container');
     
+    // Custom function to handle race_started event within this page
+    window.handleRaceStarted = function(data) {
+        console.log('Race started event handled in view_team.html:', data);
+        
+        // Show race status notification
+        raceStatusArea.style.display = 'block';
+        raceStatusArea.classList.add('active');
+        document.getElementById('race-status-title').textContent = 'Race Started!';
+        
+        if (data.message) {
+            raceStatusMessage.textContent = data.message;
+        } else {
+            raceStatusMessage.textContent = 'The race has begun! Redirecting shortly...';
+        }
+        
+        // Set a timer for the redirect
+        setTimeout(() => {
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+            } else {
+                // Fallback URL if one wasn't provided
+                window.location.href = `/race/${raceId}/questions/`;
+            }
+        }, 3000);
+    };
+    
     // Initialize race WebSocket if race ID is available
     if (raceId) {
         console.log('Race ID:', raceId);
+        
+        // Update connection status indicator
+        raceConnectionStatus.textContent = 'Race Connection: Connecting...';
+        raceConnectionStatus.className = 'badge bg-warning text-dark';
+        
         // The race-websocket.js will handle the race WebSocket connection
         const raceSocket = connectToRaceWebsocket(raceId);
+        
+        // Override the onopen, onclose, and onerror handlers to update the status badge
+        const originalOnOpen = raceSocket.onopen;
+        raceSocket.onopen = function(e) {
+            if (originalOnOpen) originalOnOpen.call(raceSocket, e);
+            raceConnectionStatus.textContent = 'Race Connection: Connected';
+            raceConnectionStatus.className = 'badge bg-success';
+        };
+        
+        const originalOnClose = raceSocket.onclose;
+        raceSocket.onclose = function(e) {
+            if (originalOnClose) originalOnClose.call(raceSocket, e);
+            raceConnectionStatus.textContent = 'Race Connection: Disconnected';
+            raceConnectionStatus.className = 'badge bg-danger';
+        };
+        
+        const originalOnError = raceSocket.onerror;
+        raceSocket.onerror = function(e) {
+            if (originalOnError) originalOnError.call(raceSocket, e);
+            raceConnectionStatus.textContent = 'Race Connection: Error';
+            raceConnectionStatus.className = 'badge bg-danger';
+        };
     } else {
         console.log('No race ID available');
+        raceConnectionStatus.textContent = 'Race Connection: No Race ID';
+        raceConnectionStatus.className = 'badge bg-secondary';
     }
     
     // Check sessionStorage first, then fallback to Django session value
@@ -134,9 +228,15 @@ document.addEventListener('DOMContentLoaded', function() {
     let reconnectTimeout;
 
     function connect() {
+        teamConnectionStatus.textContent = 'Team Connection: Connecting...';
+        teamConnectionStatus.className = 'badge bg-warning text-dark';
+        
         teamSocket.onopen = function(e) {
             console.log('WebSocket connection established');
             reconnectAttempts = 0;
+            
+            teamConnectionStatus.textContent = 'Team Connection: Connected';
+            teamConnectionStatus.className = 'badge bg-success';
             
             // Send player name and request initial state
             if (playerName) {
@@ -158,12 +258,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++;
             console.log(`Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
+            
+            teamConnectionStatus.textContent = `Team Connection: Reconnecting (${reconnectAttempts})`;
+            teamConnectionStatus.className = 'badge bg-warning text-dark';
+            
             reconnectTimeout = setTimeout(() => {
                 teamSocket = new WebSocket(
                     ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
                 );
                 connect();
             }, 3000);
+        } else {
+            teamConnectionStatus.textContent = 'Team Connection: Failed';
+            teamConnectionStatus.className = 'badge bg-danger';
         }
     }
     
@@ -188,15 +295,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateMembersList(data.members);
                     break;
             }
+        } else if (data.type === 'race_started') {
+            console.log('Race started message received in team socket:', data);
+            window.handleRaceStarted(data);
         }
     };
     
     teamSocket.onerror = function(e) {
         console.error('WebSocket error:', e);
+        teamConnectionStatus.textContent = 'Team Connection: Error';
+        teamConnectionStatus.className = 'badge bg-danger';
     };
     
     teamSocket.onclose = function(e) {
         console.log('WebSocket connection closed');
+        
+        teamConnectionStatus.textContent = 'Team Connection: Disconnected';
+        teamConnectionStatus.className = 'badge bg-danger';
         
         // If the player is still on the page, try to reconnect
         if (playerName) {
