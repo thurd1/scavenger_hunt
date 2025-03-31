@@ -11,8 +11,8 @@
         <!-- Debug info - can be removed in production -->
         <div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa;">
             <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
-            <p class="mb-1">Lobby: {{ team.lobby.name|default:"None" }}</p>
-            <p class="mb-0">Race ID: {{ team.lobby.race.id|default:"None" }}</p>
+            <p class="mb-1">Lobby: {{ lobby.name|default:"None" }}</p>
+            <p class="mb-0">Race ID: {{ lobby.race.id|default:"None" }}</p>
         </div>
         
         <div class="row">
@@ -84,7 +84,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
-    const raceId = '{{ team.lobby.race.id }}';
+    const raceId = '{{ lobby.race.id|default:"" }}';
     const membersContainer = document.getElementById('members-container');
     
     // Initialize race WebSocket if race ID is available
