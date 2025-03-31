@@ -566,25 +566,59 @@ def edit_team(request, team_id):
     return render(request, 'hunt/edit_team.html', {'team': team})
 
 def view_team(request, team_id):
-    # Get team with all related information needed for WebSocket connections
-    team = get_object_or_404(
-        Team.objects.prefetch_related('members', 'participating_lobbies__race'), 
-        id=team_id
-    )
-    members = team.members.all()
+    # Get team with all related information
+    team = get_object_or_404(Team.objects.prefetch_related('members'), id=team_id)
     
-    # Get the associated lobby, if any
-    lobby = team.participating_lobbies.first()
+    # Get the team members
+    members = list(team.members.all())
+    
+    # If the player has a name in the session but isn't in the team yet, add them
+    player_name = request.session.get('player_name')
+    if player_name and len(members) == 0:
+        # Create a new team member
+        try:
+            # Check if this name is already used
+            if not TeamMember.objects.filter(team=team, role=player_name).exists():
+                new_member = TeamMember.objects.create(
+                    team=team,
+                    role=player_name,
+                    name=player_name
+                )
+                print(f"Created new team member: {player_name} for team {team.name}")
+                members.append(new_member)
+        except Exception as e:
+            print(f"Error creating team member: {e}")
+    
+    # Try to find a lobby with a race
+    lobby = None
+    race = None
+    
+    # Check if team is part of any lobbies
+    lobbies = Lobby.objects.filter(teams=team).select_related('race')
+    if lobbies.exists():
+        lobby = lobbies.first()
+        race = lobby.race if hasattr(lobby, 'race') else None
+    
+    # If we have a race ID but no race object, try to find it directly
+    race_id_in_page = request.GET.get('race_id')
+    if not race and race_id_in_page:
+        try:
+            race = Race.objects.get(id=race_id_in_page)
+            print(f"Found race from URL parameter: {race.id}")
+        except Race.DoesNotExist:
+            pass
     
     # Debug logging
     print(f"View team: {team.name}, Team ID: {team.id}")
+    print(f"Members: {[m.role for m in members]}")
     print(f"Lobby: {lobby.name if lobby else 'None'}")
-    print(f"Race: {lobby.race.id if lobby and lobby.race else 'None'}")
+    print(f"Race: {race.id if race else 'None'}")
     
     context = {
         'team': team,
         'members': members,
-        'lobby': lobby
+        'lobby': lobby,
+        'race': race
     }
     return render(request, 'hunt/view_team.html', context)
 

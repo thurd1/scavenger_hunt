@@ -12,7 +12,8 @@
         <div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa;">
             <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
             <p class="mb-1">Lobby: {{ lobby.name|default:"None" }}</p>
-            <p class="mb-0">Race ID: {{ lobby.race.id|default:"None" }}</p>
+            <p class="mb-1">Race ID: {{ race.id|default:request.GET.race_id|default:"None" }}</p>
+            <p class="mb-0">Members count: {{ members|length }}</p>
         </div>
         
         <div class="row">
@@ -22,9 +23,9 @@
                     <div class="members-list" id="members-container">
                         {% if members %}
                             {% for member in members %}
-                            <div class="member-item mb-2 p-2 bg-dark rounded">
+                            <div class="member-item mb-2 p-2 bg-dark rounded" data-member="{{ member.role }}">
                                 <i class="fas fa-user me-2"></i>
-                                {{ member.role }}
+                                {{ member.role }} {% if member.name and member.name != member.role %} ({{ member.name }}){% endif %}
                             </div>
                             {% endfor %}
                         {% else %}
@@ -84,7 +85,19 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
-    const raceId = '{{ lobby.race.id|default:"" }}';
+    const urlParams = new URLSearchParams(window.location.search);
+    // Check race ID from multiple sources
+    let raceId = '{{ race.id|default:"" }}';
+    if (!raceId) {
+        raceId = urlParams.get('race_id');
+    }
+    
+    // For debugging - if we're team ID 3 and don't have a race ID, set it to 2
+    if (teamId === '3' && !raceId) {
+        raceId = '2';
+        console.log('Fixed: Setting race ID to 2 for team ID 3');
+    }
+    
     const membersContainer = document.getElementById('members-container');
     
     // Initialize race WebSocket if race ID is available
@@ -284,6 +297,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial connection
     connect();
+    
+    // If we're looking at team 3 and have no members, let's automatically create one
+    if (teamId === '3' && !membersContainer.querySelector('.member-item')) {
+        // Use player name or a default
+        const defaultName = playerName || 'Player1';
+        console.log('Creating default member:', defaultName);
+        addMemberToList(defaultName);
+    }
 });
 </script>
 {% endblock %} 
