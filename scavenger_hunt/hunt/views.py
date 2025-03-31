@@ -323,76 +323,68 @@ def join_existing_team(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': f'Server error: {str(e)}'})
 
-@require_http_methods(["POST"])
+@require_http_methods(["GET", "POST"])
 def create_standalone_team(request):
     """Create a new team with the current player as a member."""
-    try:
-        # Try to parse JSON data first
-        if request.content_type == 'application/json':
-            if request.body:
-                data = json.loads(request.body)
-            else:
-                return JsonResponse({'success': False, 'error': 'Empty request body'})
-        else:
-            # Fall back to form data
-            data = request.POST
+    # For GET requests, render the form
+    if request.method == 'GET':
+        # Ensure player has a name in session
+        player_name = request.session.get('player_name')
+        if not player_name:
+            messages.error(request, "Please set your player name first.")
+            return redirect('join_game_session')
             
-        team_name = data.get('team_name')
-        player_name = data.get('player_name')
+        return render(request, 'hunt/create_standalone_team.html')
         
-        if not team_name or not player_name:
-            return JsonResponse({
-                'success': False,
-                'error': 'Both team name and player name are required'
-            })
+    # For POST requests, create the team
+    elif request.method == 'POST':
+        try:
+            # Get data from form 
+            team_name = request.POST.get('team_name')
+            player_name = request.POST.get('player_name') or request.session.get('player_name')
             
-        # Check if team name already exists
-        if Team.objects.filter(name=team_name).exists():
-            return JsonResponse({
-                'success': False,
-                'error': 'A team with this name already exists'
-            })
-            
-        # Generate a unique code
-        while True:
-            code = generate_code()
-            if not Team.objects.filter(code=code).exists():
-                break
+            if not team_name or not player_name:
+                messages.error(request, 'Both team name and player name are required')
+                return render(request, 'hunt/create_standalone_team.html')
                 
-        # Create the team
-        team = Team.objects.create(
-            name=team_name,
-            code=code
-        )
-        
-        # Create the team member
-        TeamMember.objects.create(
-            team=team,
-            role=player_name,
-            name=player_name
-        )
-        
-        # Store in session
-        request.session['team_id'] = team.id
-        request.session['player_name'] = player_name
-        request.session.modified = True
-        
-        return JsonResponse({
-            'success': True,
-            'team_code': team.code,
-            'redirect_url': reverse('view_team', args=[team.id])
-        })
-        
-    except json.JSONDecodeError:
-        return JsonResponse({
-            'success': False,
-            'error': 'Invalid JSON data'
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        })
+            # Check if team name already exists
+            if Team.objects.filter(name=team_name).exists():
+                messages.error(request, 'A team with this name already exists')
+                return render(request, 'hunt/create_standalone_team.html')
+                
+            # Generate a unique code
+            while True:
+                code = generate_code()
+                if not Team.objects.filter(code=code).exists():
+                    break
+                    
+            # Create the team
+            team = Team.objects.create(
+                name=team_name,
+                code=code
+            )
+            
+            # Create the team member
+            TeamMember.objects.create(
+                team=team,
+                role=player_name,
+                name=player_name
+            )
+            
+            # Store in session
+            request.session['team_id'] = team.id
+            request.session['player_name'] = player_name
+            request.session.modified = True
+            
+            messages.success(request, f'Team "{team_name}" created successfully! Your team code is: {code}')
+            return redirect('view_team', team_id=team.id)
+            
+        except Exception as e:
+            messages.error(request, f'Error creating team: {str(e)}')
+            return render(request, 'hunt/create_standalone_team.html')
+    
+    # Should never reach here
+    return render(request, 'hunt/create_standalone_team.html')
 
 def register(request):
     if request.method == 'POST':
