@@ -566,8 +566,17 @@ def edit_team(request, team_id):
     return render(request, 'hunt/edit_team.html', {'team': team})
 
 def view_team(request, team_id):
-    team = get_object_or_404(Team.objects.prefetch_related('members'), id=team_id)
+    # Get team with all related information needed for WebSocket connections
+    team = get_object_or_404(
+        Team.objects.prefetch_related('members').select_related('lobby__race'), 
+        id=team_id
+    )
     members = team.members.all()
+    
+    # Debug logging
+    print(f"View team: {team.name}, Team ID: {team.id}")
+    print(f"Lobby: {team.lobby.name if team.lobby else 'None'}")
+    print(f"Race: {team.lobby.race.id if team.lobby and team.lobby.race else 'None'}")
     
     context = {
         'team': team,

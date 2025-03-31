@@ -80,10 +80,17 @@
 </div>
 
 <style>
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
 .dashboard-box {
     background-color: rgba(33, 37, 41, 0.9);
     border-radius: 15px;
     border: 1px solid rgba(144, 200, 60, 0.2);
+    padding: 20px;
 }
 
 .lobby-header {
@@ -100,163 +107,130 @@
     margin: 0;
 }
 
-.teams-section {
-    padding: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
 .section-title {
     color: #90C83C;
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
     text-align: center;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    margin-bottom: 30px;
+    font-size: 1.8rem;
 }
 
 .teams-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 20px;
-    padding: 10px;
+    margin-bottom: 30px;
 }
 
 .team-card {
-    background-color: #90C83C;
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.team-card .btn {
-    margin-right: 5px;
-    margin-bottom: 5px;
-    min-width: 120px;
+.team-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(144, 200, 60, 0.2);
 }
 
 .team-header {
     border-bottom: 1px solid rgba(144, 200, 60, 0.2);
-    padding-bottom: 10px;
+    padding-bottom: 15px;
     margin-bottom: 15px;
 }
 
 .team-header h3 {
     color: #90C83C;
+    margin: 0 0 10px 0;
     text-align: center;
-    margin-bottom: 15px;
-}
-
-.team-code {
-    display: inline-block;
-    background: rgba(144, 200, 60, 0.1);
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.9rem;
-    color: #90C83C;
-    margin-top: 5px;
 }
 
 .team-members h4 {
+    color: #90C83C;
+    font-size: 1.1rem;
     margin-bottom: 10px;
 }
 
 .member-list {
     list-style: none;
     padding: 0;
-    margin-bottom: 20px;
-    color: #6c757d;
-    font-style: italic;
+    margin: 0 0 20px 0;
 }
 
 .member-list li {
-    margin-bottom: 5px;
+    color: #ffffff;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.member-list li i {
+    color: #90C83C;
 }
 
 .team-actions {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 10px;
+    justify-content: center;
+    margin-top: 15px;
 }
 
 .team-actions .btn {
-    width: 100%;
-    text-align: center;
-    border-radius: 5px;
-}
-
-.no-members {
-    color: #6c757d;
-    font-style: italic;
-    text-align: center;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
-}
-
-.delete-action {
-    width: 100%;
-}
-
-.btn-block {
-    width: 100%;
-}
-
-.btn-success {
-    background: linear-gradient(135deg, #90C83C, #7AAF2F);
-    color: white;
-    border: none;
+    background: rgba(144, 200, 60, 0.1);
+    color: #90C83C;
+    border: 1px solid rgba(144, 200, 60, 0.3);
     padding: 8px 15px;
-    border-radius: 6px;
-    text-decoration: none;
-    transition: all 0.2s;
-    flex: 1;
-    text-align: center;
-    font-size: 0.9rem;
-}
-
-.btn-success:hover {
-    background: linear-gradient(135deg, #7AAF2F, #90C83C);
-    transform: translateY(-2px);
-    color: white;
-    text-decoration: none;
-}
-
-.delete-team-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: none;
-    border: none;
-    color: #dc3545;
-    font-size: 1.2rem;
+    border-radius: 4px;
     cursor: pointer;
-    padding: 5px;
-    transition: transform 0.2s;
-    z-index: 1;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    justify-content: center;
+    flex: 1;
+    min-width: 120px;
 }
 
-.delete-team-btn:hover {
-    transform: scale(1.2);
-    color: #ff0000;
+.team-actions .btn:hover {
+    background: rgba(144, 200, 60, 0.2);
+    transform: translateY(-2px);
 }
 
-.no-teams {
-    text-align: center;
-    color: #999;
-    padding: 2rem;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
-    grid-column: 1 / -1;
+.btn-delete {
+    background: rgba(220, 53, 69, 0.1) !important;
+    color: #dc3545 !important;
+    border: 1px solid rgba(220, 53, 69, 0.3) !important;
+}
+
+.btn-delete:hover {
+    background: rgba(220, 53, 69, 0.2) !important;
 }
 
 .back-button-container {
     text-align: center;
-    margin: 30px 0;
-    padding: 20px;
+    margin-top: 30px;
 }
 
+.back-btn {
+    display: inline-block;
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+.back-btn:hover {
+    background: linear-gradient(135deg, #7AAF2F, #62902E);
+    transform: translateY(-2px);
+}
+
+/* Modal styles */
 .modal {
     display: none;
     position: fixed;
@@ -269,27 +243,47 @@
 }
 
 .modal-content {
-    background-color: rgba(33, 37, 41, 0.95);
+    background: rgba(33, 37, 41, 0.95);
     border: 2px solid rgba(144, 200, 60, 0.3);
-    margin: 15% auto;
-    padding: 20px;
     border-radius: 12px;
+    margin: 15% auto;
+    padding: 30px;
     width: 80%;
     max-width: 500px;
 }
 
-.modal-content h3 {
-    color: #90C83C;
-    margin-top: 0;
-}
-
-.modal-buttons {
+.modal-header {
     display: flex;
     justify-content: space-between;
-    margin-top: 20px;
+    align-items: center;
+    margin-bottom: 20px;
 }
 
-.btn-delete {
+.modal-header h3 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.close-btn {
+    color: #90C83C;
+    font-size: 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.modal-body {
+    color: #ffffff;
+    margin-bottom: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.delete-confirm-btn {
     background: #dc3545;
     color: white;
     border: none;
@@ -298,8 +292,12 @@
     cursor: pointer;
 }
 
-.btn-cancel {
-    background: #6c757d;
+.delete-confirm-btn:hover {
+    background: #c82333;
+}
+
+.cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
     color: white;
     border: none;
     padding: 10px 20px;
@@ -307,37 +305,17 @@
     cursor: pointer;
 }
 
-.action-btn.delete-btn {
-    background-color: rgba(220, 53, 69, 0.1);
-    color: #dc3545;
-    border: 1px solid rgba(220, 53, 69, 0.3);
+.cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
-.action-btn.delete-btn:hover {
-    background-color: rgba(220, 53, 69, 0.2);
-    transform: translateY(-2px);
-}
-
-.action-btn.edit-btn {
-    background-color: rgba(255, 193, 7, 0.1);
-    color: #ffc107;
-    border: 1px solid rgba(255, 193, 7, 0.3);
-}
-
-.action-btn.edit-btn:hover {
-    background-color: rgba(255, 193, 7, 0.2);
-    transform: translateY(-2px);
-}
-
-.action-btn.view-btn {
-    background-color: rgba(23, 162, 184, 0.1);
-    color: #17a2b8;
-    border: 1px solid rgba(23, 162, 184, 0.3);
-}
-
-.action-btn.view-btn:hover {
-    background-color: rgba(23, 162, 184, 0.2);
-    transform: translateY(-2px);
+.no-teams-message {
+    text-align: center;
+    color: #ffffff;
+    padding: 30px;
+    background: rgba(33, 37, 41, 0.8);
+    border-radius: 8px;
+    margin-bottom: 30px;
 }
 </style>
 
@@ -355,17 +333,26 @@ function deleteTeam(teamId) {
             body: JSON.stringify({})
         })
         .then(response => {
+            console.log('Delete response:', response);
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error('Server returned ' + response.status);
             }
-            return response.json().catch(() => ({})); // Handle if not JSON
+            // Handle non-JSON responses gracefully
+            return response.text().then(text => {
+                try {
+                    return text ? JSON.parse(text) : {};
+                } catch (e) {
+                    console.log('Response was not JSON:', text);
+                    return {};
+                }
+            });
         })
         .then(data => {
-            // Success - reload or redirect
+            // Success - reload the page
             window.location.reload();
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Error deleting team:', error);
             alert('Error deleting team: ' + error.message);
         });
     }

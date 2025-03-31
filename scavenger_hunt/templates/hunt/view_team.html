@@ -8,6 +8,13 @@
             <h2 style="color: #90C83C">Team: {{ team.name }}</h2>
         </div>
 
+        <!-- Debug info - can be removed in production -->
+        <div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa;">
+            <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
+            <p class="mb-1">Lobby: {{ team.lobby.name|default:"None" }}</p>
+            <p class="mb-0">Race ID: {{ team.lobby.race.id|default:"None" }}</p>
+        </div>
+        
         <div class="row">
             <div class="col-12">
                 <div class="members-section">
@@ -73,10 +80,21 @@
     transform: translateY(-2px);
 }
 </style>
+<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
+    const raceId = '{{ team.lobby.race.id }}';
     const membersContainer = document.getElementById('members-container');
+    
+    // Initialize race WebSocket if race ID is available
+    if (raceId) {
+        console.log('Race ID:', raceId);
+        // The race-websocket.js will handle the race WebSocket connection
+        const raceSocket = connectToRaceWebsocket(raceId);
+    } else {
+        console.log('No race ID available');
+    }
     
     // Check sessionStorage first, then fallback to Django session value
     let playerName = sessionStorage.getItem('playerName');
