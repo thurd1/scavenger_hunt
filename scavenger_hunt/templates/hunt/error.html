@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Error{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="error-container">
+        <div class="error-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h1>An Error Occurred</h1>
+        <p class="error-message">{{ error }}</p>
+        <div class="action-buttons">
+            <a href="{% url 'join_game_session' %}" class="home-btn">
+                <i class="fas fa-home"></i> Go to Home
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+}
+
+.error-container {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(255, 99, 71, 0.3);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+}
+
+.error-icon {
+    font-size: 4rem;
+    color: #ff6347;
+    margin-bottom: 1.5rem;
+}
+
+.error-container h1 {
+    color: #ff6347;
+    margin-bottom: 1rem;
+}
+
+.error-message {
+    color: #ffffff;
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+}
+
+.action-buttons {
+    margin-top: 2rem;
+}
+
+.home-btn {
+    display: inline-block;
+    background: rgba(144, 200, 60, 0.2);
+    color: #90C83C;
+    padding: 0.75rem 1.5rem;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 1.1rem;
+    transition: all 0.2s;
+}
+
+.home-btn:hover {
+    background: rgba(144, 200, 60, 0.3);
+    transform: translateY(-2px);
+    text-decoration: none;
+    color: #90C83C;
+}
+
+.home-btn i {
+    margin-right: 0.5rem;
+}
+</style>
+{% endblock %} 

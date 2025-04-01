@@ -1,0 +1,704 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Lobby: {{ lobby.name }}{% endblock %}
+
+{% block welcome_text %}
+    <p style="color: #90C83C">Game Lobby Management</p>
+{% endblock %}
+
+{% block content %}
+<div id="deleteConfirmModal" class="modal">
+    <div class="modal-content">
+        <h3>Delete Team</h3>
+        <p>Are you sure you want to delete this team?</p>
+        <div class="modal-buttons">
+            <button onclick="confirmDelete()" class="btn-delete">Yes, Delete</button>
+            <button onclick="closeModal()" class="btn-cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div class="container py-4">
+    <div class="dashboard-box p-4">
+        <div class="lobby-header">
+            <div class="lobby-title">
+                <h1>{{ lobby.name }}</h1>
+                <button class="delete-btn" onclick="confirmDeleteLobby({{ lobby.id }})">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="lobby-info">
+                <p class="code">Code: {{ lobby.code }}</p>
+                <p>Created: {{ lobby.created_at|date:"F d, Y" }}</p>
+                <p>Teams: {{ lobby.teams.count }}</p>
+                <p class="status {% if lobby.is_active %}active{% else %}inactive{% endif %}">
+                    Status: {% if lobby.is_active %}Active{% else %}Inactive{% endif %}
+                </p>
+            </div>
+        </div>
+
+        <div class="teams-section">
+            <h2>TEAMS</h2>
+            {% if lobby.teams.all %}
+                <div class="teams-grid">
+                    {% for team in lobby.teams.all %}
+                        <div class="team-card">
+                            <div class="team-header">
+                                <h3>{{ team.name }}</h3>
+                                <span class="team-code">Code: {{ team.code }}</span>
+                            </div>
+                            <div class="team-info">
+                                <p><i class="fas fa-users"></i> Players: {{ team.players.count }}</p>
+                                <p><i class="fas fa-clock"></i> Joined: {{ team.created_at|date:"F d, Y" }}</p>
+                            </div>
+                            <div class="team-actions">
+                                <button class="action-btn delete-btn" onclick="deleteTeam({{ team.id }})" data-team-id="{{ team.id }}">
+                                    <i class="fas fa-trash"></i> Delete Team
+                                </button>
+                            </div>
+                        </div>
+            {% endfor %}
+                </div>
+        {% else %}
+                <p class="no-teams">No teams have joined this lobby yet.</p>
+        {% endif %}
+        </div>
+
+        <div class="back-button-container">
+            <a href="{% url 'manage_lobbies' %}" class="btn btn-success">
+                <i class="fas fa-arrow-left"></i> Back to Lobbies
+            </a>
+        </div>
+    </div>
+</div>
+
+<template id="teamCardTemplate">
+    <div class="team-card">
+        <div class="team-header">
+            <button class="action-btn delete-btn" onclick="deleteTeam(this.dataset.teamId)">
+                <i class="fas fa-trash"></i> Delete
+            </button>
+            <h3></h3>
+            <span class="team-code"></span>
+        </div>
+        <div class="team-members">
+            <h4>Members</h4>
+            <div class="members-container"></div>
+        </div>
+    </div>
+</template>
+
+<style>
+.dashboard-box {
+    background-color: rgba(33, 37, 41, 0.9);
+    border-radius: 15px;
+    border: 1px solid rgba(144, 200, 60, 0.2);
+}
+
+.info-section {
+    background-color: rgba(33, 37, 41, 0.5);
+    border-radius: 10px;
+    padding: 1.5rem;
+    border: 1px solid rgba(144, 200, 60, 0.2);
+}
+
+.team-card {
+    background-color: rgba(33, 37, 41, 0.5);
+}
+
+.member-item {
+    background-color: rgba(33, 37, 41, 0.7);
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    color: white;
+}
+
+.team-header {
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+}
+
+.teams-section {
+    margin-top: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.teams-section h2 {
+    color: #90C83C;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.team-card {
+    background: rgba(33, 37, 41, 0.95);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 8px;
+    padding: 15px;
+    transition: transform 0.2s;
+}
+
+.team-card:hover {
+    transform: translateY(-2px);
+}
+
+.team-header {
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+.team-header h3 {
+    color: #90C83C;
+    margin: 0 0 5px 0;
+}
+
+.team-code {
+    display: inline-block;
+    background: rgba(144, 200, 60, 0.1);
+    padding: 3px 6px;
+    border-radius: 4px;
+    color: #90C83C;
+    font-size: 0.9em;
+}
+
+.team-info {
+    color: #ffffff;
+}
+
+.team-info p {
+    margin: 5px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.team-info i {
+    color: #90C83C;
+}
+
+.no-teams {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+    font-style: italic;
+    margin: 20px 0;
+}
+
+.back-button-container {
+    text-align: center;
+    margin: 30px 0;
+    padding: 20px;
+}
+
+.lobby-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.lobby-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.lobby-info p {
+    margin: 0;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+}
+
+.modal-content h3 {
+    color: #90C83C;
+    margin-bottom: 20px;
+}
+
+.modal-content p {
+    color: #ffffff;
+    margin-bottom: 25px;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.btn-delete {
+    background: #ff4444;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-delete:hover {
+    background: #ff0000;
+    transform: translateY(-2px);
+}
+
+.btn-cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.lobby-header {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.lobby-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.lobby-title h1 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.delete-btn {
+    background: none;
+    border: none;
+    color: #dc3545;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 5px;
+    transition: transform 0.2s;
+}
+
+.delete-btn:hover {
+    transform: scale(1.2);
+    color: #ff0000;
+}
+
+.lobby-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.lobby-info p {
+    color: #ffffff;
+    margin: 0;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+}
+
+.code {
+    color: #90C83C !important;
+    font-weight: bold;
+}
+
+.status {
+    font-weight: bold;
+}
+
+.status.active {
+    color: #90C83C !important;
+}
+
+.status.inactive {
+    color: #dc3545 !important;
+}
+
+.teams-section {
+    text-align: center;
+    margin: 40px 0;
+}
+
+.teams-section h2 {
+    color: #90C83C;
+    font-size: 2rem;
+    margin: 0;
+}
+
+.back-button-container {
+    text-align: center;
+    margin-top: 40px;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+    border: none;
+    display: inline-block;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+}
+
+.modal-content {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h3 {
+    color: #90C83C;
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.modal-body {
+    color: #ffffff;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.delete-confirm-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.delete-confirm-btn:hover {
+    background: #c82333;
+}
+
+.cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    margin: 5px;
+}
+
+.action-btn.delete-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    padding: 5px 10px;
+    font-size: 0.9rem;
+}
+
+.action-btn.delete-btn:hover {
+    background-color: rgba(220, 53, 69, 0.2);
+    transform: translateY(-2px);
+}
+
+.team-card {
+    position: relative;
+    background: rgba(33, 37, 41, 0.95);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 8px;
+    padding: 15px;
+    transition: transform 0.2s;
+}
+</style>
+
+<!-- icons -->
+<link rel="stylesheeit" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
+<script>
+    const lobbyId = {{ lobby.id }};
+    let teamIdToDelete = null;
+    let lobbyToDelete = {{ lobby.id }};
+    
+    // Delete team confirmation modal
+    function showModal() {
+        document.getElementById('deleteConfirmModal').style.display = 'flex';
+    }
+    
+    function closeModal() {
+        document.getElementById('deleteConfirmModal').style.display = 'none';
+    }
+    
+    function confirmDeleteTeam(teamId) {
+        teamIdToDelete = teamId;
+        showModal();
+    }
+    
+    function confirmDelete() {
+        if (teamIdToDelete) {
+            deleteTeam(teamIdToDelete);
+        }
+        closeModal();
+    }
+    
+    function confirmDeleteLobby(lobbyId) {
+        if (confirm('Are you sure you want to delete this lobby?')) {
+            deleteLobby(lobbyId);
+        }
+    }
+    
+    function deleteTeam(teamId) {
+        fetch(`/api/teams/${teamId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                // Remove the team card from the DOM
+                const teamElement = document.querySelector(`[data-team-id="${teamId}"]`);
+                if (teamElement && teamElement.parentElement) {
+                    teamElement.parentElement.removeChild(teamElement);
+                } else {
+                    // If we can't find the team element, just reload the page
+                    location.reload();
+                }
+            } else {
+                alert('Error deleting team: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting team: ' + error.message);
+        });
+    }
+    
+    function deleteLobby(lobbyId) {
+        fetch(`/api/lobbies/${lobbyId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.href = '{% url "manage_lobbies" %}';
+            } else {
+                alert('Error deleting lobby: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    }
+    
+    function updateTimer() {
+        const timerDisplay = document.getElementById('timer');
+        if (!timerDisplay) {
+            return;
+        }
+        
+        const now = new Date().getTime();
+        const targetTime = new Date(timerDisplay.dataset.targetTime).getTime();
+        const remaining = targetTime - now;
+        
+        if (remaining <= 0) {
+            timerDisplay.textContent = "Time's up!";
+            return;
+        }
+        
+        const minutes = Math.floor(remaining / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        
+        timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    function startRace() {
+        const raceBtn = document.getElementById('start-race-btn');
+        const lobbyId = raceBtn.dataset.lobbyId;
+        const raceId = raceBtn.dataset.raceId;
+        
+        // Add loading indicator
+        raceBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+        raceBtn.disabled = true;
+        
+        // First make the API call to start the race
+        fetch(`/lobby/${lobbyId}/start-race/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Race start API call successful:', data);
+                // Notification for the leader that the race started successfully
+                const notification = document.createElement('div');
+                notification.className = 'race-notification';
+                notification.innerHTML = 'Race started successfully! Players will be redirected.';
+                notification.style.position = 'fixed';
+                notification.style.top = '20px';
+                notification.style.left = '50%';
+                notification.style.transform = 'translateX(-50%)';
+                notification.style.padding = '15px 25px';
+                notification.style.background = 'rgba(144, 200, 60, 0.9)';
+                notification.style.color = 'white';
+                notification.style.borderRadius = '8px';
+                notification.style.zIndex = '9999';
+                document.body.appendChild(notification);
+                
+                // Remove notification after 5 seconds
+                setTimeout(() => {
+                    notification.remove();
+                }, 5000);
+                
+                // Reset button
+                raceBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> Race Started';
+                raceBtn.classList.add('race-active');
+            } else {
+                console.error('Error starting race:', data.error);
+                raceBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> Start Race';
+                raceBtn.disabled = false;
+                alert('Error starting race: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error starting race:', error);
+            raceBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> Start Race';
+            raceBtn.disabled = false;
+            alert('Error starting race. Please try again.');
+        });
+    }
+    
+    // Get CSRF token from cookies
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

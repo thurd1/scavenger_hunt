@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+{% load static %}
+{% load hunt_extras %}
+
+{% block content %}
+<div class="container">
+    <div class="race-header">
+        <h1>{{ race.name }}</h1>
+        <div class="race-info">
+            <p><strong>Team:</strong> {{ team.name }}</p>
+            <p><strong>Player:</strong> {{ team_member.name }}</p>
+            <p id="timer" class="race-timer"></p>
+        </div>
+    </div>
+
+    <div class="race-content">
+        {% if not zones %}
+            <div class="empty-state">
+                <p>No questions available for this race yet. Please wait for the leader to add questions.</p>
+            </div>
+        {% else %}
+            <div class="accordion" id="zoneAccordion">
+                {% for zone in zones %}
+                    <div class="card zone-card">
+                        <div class="card-header" id="heading{{ zone.id }}">
+                            <h2 class="mb-0">
+                                <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#collapse{{ zone.id }}" aria-expanded="true" aria-controls="collapse{{ zone.id }}">
+                                    <i class="fas fa-map-marker-alt"></i> {{ zone.name }} - {{ zone.location }}
+                                </button>
+                            </h2>
+                        </div>
+
+                        <div id="collapse{{ zone.id }}" class="collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ zone.id }}" data-parent="#zoneAccordion">
+                            <div class="card-body">
+                                {% with zone_questions=questions_by_zone|get_item:zone.id %}
+                                    {% if zone_questions %}
+                                        <div class="questions-list">
+                                            {% for question in zone_questions %}
+                                                <div class="question-card" id="question-{{ question.id }}">
+                                                    <div class="question-text">
+                                                        <h4>Question {{ forloop.counter }}</h4>
+                                                        <p>{{ question.text }}</p>
+                                                    </div>
+                                                    <div class="question-answer">
+                                                        <form class="answer-form" data-question-id="{{ question.id }}">
+                                                            <div class="form-group">
+                                                                <input type="text" class="form-control answer-input" placeholder="Your answer" required>
+                                                            </div>
+                                                            <button type="submit" class="btn btn-success submit-answer">Submit Answer</button>
+                                                        </form>
+                                                        <div class="answer-feedback" style="display: none;"></div>
+                                                    </div>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <p class="no-questions">No questions for this zone yet.</p>
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 1000px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+}
+
+.race-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.race-header h1 {
+    color: #90C83C;
+    margin-bottom: 1rem;
+}
+
+.race-info {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2rem;
+}
+
+.race-info p {
+    color: #ffffff;
+    margin: 0;
+}
+
+.race-info strong {
+    color: #90C83C;
+}
+
+.race-timer {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #ff9800 !important;
+}
+
+.race-content {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 2rem;
+}
+
+.zone-card {
+    background: rgba(33, 37, 41, 0.8);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.card-header {
+    background: rgba(144, 200, 60, 0.1);
+    border-bottom: 1px solid rgba(144, 200, 60, 0.3);
+    padding: 0.75rem 1.25rem;
+}
+
+.btn-link {
+    color: #90C83C;
+    text-decoration: none;
+    width: 100%;
+    text-align: left;
+    font-weight: bold;
+    padding: 0;
+}
+
+.btn-link:hover, .btn-link:focus {
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.questions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.question-card {
+    background: rgba(33, 37, 41, 0.7);
+    border: 1px solid rgba(144, 200, 60, 0.2);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.question-text h4 {
+    color: #90C83C;
+    margin-bottom: 0.5rem;
+}
+
+.question-text p {
+    color: #ffffff;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.answer-form {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.form-group {
+    flex-grow: 1;
+    margin-bottom: 0;
+}
+
+.answer-input {
+    width: 100%;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    color: #ffffff;
+    border-radius: 4px;
+}
+
+.submit-answer {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    border: none;
+    padding: 0.5rem 1rem;
+    white-space: nowrap;
+}
+
+.answer-feedback {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.answer-feedback.correct {
+    background: rgba(40, 167, 69, 0.2);
+    color: #28a745;
+}
+
+.answer-feedback.incorrect {
+    background: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #ffffff;
+}
+
+.no-questions {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.7);
+    font-style: italic;
+}
+</style>
+
+<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up race timer
+    const raceEndTime = new Date();
+    raceEndTime.setMinutes(raceEndTime.getMinutes() + {{ race.time_limit_minutes }});
+    
+    function updateTimer() {
+        const now = new Date();
+        const timeDiff = raceEndTime - now;
+        
+        if (timeDiff <= 0) {
+            document.getElementById('timer').textContent = "Time's up!";
+            return;
+        }
+        
+        const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+        const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+        
+        document.getElementById('timer').textContent = 
+            "Time remaining: " + hours.toString().padStart(2, '0') + ":" + 
+            minutes.toString().padStart(2, '0') + ":" + 
+            seconds.toString().padStart(2, '0');
+        
+        setTimeout(updateTimer, 1000);
+    }
+    
+    updateTimer();
+    
+    // Set up answer form submission
+    document.querySelectorAll('.answer-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const questionId = this.dataset.questionId;
+            const answerInput = this.querySelector('.answer-input');
+            const answer = answerInput.value.trim();
+            const feedbackEl = this.nextElementSibling;
+            
+            if (!answer) return;
+            
+            // Send answer to server for verification
+            fetch('/check-answer/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    question_id: questionId,
+                    answer: answer,
+                    team_code: '{{ team.code }}'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                feedbackEl.style.display = 'block';
+                
+                if (data.correct) {
+                    feedbackEl.textContent = 'Correct answer! Well done!';
+                    feedbackEl.className = 'answer-feedback correct';
+                    
+                    // Disable the form
+                    answerInput.disabled = true;
+                    this.querySelector('button').disabled = true;
+                } else {
+                    feedbackEl.textContent = 'Incorrect answer. Try again!';
+                    feedbackEl.className = 'answer-feedback incorrect';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking answer:', error);
+                feedbackEl.style.display = 'block';
+                feedbackEl.textContent = 'Error checking answer. Please try again.';
+                feedbackEl.className = 'answer-feedback incorrect';
+            });
+        });
+    });
+    
+    // Connect to the race socket for real-time updates
+    if (typeof connectToRaceWebsocket === 'function') {
+        window.raceSocket = connectToRaceWebsocket({{ race.id }});
+    }
+});
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %} 

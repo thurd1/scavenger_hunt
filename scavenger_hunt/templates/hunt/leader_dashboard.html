@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Leader Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Leader Dashboard</h1>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-flag"></i> Races</h2>
+            </div>
+            <div class="card-content">
+                <div class="button-group">
+                    <a href="{% url 'manage_riddles' %}" class="action-btn">
+                        <i class="fas fa-cog"></i> Manage Races
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-users"></i> Lobbies</h2>
+            </div>
+            <div class="card-content">
+                <div class="button-group">
+                    <a href="{% url 'manage_lobbies' %}" class="action-btn">
+                        <i class="fas fa-door-open"></i> Manage Lobbies
+                    </a>
+                    <a href="{% url 'create_lobby' %}" class="action-btn secondary">
+                        <i class="fas fa-plus"></i> Create Lobby
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-users"></i> Teams</h2>
+            </div>
+            <div class="card-content">
+                <div class="button-group">
+                    <a href="{% url 'team_list' %}" class="action-btn">
+                        <i class="fas fa-users"></i> Manage Teams
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h2><i class="fas fa-gamepad"></i> Game Session</h2>
+            </div>
+            <div class="card-content">
+                <div class="button-group">
+                    <a href="{% url 'join_game_session' %}" class="action-btn">
+                        <i class="fas fa-play"></i> Join Game
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.page-header h1 {
+    color: #90C83C;
+    margin: 0;
+    font-size: 2.5rem;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    margin-top: 30px;
+}
+
+.dashboard-card {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.2s;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    background: rgba(144, 200, 60, 0.1);
+    padding: 20px;
+    border-bottom: 1px solid rgba(144, 200, 60, 0.3);
+}
+
+.card-header h2 {
+    color: #90C83C;
+    margin: 0;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.card-content {
+    padding: 20px;
+    text-align: center;
+}
+
+.card-content p {
+    color: #ffffff;
+    margin-bottom: 20px;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #90C83C;
+    color: #ffffff;
+    padding: 12px 24px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.action-btn:hover {
+    background: #7ab32f;
+    transform: translateY(-2px);
+    color: #ffffff;
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.action-btn.secondary {
+    background: rgba(144, 200, 60, 0.1);
+    border: 1px solid #90C83C;
+}
+
+.action-btn.secondary:hover {
+    background: rgba(144, 200, 60, 0.2);
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<!-- icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% endblock %} 

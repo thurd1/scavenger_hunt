@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit Riddle Answer</title>
+</head>
+<body>
+    <h1>Answer the Riddle: {{ riddle.question }}</h1>
+    <form method="post">
+        {% csrf_token %}
+        <label for="answer">Your Answer:</label>
+        <input type="text" name="answer" required>
+        <button type="submit">Submit Answer</button>
+    </form>
+    <p><a href="{% url 'team_details' participant.team.id %}">Back to Team Details</a></p>
+</body>
+</html>
