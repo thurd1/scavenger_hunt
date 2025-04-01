@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block title %}Team View{% endblock %}
+
+{% block head_extras %}
+<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
+{% endblock %}
+
+{% block body_attributes %}data-race-id="{{ race_id }}"{% endblock %}
+
 {% block content %}
 <div class="container py-4">
     <div class="dashboard-box p-4">
@@ -119,7 +127,6 @@
     100% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0); }
 }
 </style>
-<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
@@ -131,12 +138,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let raceId = '{{ race.id|default:"" }}';
     if (!raceId) {
         raceId = urlParams.get('race_id');
-    }
-    
-    // If Team ID is 6 and we don't have a race ID, use race ID 2
-    if (teamId === '6' && !raceId) {
-        console.log('Fixed: Setting race ID to 2 for Team ID 6');
-        raceId = '2';
     }
     
     const membersContainer = document.getElementById('members-container');

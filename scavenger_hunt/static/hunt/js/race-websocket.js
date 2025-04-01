@@ -255,71 +255,85 @@ document.addEventListener('DOMContentLoaded', function() {
  * Aggressively look for a race ID from various sources
  */
 function findRaceId() {
-    let raceId = null;
+    // Try multiple ways to find the race ID
     
-    // 1. Check if we have a race ID from a button
-    const startRaceBtn = document.getElementById('start-race-btn');
-    if (startRaceBtn && startRaceBtn.dataset.raceId) {
-        raceId = startRaceBtn.dataset.raceId;
-        console.log(`Found race ID from button: ${raceId}`);
-        return raceId;
+    // 1. Check data attribute on body
+    const bodyRaceId = document.body.getAttribute('data-race-id');
+    if (bodyRaceId) {
+        console.log('Found race ID from body data attribute:', bodyRaceId);
+        return bodyRaceId;
     }
     
-    // 2. Check if the race ID is in a debug info section
-    const debugInfo = document.querySelector('.debug-info');
-    if (debugInfo) {
-        const debugText = debugInfo.textContent;
-        const raceMatch = debugText.match(/Race ID:\s*(\d+)/i);
-        if (raceMatch && raceMatch[1]) {
-            raceId = raceMatch[1];
-            console.log(`Found race ID from debug info: ${raceId}`);
-            return raceId;
-        }
+    // 2. Check race detail URL
+    const raceDetailMatch = window.location.pathname.match(/\/race\/(\d+)\/detail\//);
+    if (raceDetailMatch && raceDetailMatch[1]) {
+        console.log('Found race ID from race detail URL:', raceDetailMatch[1]);
+        return raceDetailMatch[1];
     }
     
-    // 3. Try to get race ID from URL path (e.g., /race/123/)
-    const pathMatch = window.location.pathname.match(/\/race\/(\d+)\//);
-    if (pathMatch && pathMatch[1]) {
-        raceId = pathMatch[1];
-        console.log(`Found race ID from URL: ${raceId}`);
-        return raceId;
+    // 3. Check race questions URL
+    const raceQuestionsMatch = window.location.pathname.match(/\/race\/(\d+)\/questions\//);
+    if (raceQuestionsMatch && raceQuestionsMatch[1]) {
+        console.log('Found race ID from race questions URL:', raceQuestionsMatch[1]);
+        return raceQuestionsMatch[1];
     }
     
-    // 4. Check if we're in a lobby
-    const lobbyMatch = window.location.pathname.match(/\/lobby\/(\d+)\//);
-    if (lobbyMatch && lobbyMatch[1]) {
-        const lobbyId = lobbyMatch[1];
-        console.log(`Found lobby ID from URL: ${lobbyId}`);
-        return lobbyId; // Use lobby ID as race ID (they're often the same)
-    }
-    
-    // 5. Check if we're in a team view
-    const teamMatch = window.location.pathname.match(/\/team\/(\d+)\/view\//);
-    if (teamMatch && teamMatch[1]) {
-        // For Team 8, hardcode to Race 2 as a last resort fallback
-        if (teamMatch[1] === '8') {
-            console.log('Found Team 8, using Race 2 as fallback');
-            return '2';
-        }
-        
-        // Look for race ID in any element on the page
-        const pageContent = document.body.textContent;
-        const raceMatches = pageContent.match(/Race ID:\s*(\d+)/i);
-        if (raceMatches && raceMatches[1]) {
-            raceId = raceMatches[1];
-            console.log(`Found race ID in page content: ${raceId}`);
-            return raceId;
-        }
-    }
-    
-    // 6. Check query parameters
+    // 4. Check if we have race ID as URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     const raceIdParam = urlParams.get('race_id');
     if (raceIdParam) {
-        console.log(`Found race ID from URL parameter: ${raceIdParam}`);
+        console.log('Found race ID from URL parameter:', raceIdParam);
         return raceIdParam;
     }
     
+    // 5. Check if we're in a team view to get race ID from API
+    const teamMatch = window.location.pathname.match(/\/team\/(\d+)\/view\//);
+    if (teamMatch && teamMatch[1]) {
+        const teamId = teamMatch[1];
+        console.log('Found team ID from URL:', teamId);
+        
+        // Make a synchronous request to get the race ID for this team
+        let raceId = null;
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `/api/team/${teamId}/race/`, false); // Synchronous request
+            xhr.send();
+            
+            if (xhr.status === 200) {
+                const response = JSON.parse(xhr.responseText);
+                if (response.success && response.race_id) {
+                    raceId = response.race_id;
+                    console.log(`Found race ID ${raceId} for team ${teamId} from API`);
+                }
+            }
+        } catch (e) {
+            console.error('Error getting race ID for team:', e);
+        }
+        
+        if (raceId) {
+            return raceId;
+        }
+    }
+    
+    // 6. Check if we're in the race detail page which might have the ID in the HTML
+    const raceIdElement = document.getElementById('race-id');
+    if (raceIdElement && raceIdElement.value) {
+        console.log('Found race ID from hidden input:', raceIdElement.value);
+        return raceIdElement.value;
+    }
+    
+    // 7. Look for debug info section
+    const debugInfoElement = document.querySelector('.debug-info');
+    if (debugInfoElement) {
+        const raceIdText = debugInfoElement.textContent;
+        const raceIdMatch = raceIdText.match(/Race ID: (\d+)/);
+        if (raceIdMatch && raceIdMatch[1]) {
+            console.log('Found race ID from debug info:', raceIdMatch[1]);
+            return raceIdMatch[1];
+        }
+    }
+    
+    console.warn('Could not find race ID');
     return null;
 }
 

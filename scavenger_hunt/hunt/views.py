@@ -669,15 +669,6 @@ def view_team(request, team_id):
         except Race.DoesNotExist:
             pass
     
-    # Fallbacks for specific teams
-    if team.id == 8 and not race_id:
-        race_id = 2
-        try:
-            race = Race.objects.get(id=race_id)
-            print(f"Using fallback: Found race {race.id} for team {team.id}")
-        except Race.DoesNotExist:
-            pass
-    
     # Debug logging
     print(f"View team: {team.name}, Team ID: {team.id}")
     print(f"Members: {[m.role for m in members]}")
@@ -1358,3 +1349,41 @@ def check_race_status(request, race_id):
         'redirect_url': redirect_url,
         'race_id': race_id
     })
+
+def get_team_race(request, team_id):
+    """API endpoint to get race associated with a team"""
+    try:
+        team = get_object_or_404(Team, id=team_id)
+        
+        # Try to find race through lobby
+        race_id = None
+        
+        # Check if team is part of any lobbies with races
+        lobbies = Lobby.objects.filter(teams=team).select_related('race')
+        if lobbies.exists():
+            for lobby in lobbies:
+                if lobby.race:
+                    race_id = lobby.race.id
+                    break
+        
+        # If no race found via lobbies, check active races for the most recent one
+        if not race_id:
+            try:
+                # Find most recently created active race
+                most_recent_race = Race.objects.filter(is_active=True).order_by('-created_at').first()
+                if most_recent_race:
+                    race_id = most_recent_race.id
+                    print(f"Using most recent active race (ID: {race_id}) for team {team_id}")
+            except Exception as e:
+                print(f"Error finding active race: {e}")
+        
+        return JsonResponse({
+            'success': True,
+            'team_id': team_id,
+            'race_id': race_id,
+            'has_race': race_id is not None
+        })
+    except Team.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Team not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
