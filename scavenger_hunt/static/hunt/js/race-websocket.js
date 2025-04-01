@@ -23,7 +23,7 @@ function connectToRaceWebsocket(raceId) {
             }
             
             // Show connected message on screen for debugging
-            showMessage('WebSocket connected!', 'success');
+            showMessage('Race WebSocket connected!', 'success');
         };
         
         socket.onmessage = function(e) {
@@ -33,10 +33,10 @@ function connectToRaceWebsocket(raceId) {
                 
                 // Handle different types of messages
                 if (data.type === 'race_started') {
-                    console.log('Race started event received with data:', data);
+                    console.log('🔥 Race started event received with data:', data);
                     
                     // Show a notification that we received the race started event
-                    showMessage('Race started event received! Redirecting...', 'info');
+                    showMessage('Race started event received! Redirecting to questions page...', 'info');
                     
                     // Check if there's a custom handler defined in the page
                     if (typeof window.handleRaceStarted === 'function') {
@@ -46,26 +46,7 @@ function connectToRaceWebsocket(raceId) {
                     } else {
                         // Use the default handler in this file
                         console.log('Using default race_started handler');
-                        if (data.redirect_url) {
-                            console.log('Redirecting to:', data.redirect_url);
-                            
-                            // Redirect with a small delay to allow the message to be seen
-                            setTimeout(() => {
-                                window.location.href = data.redirect_url;
-                            }, 1000);
-                        } else {
-                            // If redirect URL is missing, try a fallback
-                            console.error('Missing redirect_url in race_started event');
-                            showMessage('Race started but no redirect URL provided! Trying fallback...', 'warning');
-                            
-                            // Try to build a fallback URL based on the race ID
-                            const fallbackUrl = `/race/${raceId}/questions/`;
-                            console.log('Using fallback URL:', fallbackUrl);
-                            
-                            setTimeout(() => {
-                                window.location.href = fallbackUrl;
-                            }, 2000);
-                        }
+                        handleRaceStartedEvent(data, raceId);
                     }
                 }
             } catch (error) {
@@ -107,6 +88,86 @@ function connectToRaceWebsocket(raceId) {
         showMessage('Failed to create WebSocket: ' + error.message, 'error');
         return null;
     }
+}
+
+/**
+ * Handle the race_started event
+ * @param {Object} data - The event data
+ * @param {number} raceId - The race ID
+ */
+function handleRaceStartedEvent(data, raceId) {
+    // Create a visible notification that will persist
+    const notification = document.createElement('div');
+    notification.style.position = 'fixed';
+    notification.style.top = '50%';
+    notification.style.left = '50%';
+    notification.style.transform = 'translate(-50%, -50%)';
+    notification.style.zIndex = '10000';
+    notification.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    notification.style.color = 'white';
+    notification.style.padding = '20px';
+    notification.style.borderRadius = '10px';
+    notification.style.textAlign = 'center';
+    notification.style.maxWidth = '80%';
+    notification.style.boxShadow = '0 0 20px rgba(0, 0, 0, 0.5)';
+    
+    // Add a spinner
+    notification.innerHTML = `
+        <h3 style="color: #90C83C; margin-bottom: 15px;">Race Starting!</h3>
+        <p>You are being redirected to the questions page...</p>
+        <div class="spinner" style="margin: 15px auto; border: 4px solid rgba(255,255,255,0.3); border-radius: 50%; border-top: 4px solid #90C83C; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+        <p id="countdown">Redirecting in 3 seconds</p>
+    `;
+    
+    // Add spinner animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Add to document
+    document.body.appendChild(notification);
+    
+    // Get the redirect URL
+    let redirectUrl;
+    if (data.redirect_url) {
+        redirectUrl = data.redirect_url;
+        console.log(`Using redirect URL from event: ${redirectUrl}`);
+    } else {
+        // Construct it from the race ID
+        redirectUrl = `/race/${raceId}/questions/`;
+        console.log(`Using constructed URL: ${redirectUrl}`);
+    }
+    
+    // Create a direct link that users can click if auto-redirect fails
+    const directLink = document.createElement('a');
+    directLink.href = redirectUrl;
+    directLink.textContent = 'Click here if you are not redirected automatically';
+    directLink.style.color = '#90C83C';
+    directLink.style.display = 'block';
+    directLink.style.marginTop = '15px';
+    directLink.style.textDecoration = 'underline';
+    notification.appendChild(directLink);
+    
+    // Countdown for redirect
+    let countdown = 3;
+    const countdownElement = document.getElementById('countdown');
+    const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdownElement) {
+            countdownElement.textContent = `Redirecting in ${countdown} seconds`;
+        }
+        
+        if (countdown <= 0) {
+            clearInterval(countdownInterval);
+            console.log('🔄 Redirecting to questions page:', redirectUrl);
+            window.location.href = redirectUrl;
+        }
+    }, 1000);
 }
 
 /**

@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Custom function to handle race_started event within this page
     window.handleRaceStarted = function(data) {
-        console.log('Race started event handled in view_team.html:', data);
+        console.log('🚀 Race started event handled in view_team.html:', data);
         
         // Show race status notification
         raceStatusArea.style.display = 'block';
@@ -141,31 +141,52 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data.message) {
             raceStatusMessage.textContent = data.message;
         } else {
-            raceStatusMessage.textContent = 'The race has begun! Redirecting shortly...';
+            raceStatusMessage.textContent = 'The race has begun! Redirecting to questions page...';
         }
         
         // Try to build a redirect URL from the data
-        let redirectUrl = null;
+        let redirectUrl;
         
         if (data.redirect_url) {
             redirectUrl = data.redirect_url;
             console.log(`Using redirect URL from event: ${redirectUrl}`);
         } else if (raceId) {
-            // Fallback URL if one wasn't provided
+            // Use a direct URL to the questions page
             redirectUrl = `/race/${raceId}/questions/`;
-            console.log(`Using fallback URL: ${redirectUrl}`);
+            console.log(`Using questions URL: ${redirectUrl}`);
         } else {
             console.error('No redirect URL and no race ID available');
             raceStatusMessage.textContent += ' Error finding redirect URL. Please refresh the page.';
             return;
         }
         
+        // Create a visible button users can click
+        const redirectButton = document.createElement('a');
+        redirectButton.href = redirectUrl;
+        redirectButton.className = 'btn btn-success mt-3';
+        redirectButton.textContent = 'Go to Questions';
+        redirectButton.style.display = 'inline-block';
+        raceStatusArea.appendChild(redirectButton);
+        
         // Set a timer for the redirect
         console.log(`Will redirect to ${redirectUrl} in 3 seconds`);
-        setTimeout(() => {
-            console.log(`Redirecting to ${redirectUrl} now`);
-            window.location.href = redirectUrl;
-        }, 3000);
+        let countdown = 3;
+        
+        const countdownElement = document.createElement('p');
+        countdownElement.textContent = `Redirecting in ${countdown} seconds...`;
+        countdownElement.className = 'mt-2';
+        raceStatusArea.appendChild(countdownElement);
+        
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            countdownElement.textContent = `Redirecting in ${countdown} seconds...`;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                console.log(`Redirecting to ${redirectUrl} now`);
+                window.location.href = redirectUrl;
+            }
+        }, 1000);
     };
     
     // Initialize race WebSocket if race ID is available

@@ -1245,18 +1245,51 @@ def race_questions(request, race_id):
     
     # Check if user is part of a team in this race
     team_member = None
-    try:
-        team_code = request.session.get('team_code')
-        player_name = request.session.get('player_name')
-        
-        if team_code and player_name:
-            team = Team.objects.get(code=team_code)
-            team_member = TeamMember.objects.get(team=team, name=player_name)
-        else:
-            return redirect('join_game_session')
-    except (Team.DoesNotExist, TeamMember.DoesNotExist):
-        messages.error(request, "You are not part of a team in this race.")
+    player_name = request.session.get('player_name')
+    
+    if not player_name:
+        messages.error(request, "Please set your player name first.")
         return redirect('join_game_session')
+    
+    try:
+        # First try to get team from session (team_id)
+        team_id = request.session.get('team_id')
+        if team_id:
+            team = Team.objects.get(id=team_id)
+            
+            # Check if the team is part of a lobby with this race
+            team_in_race = team.participating_lobbies.filter(race=race).exists()
+            
+            if not team_in_race:
+                # Team is not part of this race
+                messages.warning(request, "Your team is not participating in this race.")
+                # Continue anyway to show questions
+            
+            try:
+                team_member = TeamMember.objects.get(team=team, role=player_name)
+                print(f"Found team member {player_name} in team {team.name}")
+            except TeamMember.DoesNotExist:
+                # Create a team member if they don't exist yet
+                team_member = TeamMember.objects.create(team=team, role=player_name, name=player_name)
+                print(f"Created new team member {player_name} for team {team.name}")
+        else:
+            # Fallback: try to find any team this player is part of
+            team_member = TeamMember.objects.filter(role=player_name).first()
+            
+            if not team_member:
+                print(f"No team found for player {player_name}")
+                messages.error(request, "You are not part of any team. Please join a team first.")
+                return redirect('join_team')
+            
+            team = team_member.team
+            print(f"Found team {team.name} for player {player_name}")
+    except Team.DoesNotExist:
+        messages.error(request, "Team not found.")
+        return redirect('join_team')
+    except Exception as e:
+        print(f"Error finding team: {e}")
+        messages.error(request, f"Error finding your team: {str(e)}")
+        return redirect('join_team')
     
     # Get zones and questions for this race
     zones = Zone.objects.filter(race=race).order_by('created_at')
@@ -1272,7 +1305,7 @@ def race_questions(request, race_id):
     
     context = {
         'race': race,
-        'team': team_member.team,
+        'team': team,
         'team_member': team_member,
         'zones': zones,
         'questions_by_zone': questions_by_zone,

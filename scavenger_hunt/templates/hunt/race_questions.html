@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load hunt_extras %}
 
 {% block content %}
 <div class="container">
@@ -228,6 +229,7 @@
 }
 </style>
 
+<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Set up race timer
