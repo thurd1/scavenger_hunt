@@ -205,7 +205,7 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
     def remove_player_from_all_teams(self):
         """Remove the player from all teams they're in"""
         try:
-            deleted_count = TeamMember.objects.filter(name=self.player_name).delete()[0]
+            deleted_count = TeamMember.objects.filter(role=self.player_name).delete()[0]
             logger.info(f"Removed player {self.player_name} from {deleted_count} teams")
         except Exception as e:
             logger.error(f"Error removing player from teams: {e}")
@@ -233,7 +233,7 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
             
             for team in teams:
                 lobbies = list(team.participating_lobbies.values_list('id', flat=True))
-                members = list(team.members.all().values('name', 'role'))
+                members = list(team.members.all().values('role'))
                 
                 teams_data.append({
                     'id': team.id,
@@ -325,7 +325,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                     'id': team.id,
                     'name': team.name,
                     'code': team.code,
-                    'members': list(team.members.all().values('name', 'role'))
+                    'members': list(team.members.all().values('role'))
                 }
                 teams.append(team_data)
             

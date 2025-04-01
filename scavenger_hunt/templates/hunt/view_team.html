@@ -34,7 +34,7 @@
                             {% for member in members %}
                             <div class="member-item mb-2 p-2 bg-dark rounded" data-member="{{ member.role }}">
                                 <i class="fas fa-user me-2"></i>
-                                {{ member.role }} {% if member.name and member.name != member.role %} ({{ member.name }}){% endif %}
+                                {{ member.role }}
                             </div>
                             {% endfor %}
                         {% else %}

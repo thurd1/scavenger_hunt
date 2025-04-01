@@ -1066,7 +1066,7 @@ def student_question(request, lobby_id, question_id):
         
         # Get the team for this player
         try:
-            team_member = TeamMember.objects.get(name=player_name, team__lobby=lobby)
+            team_member = TeamMember.objects.get(role=player_name, team__lobby=lobby)
             team = team_member.team
             
             # Prepare the context
@@ -1179,7 +1179,7 @@ def upload_photo(request, lobby_id, question_id):
         
         # Find the team for this player
         try:
-            team_member = TeamMember.objects.get(name=player_name, team__lobby=lobby)
+            team_member = TeamMember.objects.get(role=player_name, team__lobby=lobby)
             team = team_member.team
             
             # Save the photo
