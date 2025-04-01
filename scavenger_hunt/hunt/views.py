@@ -227,7 +227,20 @@ def join_game_session(request):
         try:
             lobby = Lobby.objects.get(code=lobby_code, is_active=True)
             request.session['lobby_code'] = lobby_code
+            request.session.modified = True
+            
+            # Check if player name is already set
+            player_name = request.session.get('player_name')
+            if not player_name:
+                # If no player name, show the player name form
+                return render(request, 'hunt/set_player_name.html', {
+                    'lobby': lobby,
+                    'lobby_code': lobby_code
+                })
+            
+            # If player name exists, show team options
             return render(request, 'hunt/team_options.html', {'lobby': lobby})
+            
         except Lobby.DoesNotExist:
             messages.error(request, 'Invalid lobby code. Please try again.')
     return render(request, 'hunt/join_game_session.html')
@@ -241,15 +254,23 @@ def save_player_name(request):
             request.session['player_name'] = player_name
             request.session.modified = True
             print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
-        
-        lobby_code = request.session.get('lobby_code')
-        print(f"Lobby code in session: {lobby_code}")  # Debug print
-        
-        if lobby_code:
-            lobby = get_object_or_404(Lobby, code=lobby_code)
-        return render(request, 'hunt/team_options.html', {'lobby': lobby})
             
-        print("No player name provided or lobby code missing")  # Debug print
+            # Get lobby code and redirect to team options
+            lobby_code = request.session.get('lobby_code')
+            if lobby_code:
+                try:
+                    lobby = Lobby.objects.get(code=lobby_code)
+                    return render(request, 'hunt/team_options.html', {'lobby': lobby})
+                except Lobby.DoesNotExist:
+                    messages.error(request, 'Lobby not found. Please try again.')
+                    return redirect('join_game_session')
+            else:
+                messages.error(request, 'No lobby code found. Please join a lobby first.')
+                return redirect('join_game_session')
+        else:
+            messages.error(request, 'Please enter your name.')
+            return redirect('join_game_session')
+            
     return redirect('join_game_session')
 
 def broadcast_team_update(team_id):
@@ -386,14 +407,14 @@ def join_existing_team(request):
 @require_http_methods(["GET", "POST"])
 def create_standalone_team(request):
     """Create a new team with the current player as a member."""
+    # Check if player has a name in session
+    player_name = request.session.get('player_name')
+    if not player_name:
+        messages.error(request, "Please set your player name first.")
+        return redirect('join_game_session')
+    
     # For GET requests, render the form
     if request.method == 'GET':
-        # Ensure player has a name in session
-        player_name = request.session.get('player_name')
-        if not player_name:
-            messages.error(request, "Please set your player name first.")
-            return redirect('join_game_session')
-        
         # Get lobby code from session if available
         lobby_code = request.session.get('lobby_code')
         print(f"Creating team form - Lobby code in session: {lobby_code}")
@@ -405,12 +426,11 @@ def create_standalone_team(request):
         try:
             # Get data from form 
             team_name = request.POST.get('team_name')
-            player_name = request.POST.get('player_name') or request.session.get('player_name')
             
             print(f"Creating team - Team name: {team_name}, Player name: {player_name}")
             
-            if not team_name or not player_name:
-                messages.error(request, 'Both team name and player name are required')
+            if not team_name:
+                messages.error(request, 'Team name is required')
                 return render(request, 'hunt/create_standalone_team.html')
                 
             # Check if team name already exists
@@ -470,7 +490,6 @@ def create_standalone_team(request):
             
             # Store in session
             request.session['team_id'] = team.id
-            request.session['player_name'] = player_name
             request.session.modified = True
             
             messages.success(request, f'Team "{team_name}" created successfully! Your team code is: {code}')
