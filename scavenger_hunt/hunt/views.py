@@ -240,6 +240,8 @@ def join_game_session(request):
         lobby_code = request.POST.get('lobby_code')
         try:
             lobby = Lobby.objects.get(code=lobby_code, is_active=True)
+            
+            # Store lobby code in session
             request.session['lobby_code'] = lobby_code
             request.session.modified = True
             
@@ -265,6 +267,7 @@ def save_player_name(request):
         print(f"Attempting to save player name: {player_name}")  # Debug print
         
         if player_name:
+            # Save player name in session
             request.session['player_name'] = player_name
             request.session.modified = True
             print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
@@ -282,7 +285,8 @@ def save_player_name(request):
                     request.session['lobby_code'] = lobby_code
                     request.session.modified = True
                     
-                    return render(request, 'hunt/team_options.html', {'lobby': lobby})
+                    # Redirect to team options
+                    return redirect('team_options')
                 except Lobby.DoesNotExist:
                     print(f"Lobby with code {lobby_code} not found")  # Debug print
                     messages.error(request, 'Lobby not found. Please try again.')
@@ -1498,3 +1502,24 @@ def get_team_race(request, team_id):
         return JsonResponse({'success': False, 'error': 'Team not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+def team_options(request):
+    """View for team options after player name is set"""
+    # Check if player name is set
+    player_name = request.session.get('player_name')
+    if not player_name:
+        messages.error(request, "Please set your player name first.")
+        return redirect('join_game_session')
+    
+    # Get lobby code from session
+    lobby_code = request.session.get('lobby_code')
+    if not lobby_code:
+        messages.error(request, "No lobby code found. Please join a lobby first.")
+        return redirect('join_game_session')
+    
+    try:
+        lobby = Lobby.objects.get(code=lobby_code, is_active=True)
+        return render(request, 'hunt/team_options.html', {'lobby': lobby})
+    except Lobby.DoesNotExist:
+        messages.error(request, "Invalid lobby code. Please try again.")
+        return redirect('join_game_session')
