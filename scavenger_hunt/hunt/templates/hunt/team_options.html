@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="game-card">
+                <h1>Join or Create a Team</h1>
+                
+                <div class="player-info">
+                    <p>Player: {{ request.session.player_name }}</p>
+                    {% if lobby %}
+                        <p>Lobby: {{ lobby.name|default:"" }} (Code: {{ lobby.code }})</p>
+                    {% endif %}
+                </div>
+                
+                <div class="team-options">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="option-card">
+                                <h3>Create a New Team</h3>
+                                <p>Be a leader and start your own team!</p>
+                                <a href="{% url 'create_standalone_team' %}" class="btn btn-primary">Create Team</a>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="option-card">
+                                <h3>Join an Existing Team</h3>
+                                <p>Have a team code? Join your friends!</p>
+                                <a href="{% url 'join_team' %}" class="btn btn-primary">Join Team</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="back-link mt-4">
+                    <a href="{% url 'join_game_session' %}" class="btn btn-outline-secondary">Back to Game Session</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

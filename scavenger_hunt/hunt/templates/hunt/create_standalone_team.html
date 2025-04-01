@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="game-card">
+                <h1>Create a New Team</h1>
+                
+                <div class="player-info">
+                    <p>Player: {{ request.session.player_name }}</p>
+                </div>
+                
+                <form method="post" action="{% url 'create_standalone_team' %}">
+                    {% csrf_token %}
+                    
+                    {% if lobby_code %}
+                    <input type="hidden" name="lobby_code" value="{{ lobby_code }}">
+                    {% endif %}
+                    
+                    <div class="form-group mb-3">
+                        <label for="team_name">Team Name</label>
+                        <input type="text" class="form-control" id="team_name" name="team_name" required>
+                    </div>
+                    
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary">Create Team</button>
+                    </div>
+                </form>
+                
+                <div class="back-link mt-4 text-center">
+                    <a href="{% url 'team_options' %}" class="btn btn-outline-secondary">Back to Team Options</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

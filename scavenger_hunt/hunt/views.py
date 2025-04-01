@@ -441,18 +441,21 @@ def join_existing_team(request):
 @require_http_methods(["GET", "POST"])
 def create_standalone_team(request):
     """Create a new team with the current player as a member."""
+    print("\n=== create_standalone_team ===")
     # Check if player has a name in session
     player_name = request.session.get('player_name')
+    print(f"Player name from session: {player_name}")
+    
     if not player_name:
         messages.error(request, "Please set your player name first.")
         return redirect('join_game_session')
     
+    # Get lobby code from session if available
+    lobby_code = request.session.get('lobby_code')
+    print(f"Lobby code from session: {lobby_code}")
+    
     # For GET requests, render the form
     if request.method == 'GET':
-        # Get lobby code from session if available
-        lobby_code = request.session.get('lobby_code')
-        print(f"Creating team form - Lobby code in session: {lobby_code}")
-        
         return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
         
     # For POST requests, create the team
@@ -460,17 +463,16 @@ def create_standalone_team(request):
         try:
             # Get data from form 
             team_name = request.POST.get('team_name')
-            
             print(f"Creating team - Team name: {team_name}, Player name: {player_name}")
             
             if not team_name:
                 messages.error(request, 'Team name is required')
-                return render(request, 'hunt/create_standalone_team.html')
+                return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
                 
             # Check if team name already exists
             if Team.objects.filter(name=team_name).exists():
                 messages.error(request, 'A team with this name already exists')
-                return render(request, 'hunt/create_standalone_team.html')
+                return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
                 
             # Generate a unique code
             while True:
@@ -498,9 +500,7 @@ def create_standalone_team(request):
                 print(f"Team member {player_name} already exists in team {team.name}")
             
             # Associate with lobby if a lobby code is in session
-            lobby_code = request.session.get('lobby_code')
-            print(f"Checking lobby code in session: {lobby_code}")
-            
+            lobby = None
             if lobby_code:
                 try:
                     lobby = Lobby.objects.get(code=lobby_code)
@@ -536,10 +536,10 @@ def create_standalone_team(request):
         except Exception as e:
             print(f"Error creating team: {str(e)}")
             messages.error(request, f'Error creating team: {str(e)}')
-            return render(request, 'hunt/create_standalone_team.html')
+            return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
     
     # Should never reach here
-    return render(request, 'hunt/create_standalone_team.html')
+    return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
 
 def register(request):
     if request.method == 'POST':
