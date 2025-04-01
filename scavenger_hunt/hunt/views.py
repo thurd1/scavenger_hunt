@@ -254,8 +254,8 @@ def join_game_session(request):
                     'lobby_code': lobby_code
                 })
             
-            # If player name exists, show team options
-            return render(request, 'hunt/team_options.html', {'lobby': lobby})
+            # If player name exists, redirect to team options
+            return redirect('team_options')
             
         except Lobby.DoesNotExist:
             messages.error(request, 'Invalid lobby code. Please try again.')
@@ -263,6 +263,11 @@ def join_game_session(request):
 
 def save_player_name(request):
     if request.method == 'POST':
+        # Check if player name is already set in session
+        if request.session.get('player_name'):
+            print("Player name already set in session, redirecting to team options")
+            return redirect('team_options')
+            
         player_name = request.POST.get('player_name')
         print(f"Attempting to save player name: {player_name}")  # Debug print
         
