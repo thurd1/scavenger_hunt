@@ -48,6 +48,24 @@ function submitName() {
     if (name) {
         sessionStorage.setItem('playerName', name);
         document.getElementById('namePrompt').style.display = 'none';
+        
+        // Send the player name to the server to save in Django's session
+        fetch('{% url "save_player_name" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: 'player_name=' + encodeURIComponent(name)
+        })
+        .then(response => {
+            if (!response.ok) {
+                console.error('Error saving player name to server session');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
     } else {
         alert('Please enter a valid name');
     }
@@ -57,6 +75,21 @@ function checkPlayerName(event) {
     if (!sessionStorage.getItem('playerName')) {
         event.preventDefault();
         document.getElementById('namePrompt').style.display = 'block';
+    } else {
+        // Make sure the name is also stored in Django session before proceeding
+        const playerName = sessionStorage.getItem('playerName');
+        
+        // This is a passive check - it doesn't block, but ensures the name is sent to server
+        fetch('{% url "save_player_name" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: 'player_name=' + encodeURIComponent(playerName)
+        }).catch(error => {
+            console.error('Error saving player name to server session:', error);
+        });
     }
 }
 </script>
