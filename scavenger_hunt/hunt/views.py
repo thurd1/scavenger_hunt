@@ -78,71 +78,85 @@ def lobby_details(request, lobby_id):
     }
     return render(request, 'hunt/lobby_details.html', context)
 
-@login_required
+@require_http_methods(["POST"])
 def start_race(request, lobby_id):
-    if request.method == 'POST':
-        try:
-            lobby = get_object_or_404(Lobby, id=lobby_id)
-            
-            # Validate user permissions (must be leader/admin)
-            if not request.user.is_authenticated:
-                return JsonResponse({'success': False, 'error': 'Authentication required'})
-            
-            # Get the race
-            race = lobby.race
-            if not race:
-                return JsonResponse({'success': False, 'error': 'No race assigned to this lobby'})
-            
-            # Update race state
-            race.is_active = True
-            race.save()
-            
-            # Update lobby state
-            lobby.hunt_started = True
-            lobby.start_time = timezone.now()
-            lobby.save()
-            
-            # Build the redirect URL for participants
-            redirect_url = reverse('race_questions', kwargs={'race_id': race.id})
-            
-            # Notify all connected clients through WebSocket
-            channel_layer = get_channel_layer()
-            
-            # Send to lobby channel
-            async_to_sync(channel_layer.group_send)(
-                f'lobby_{lobby_id}',
-                {
-                    'type': 'race_started',
-                    'redirect_url': redirect_url,
-                    'race_id': race.id
-                }
-            )
-            
-            # Also send to race channel
-            async_to_sync(channel_layer.group_send)(
-                f'race_{race.id}',
-                {
-                    'type': 'race_started',
-                    'redirect_url': redirect_url,
-                    'race_id': race.id
-                }
-            )
-            
-            # Log success
-            logger.info(f"Race {race.id} started successfully in lobby {lobby_id}")
-            
+    """Start the race for a lobby."""
+    try:
+        # Get the lobby
+        lobby = get_object_or_404(Lobby, id=lobby_id)
+        
+        # Check if user is authenticated and is the host
+        if not request.user.is_authenticated or request.user != lobby.host:
             return JsonResponse({
-                'success': True,
-                'message': 'Race started successfully',
-                'redirect_url': redirect_url,
-                'race_id': race.id
-            })
-            
-        except Exception as e:
-            logger.error(f"Error starting race: {e}")
-            return JsonResponse({'success': False, 'error': str(e)})
-    
-    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+                'success': False,
+                'message': 'You are not authorized to start this race.'
+            }, status=403)
+        
+        # Get the race from the lobby
+        race = lobby.race
+        if not race:
+            return JsonResponse({
+                'success': False,
+                'message': 'No race assigned to this lobby.'
+            }, status=400)
+        
+        # Update race state
+        race.state = 'active'
+        race.save()
+        
+        # Update lobby state
+        lobby.state = 'hunt_started'
+        lobby.start_time = timezone.now()
+        lobby.save()
+        
+        # Construct the redirect URL for participants
+        redirect_url = reverse('race_questions', kwargs={'race_id': race.id})
+        
+        # Send notifications to connected clients
+        channel_layer = get_channel_layer()
+        
+        # Send to lobby channel
+        async_to_sync(channel_layer.group_send)(
+            f"lobby_{lobby.id}",
+            {
+                "type": "lobby_message",
+                "message": {
+                    "type": "race_started",
+                    "lobby_id": lobby.id,
+                    "race_id": race.id,
+                    "redirect_url": redirect_url
+                }
+            }
+        )
+        
+        # Send to race channel
+        async_to_sync(channel_layer.group_send)(
+            f"race_{race.id}",
+            {
+                "type": "race_message",
+                "message": {
+                    "type": "race_started",
+                    "race_id": race.id,
+                    "redirect_url": redirect_url
+                }
+            }
+        )
+        
+        print(f"Race {race.id} started in lobby {lobby.id}")
+        print(f"Redirect URL: {redirect_url}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Race started successfully',
+            'redirect_url': redirect_url
+        })
+        
+    except Exception as e:
+        print(f"Error starting race: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error starting race: {str(e)}'
+        }, status=500)
 
 class LobbyDetailsView(DetailView):
     model = Lobby
@@ -263,6 +277,11 @@ def save_player_name(request):
                 try:
                     lobby = Lobby.objects.get(code=lobby_code)
                     print(f"Found lobby: {lobby.name} (ID: {lobby.id})")  # Debug print
+                    
+                    # Ensure lobby code is in session
+                    request.session['lobby_code'] = lobby_code
+                    request.session.modified = True
+                    
                     return render(request, 'hunt/team_options.html', {'lobby': lobby})
                 except Lobby.DoesNotExist:
                     print(f"Lobby with code {lobby_code} not found")  # Debug print
@@ -721,12 +740,14 @@ def view_team(request, team_id):
     if lobby_code:
         try:
             lobby = Lobby.objects.get(code=lobby_code)
-            print(f"Found lobby {lobby.name} (ID: {lobby.id}) with code {lobby_code}")
+            print(f"Found lobby: {lobby.name} (ID: {lobby.id}) with code {lobby_code}")
             
             # If team is not in this lobby, add it
             if not lobby.teams.filter(id=team.id).exists():
                 print(f"Adding team {team.id} to lobby {lobby.id}")
                 lobby.teams.add(team)
+                # Save the changes
+                lobby.save()
             
             # Get race from lobby
             race = lobby.race
