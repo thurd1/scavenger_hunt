@@ -255,19 +255,25 @@ def save_player_name(request):
             request.session.modified = True
             print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
             
-            # Get lobby code and redirect to team options
-            lobby_code = request.session.get('lobby_code')
+            # Get lobby code from POST or session
+            lobby_code = request.POST.get('lobby_code') or request.session.get('lobby_code')
+            print(f"Lobby code from POST/session: {lobby_code}")  # Debug print
+            
             if lobby_code:
                 try:
                     lobby = Lobby.objects.get(code=lobby_code)
+                    print(f"Found lobby: {lobby.name} (ID: {lobby.id})")  # Debug print
                     return render(request, 'hunt/team_options.html', {'lobby': lobby})
                 except Lobby.DoesNotExist:
+                    print(f"Lobby with code {lobby_code} not found")  # Debug print
                     messages.error(request, 'Lobby not found. Please try again.')
                     return redirect('join_game_session')
             else:
+                print("No lobby code found")  # Debug print
                 messages.error(request, 'No lobby code found. Please join a lobby first.')
                 return redirect('join_game_session')
         else:
+            print("No player name provided")  # Debug print
             messages.error(request, 'Please enter your name.')
             return redirect('join_game_session')
             
