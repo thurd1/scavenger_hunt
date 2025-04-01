@@ -307,25 +307,29 @@ def join_team(request):
         try:
             lobby = Lobby.objects.get(code=lobby_code)
             
-            # Don't use prefetch_related directly, as it might be trying to prefetch 'name'
-            teams = lobby.teams.all()
+            # Get all teams in this lobby
+            teams = list(lobby.teams.all())
+            print(f"Found {len(teams)} teams in lobby")
             
-            # Manually load the related members to avoid the SQL issue
+            # For each team, attach the members directly
             for team in teams:
-                # Only select the 'role' field
-                team._prefetched_objects_cache = {
-                    'members': list(TeamMember.objects.filter(team=team).only('role', 'team'))
-                }
+                # Get members for this team
+                members = list(TeamMember.objects.filter(team=team).only('role', 'team'))
+                
+                # Attach members list directly to the team object
+                team.member_list = members
+                
+                # Add a method to count members
+                team.member_count = len(members)
             
-            print(f"Found {teams.count()} teams in lobby {lobby.name}")
         except Lobby.DoesNotExist:
             print(f"Lobby with code {lobby_code} not found")
-            teams = Team.objects.none()
+            teams = []
             lobby = None
     else:
         # If no lobby code in session, don't show any teams
         print("No lobby code in session, not showing any teams")
-        teams = Team.objects.none()
+        teams = []
         lobby = None
     
     return render(request, 'hunt/join_team.html', {
