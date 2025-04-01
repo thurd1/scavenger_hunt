@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="game-card">
+                <h1>Team: {{ team.name }}</h1>
+                
+                <p class="small text-muted">Debug: Team ID: {{ team.id }}</p>
+                
+                {% if lobby %}
+                    <p><strong>Lobby:</strong> {{ lobby.name|default:"No name" }} (Code: {{ lobby_code }})</p>
+                {% else %}
+                    <p><strong>Lobby:</strong> None</p>
+                    <p><strong>Lobby Code:</strong> {{ lobby_code }}</p>
+                {% endif %}
+                
+                {% if race %}
+                    <p><strong>Race:</strong> {{ race.name|default:"No name" }} (ID: {{ race_id }})</p>
+                {% else %}
+                    <p><strong>Race ID:</strong> {{ race_id }}</p>
+                {% endif %}
+                
+                <h3>Members count: {{ members|length }}</h3>
+                <div class="team-members-list">
+                    <h4>Team Members</h4>
+                    <ul>
+                        {% for member in members %}
+                            <li>{{ member.role }}</li>
+                        {% empty %}
+                            <li>No members yet</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                
+                <div class="team-code">
+                    <p><strong>Team Code:</strong> {{ team.code }}</p>
+                    <p>Share this code with others to join your team!</p>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <a href="{% url 'join_game_session' %}" class="btn btn-outline-primary">Back to Join Game</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if race_id %}
+<script>
+    // Store race ID for WebSocket connection
+    window.raceId = "{{ race_id }}";
+</script>
+<script src="/static/hunt/js/race-websocket.js"></script>
+{% endif %}
+{% endblock %} 

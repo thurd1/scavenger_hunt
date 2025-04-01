@@ -85,8 +85,8 @@ def start_race(request, lobby_id):
         # Get the lobby
         lobby = get_object_or_404(Lobby, id=lobby_id)
         
-        # Check if user is authenticated and is the host
-        if not request.user.is_authenticated or request.user != lobby.host:
+        # Check if user is authenticated - remove host check
+        if not request.user.is_authenticated:
             return JsonResponse({
                 'success': False,
                 'message': 'You are not authorized to start this race.'
@@ -485,13 +485,17 @@ def create_standalone_team(request):
             )
             print(f"Created team: {team.name} (ID: {team.id})")
             
-            # Create the team member
-            TeamMember.objects.create(
-                team=team,
-                role=player_name,
-                name=player_name
-            )
-            print(f"Created team member: {player_name} for team {team.name}")
+            # Check if a team member with this name already exists
+            if not TeamMember.objects.filter(team=team, role=player_name).exists():
+                # Create the team member
+                TeamMember.objects.create(
+                    team=team,
+                    role=player_name,
+                    name=player_name
+                )
+                print(f"Created team member: {player_name} for team {team.name}")
+            else:
+                print(f"Team member {player_name} already exists in team {team.name}")
             
             # Associate with lobby if a lobby code is in session
             lobby_code = request.session.get('lobby_code')
