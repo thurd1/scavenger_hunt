@@ -48,6 +48,21 @@
             <h5 class="text-center" id="race-status-title">Race Status</h5>
             <p id="race-status-message" class="text-center mb-0"></p>
         </div>
+        
+        <!-- Manual race access button (for fallback) -->
+        {% if race.id %}
+        <div class="text-center mt-3">
+            <a href="{% url 'race_questions' race.id %}" class="btn btn-sm btn-success">
+                <i class="fas fa-play"></i> Access Race Questions
+            </a>
+        </div>
+        {% elif race_id %}
+        <div class="text-center mt-3">
+            <a href="{% url 'race_questions' race_id %}" class="btn btn-sm btn-success">
+                <i class="fas fa-play"></i> Access Race Questions
+            </a>
+        </div>
+        {% endif %}
     </div>
 </div>
 

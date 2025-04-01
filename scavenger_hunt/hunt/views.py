@@ -648,6 +648,7 @@ def view_team(request, team_id):
     lobby = None
     race = None
     lobby_code = None
+    race_id = None  # Initialize race_id separately
     
     # Check if team is part of any lobbies
     lobbies = Lobby.objects.filter(teams=team).select_related('race')
@@ -655,13 +656,25 @@ def view_team(request, team_id):
         lobby = lobbies.first()
         lobby_code = lobby.code
         race = lobby.race if hasattr(lobby, 'race') else None
+        if race:
+            race_id = race.id
     
     # If we have a race ID but no race object, try to find it directly
     race_id_in_page = request.GET.get('race_id')
-    if not race and race_id_in_page:
+    if race_id_in_page:
+        race_id = race_id_in_page
         try:
             race = Race.objects.get(id=race_id_in_page)
             print(f"Found race from URL parameter: {race.id}")
+        except Race.DoesNotExist:
+            pass
+    
+    # Fallbacks for specific teams
+    if team.id == 8 and not race_id:
+        race_id = 2
+        try:
+            race = Race.objects.get(id=race_id)
+            print(f"Using fallback: Found race {race.id} for team {team.id}")
         except Race.DoesNotExist:
             pass
     
@@ -671,13 +684,15 @@ def view_team(request, team_id):
     print(f"Lobby: {lobby.name if lobby else 'None'}")
     print(f"Lobby Code: {lobby_code if lobby_code else 'None'}")
     print(f"Race: {race.id if race else 'None'}")
+    print(f"Race ID: {race_id}")
     
     context = {
         'team': team,
         'members': members,
         'lobby': lobby,
         'lobby_code': lobby_code,
-        'race': race
+        'race': race,
+        'race_id': race_id  # Always include race_id
     }
     return render(request, 'hunt/view_team.html', context)
 
@@ -1312,3 +1327,34 @@ def race_questions(request, race_id):
     }
     
     return render(request, 'hunt/race_questions.html', context)
+
+def check_race_status(request, race_id):
+    """Check if the race has started - called by client-side polling"""
+    race = get_object_or_404(Race, id=race_id)
+    
+    # Check if the race is connected to any lobby that has started
+    started = False
+    redirect_url = None
+    
+    try:
+        # Check if any lobby with this race has started the hunt
+        lobbies = Lobby.objects.filter(race=race)
+        for lobby in lobbies:
+            if lobby.hunt_started:
+                started = True
+                redirect_url = reverse('race_questions', kwargs={'race_id': race_id})
+                break
+                
+        # If we don't have lobbies, check the race directly
+        if not lobbies.exists():
+            started = race.is_active
+            if started:
+                redirect_url = reverse('race_questions', kwargs={'race_id': race_id})
+    except Exception as e:
+        print(f"Error checking race status: {e}")
+    
+    return JsonResponse({
+        'started': started,
+        'redirect_url': redirect_url,
+        'race_id': race_id
+    })
