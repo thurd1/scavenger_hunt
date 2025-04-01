@@ -180,6 +180,10 @@ class TeamAnswer(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='team_answers')
     answered_correctly = models.BooleanField(default=False)
     answered_at = models.DateTimeField(auto_now_add=True)
+    attempts = models.IntegerField(default=0)
+    points_awarded = models.IntegerField(default=0)
+    requires_photo = models.BooleanField(default=False)
+    photo = models.ImageField(upload_to='answer_photos/', null=True, blank=True)
     
     class Meta:
         unique_together = ('team', 'question')
@@ -188,3 +192,17 @@ class TeamAnswer(models.Model):
     def __str__(self):
         status = "correct" if self.answered_correctly else "incorrect"
         return f"{self.team.name} - {self.question.text[:20]} - {status}"
+
+class TeamRaceProgress(models.Model):
+    """Tracks which question a team is currently on in a race"""
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='race_progress')
+    race = models.ForeignKey(Race, on_delete=models.CASCADE, related_name='team_progress')
+    current_question_index = models.IntegerField(default=0)
+    total_points = models.IntegerField(default=0)
+    last_updated = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('team', 'race')
+    
+    def __str__(self):
+        return f"{self.team.name} - Race {self.race.name} - Question #{self.current_question_index+1}"
