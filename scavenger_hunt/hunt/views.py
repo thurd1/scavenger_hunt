@@ -396,6 +396,7 @@ def create_standalone_team(request):
         
         # Get lobby code from session if available
         lobby_code = request.session.get('lobby_code')
+        print(f"Creating team form - Lobby code in session: {lobby_code}")
         
         return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
         
@@ -405,6 +406,8 @@ def create_standalone_team(request):
             # Get data from form 
             team_name = request.POST.get('team_name')
             player_name = request.POST.get('player_name') or request.session.get('player_name')
+            
+            print(f"Creating team - Team name: {team_name}, Player name: {player_name}")
             
             if not team_name or not player_name:
                 messages.error(request, 'Both team name and player name are required')
@@ -426,6 +429,7 @@ def create_standalone_team(request):
                 name=team_name,
                 code=code
             )
+            print(f"Created team: {team.name} (ID: {team.id})")
             
             # Create the team member
             TeamMember.objects.create(
@@ -433,21 +437,36 @@ def create_standalone_team(request):
                 role=player_name,
                 name=player_name
             )
+            print(f"Created team member: {player_name} for team {team.name}")
             
             # Associate with lobby if a lobby code is in session
             lobby_code = request.session.get('lobby_code')
+            print(f"Checking lobby code in session: {lobby_code}")
+            
             if lobby_code:
                 try:
                     lobby = Lobby.objects.get(code=lobby_code)
-                    lobby.teams.add(team)
-                    print(f"Added team {team.name} (ID: {team.id}) to lobby {lobby.name} (ID: {lobby.id}) with code {lobby_code}")
+                    print(f"Found lobby: {lobby.name} (ID: {lobby.id}) with code {lobby_code}")
+                    
+                    # Check if team is already in lobby
+                    if lobby.teams.filter(id=team.id).exists():
+                        print(f"Team {team.name} is already in lobby {lobby.name}")
+                    else:
+                        # Add team to lobby
+                        lobby.teams.add(team)
+                        print(f"Added team {team.name} (ID: {team.id}) to lobby {lobby.name} (ID: {lobby.id})")
                     
                     # Get race from lobby
                     race = lobby.race
                     if race:
                         print(f"Found race {race.id} from lobby {lobby.id}")
+                    else:
+                        print(f"No race found in lobby {lobby.id}")
+                        
                 except Lobby.DoesNotExist:
                     print(f"Lobby with code {lobby_code} not found")
+            else:
+                print("No lobby code found in session")
             
             # Store in session
             request.session['team_id'] = team.id
@@ -458,6 +477,7 @@ def create_standalone_team(request):
             return redirect('view_team', team_id=team.id)
             
         except Exception as e:
+            print(f"Error creating team: {str(e)}")
             messages.error(request, f'Error creating team: {str(e)}')
             return render(request, 'hunt/create_standalone_team.html')
     
@@ -639,8 +659,12 @@ def view_team(request, team_id):
     # Get team with all related information
     team = get_object_or_404(Team.objects.prefetch_related('members', 'participating_lobbies'), id=team_id)
     
+    print(f"\n=== View Team Debug Info ===")
+    print(f"Team: {team.name} (ID: {team.id})")
+    
     # Get the team members
     members = list(team.members.all())
+    print(f"Members: {[m.role for m in members]}")
     
     # If the player has a name in the session but isn't in the team yet, add them
     player_name = request.session.get('player_name')
@@ -667,10 +691,12 @@ def view_team(request, team_id):
     
     # First try to get lobby code from session
     lobby_code = request.session.get('lobby_code')
+    print(f"Lobby code from session: {lobby_code}")
+    
     if lobby_code:
         try:
             lobby = Lobby.objects.get(code=lobby_code)
-            print(f"Found lobby {lobby.id} with code {lobby_code}")
+            print(f"Found lobby {lobby.name} (ID: {lobby.id}) with code {lobby_code}")
             
             # If team is not in this lobby, add it
             if not lobby.teams.filter(id=team.id).exists():
@@ -682,12 +708,17 @@ def view_team(request, team_id):
             if race:
                 race_id = race.id
                 print(f"Found race {race_id} from lobby")
+            else:
+                print(f"No race found in lobby {lobby.id}")
         except Lobby.DoesNotExist:
             print(f"Lobby with code {lobby_code} not found")
     
     # If we still don't have a lobby, check if team is part of any lobbies
     if not lobby:
         lobbies = Lobby.objects.filter(teams=team).select_related('race')
+        print(f"Checking existing lobby associations for team {team.id}")
+        print(f"Found {lobbies.count()} lobbies")
+        
         if lobbies.exists():
             lobby = lobbies.first()
             lobby_code = lobby.code
@@ -695,15 +726,21 @@ def view_team(request, team_id):
             if race:
                 race_id = race.id
                 print(f"Found lobby {lobby.id} and race {race_id} from team's existing associations")
+            else:
+                print(f"Found lobby {lobby.id} but no race associated")
+        else:
+            print(f"No existing lobby associations found for team {team.id}")
     
     # Debug logging
-    print(f"View team: {team.name}, Team ID: {team.id}")
+    print(f"\nFinal State:")
+    print(f"Team: {team.name}, Team ID: {team.id}")
     print(f"Members: {[m.role for m in members]}")
     print(f"Lobby: {lobby.name if lobby else 'None'}")
     print(f"Lobby Code: {lobby_code if lobby_code else 'None'}")
     print(f"Race: {race.id if race else 'None'}")
     print(f"Race ID: {race_id}")
     print(f"Team's participating lobbies: {[l.id for l in team.participating_lobbies.all()]}")
+    print("=== End Debug Info ===\n")
     
     context = {
         'team': team,
