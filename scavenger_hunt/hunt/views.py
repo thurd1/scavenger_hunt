@@ -363,8 +363,8 @@ def join_existing_team(request):
                     'redirect_url': reverse('view_team', args=[team.id])
                 })
                 
-            # Create team member
-            TeamMember.objects.create(team=team, role=player_name, name=player_name)
+            # Create team member - removed name field
+            TeamMember.objects.create(team=team, role=player_name)
             
             # Store player name in session
             request.session['player_name'] = player_name
@@ -427,11 +427,10 @@ def create_standalone_team(request):
                 code=code
             )
             
-            # Create the team member
+            # Create the team member - removed name field
             TeamMember.objects.create(
                 team=team,
-                role=player_name,
-                name=player_name
+                role=player_name
             )
             
             # Associate with lobby if a lobby code is in session
@@ -529,11 +528,10 @@ def create_team(request, lobby_id):
             team = form.save()
             lobby.teams.add(team)
             
-            # Create a team member for the creator
+            # Create a team member for the creator - removed name field
             team_member = TeamMember.objects.create(
                 team=team,
-                role=player_name,
-                name=player_name
+                role=player_name
             )
             print(f"Created team member: {player_name} for team {team.name}")
             
@@ -646,8 +644,7 @@ def view_team(request, team_id):
             if not TeamMember.objects.filter(team=team, role=player_name).exists():
                 new_member = TeamMember.objects.create(
                     team=team,
-                    role=player_name,
-                    name=player_name
+                    role=player_name
                 )
                 print(f"Created new team member: {player_name} for team {team.name}")
                 members.append(new_member)
@@ -1285,8 +1282,8 @@ def race_questions(request, race_id):
                 team_member = TeamMember.objects.get(team=team, role=player_name)
                 print(f"Found team member {player_name} in team {team.name}")
             except TeamMember.DoesNotExist:
-                # Create a team member if they don't exist yet
-                team_member = TeamMember.objects.create(team=team, role=player_name, name=player_name)
+                # Create a team member if they don't exist yet - removed name field
+                team_member = TeamMember.objects.create(team=team, role=player_name)
                 print(f"Created new team member {player_name} for team {team.name}")
         else:
             # Fallback: try to find any team this player is part of
