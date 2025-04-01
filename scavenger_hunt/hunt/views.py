@@ -440,7 +440,12 @@ def create_standalone_team(request):
                 try:
                     lobby = Lobby.objects.get(code=lobby_code)
                     lobby.teams.add(team)
-                    print(f"Added team {team.name} to lobby {lobby.name}")
+                    print(f"Added team {team.name} (ID: {team.id}) to lobby {lobby.name} (ID: {lobby.id}) with code {lobby_code}")
+                    
+                    # Get race from lobby
+                    race = lobby.race
+                    if race:
+                        print(f"Found race {race.id} from lobby {lobby.id}")
                 except Lobby.DoesNotExist:
                     print(f"Lobby with code {lobby_code} not found")
             
@@ -632,7 +637,7 @@ def edit_team(request, team_id):
 
 def view_team(request, team_id):
     # Get team with all related information
-    team = get_object_or_404(Team.objects.prefetch_related('members'), id=team_id)
+    team = get_object_or_404(Team.objects.prefetch_related('members', 'participating_lobbies'), id=team_id)
     
     # Get the team members
     members = list(team.members.all())
@@ -658,7 +663,7 @@ def view_team(request, team_id):
     lobby = None
     race = None
     lobby_code = None
-    race_id = None  # Initialize race_id separately
+    race_id = None
     
     # First try to get lobby code from session
     lobby_code = request.session.get('lobby_code')
@@ -686,20 +691,10 @@ def view_team(request, team_id):
         if lobbies.exists():
             lobby = lobbies.first()
             lobby_code = lobby.code
-            race = lobby.race if hasattr(lobby, 'race') else None
+            race = lobby.race
             if race:
                 race_id = race.id
                 print(f"Found lobby {lobby.id} and race {race_id} from team's existing associations")
-    
-    # If we have a race ID but no race object, try to find it directly
-    race_id_in_page = request.GET.get('race_id')
-    if race_id_in_page:
-        race_id = race_id_in_page
-        try:
-            race = Race.objects.get(id=race_id_in_page)
-            print(f"Found race from URL parameter: {race.id}")
-        except Race.DoesNotExist:
-            pass
     
     # Debug logging
     print(f"View team: {team.name}, Team ID: {team.id}")
@@ -708,6 +703,7 @@ def view_team(request, team_id):
     print(f"Lobby Code: {lobby_code if lobby_code else 'None'}")
     print(f"Race: {race.id if race else 'None'}")
     print(f"Race ID: {race_id}")
+    print(f"Team's participating lobbies: {[l.id for l in team.participating_lobbies.all()]}")
     
     context = {
         'team': team,
@@ -715,7 +711,7 @@ def view_team(request, team_id):
         'lobby': lobby,
         'lobby_code': lobby_code,
         'race': race,
-        'race_id': race_id  # Always include race_id
+        'race_id': race_id
     }
     return render(request, 'hunt/view_team.html', context)
 
