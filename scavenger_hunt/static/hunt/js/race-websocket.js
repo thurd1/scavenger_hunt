@@ -46,7 +46,7 @@ function connectToRaceWebsocket(raceId) {
                     } else {
                         // Use the default handler in this file
                         console.log('Using default race_started handler');
-                        handleRaceStartedEvent(data, raceId);
+                        handleRaceStartedEvent(data, data.race_id || raceId);
                     }
                 }
             } catch (error) {

@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question, TeamAnswer
+from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question, TeamAnswer, TeamRaceProgress
 from django.http import JsonResponse
 from .forms import JoinLobbyForm, LobbyForm, TeamForm
 from django.http import HttpResponse
@@ -88,15 +88,19 @@ def start_race(request, lobby_id):
             if not request.user.is_authenticated:
                 return JsonResponse({'success': False, 'error': 'Authentication required'})
             
-            # Update lobby state
-            lobby.hunt_started = True
-            lobby.start_time = timezone.now()
-            lobby.save()
-            
             # Get the race
             race = lobby.race
             if not race:
                 return JsonResponse({'success': False, 'error': 'No race assigned to this lobby'})
+            
+            # Update race state
+            race.is_active = True
+            race.save()
+            
+            # Update lobby state
+            lobby.hunt_started = True
+            lobby.start_time = timezone.now()
+            lobby.save()
             
             # Build the redirect URL for participants
             redirect_url = reverse('race_questions', kwargs={'race_id': race.id})
@@ -109,7 +113,8 @@ def start_race(request, lobby_id):
                 f'lobby_{lobby_id}',
                 {
                     'type': 'race_started',
-                    'redirect_url': redirect_url
+                    'redirect_url': redirect_url,
+                    'race_id': race.id
                 }
             )
             
@@ -118,14 +123,19 @@ def start_race(request, lobby_id):
                 f'race_{race.id}',
                 {
                     'type': 'race_started',
-                    'redirect_url': redirect_url
+                    'redirect_url': redirect_url,
+                    'race_id': race.id
                 }
             )
+            
+            # Log success
+            logger.info(f"Race {race.id} started successfully in lobby {lobby_id}")
             
             return JsonResponse({
                 'success': True,
                 'message': 'Race started successfully',
-                'redirect_url': redirect_url
+                'redirect_url': redirect_url,
+                'race_id': race.id
             })
             
         except Exception as e:
@@ -1269,7 +1279,7 @@ def race_questions(request, race_id):
             if not team_in_race:
                 # Team is not part of this race
                 messages.warning(request, "Your team is not participating in this race.")
-                # Continue anyway to show questions
+                return redirect('join_game_session')
             
             try:
                 team_member = TeamMember.objects.get(team=team, role=player_name)
@@ -1279,45 +1289,45 @@ def race_questions(request, race_id):
                 team_member = TeamMember.objects.create(team=team, role=player_name, name=player_name)
                 print(f"Created new team member {player_name} for team {team.name}")
         else:
-            # Fallback: try to find any team this player is part of
-            team_member = TeamMember.objects.filter(role=player_name).first()
+            messages.error(request, "No team found. Please join a team first.")
+            return redirect('join_game_session')
             
-            if not team_member:
-                print(f"No team found for player {player_name}")
-                messages.error(request, "You are not part of any team. Please join a team first.")
-                return redirect('join_team')
-            
-            team = team_member.team
-            print(f"Found team {team.name} for player {player_name}")
-    except Team.DoesNotExist:
-        messages.error(request, "Team not found.")
-        return redirect('join_team')
+        # Get or create team progress for this race
+        team_progress, created = TeamRaceProgress.objects.get_or_create(
+            team=team,
+            race=race,
+            defaults={'current_question_index': 0, 'total_points': 0}
+        )
+        
+        # Get all questions for this race
+        questions = Question.objects.filter(zone__race=race).order_by('zone__created_at', 'created_at')
+        
+        # Get current question based on progress
+        current_question = questions[team_progress.current_question_index] if questions.exists() else None
+        
+        # Get team's answers for this race
+        team_answers = TeamAnswer.objects.filter(
+            team=team,
+            question__zone__race=race
+        ).select_related('question')
+        
+        context = {
+            'race': race,
+            'team': team,
+            'team_member': team_member,
+            'current_question': current_question,
+            'team_answers': team_answers,
+            'team_progress': team_progress,
+            'total_questions': questions.count(),
+            'current_question_index': team_progress.current_question_index + 1
+        }
+        
+        return render(request, 'hunt/race_questions.html', context)
+        
     except Exception as e:
-        print(f"Error finding team: {e}")
-        messages.error(request, f"Error finding your team: {str(e)}")
-        return redirect('join_team')
-    
-    # Get zones and questions for this race
-    zones = Zone.objects.filter(race=race).order_by('created_at')
-    questions = Question.objects.filter(zone__race=race).select_related('zone').order_by('zone__created_at')
-    
-    # Group questions by zone
-    questions_by_zone = {}
-    for zone in zones:
-        questions_by_zone[zone.id] = []
-    
-    for question in questions:
-        questions_by_zone[question.zone.id].append(question)
-    
-    context = {
-        'race': race,
-        'team': team,
-        'team_member': team_member,
-        'zones': zones,
-        'questions_by_zone': questions_by_zone,
-    }
-    
-    return render(request, 'hunt/race_questions.html', context)
+        logger.error(f"Error in race_questions view: {e}")
+        messages.error(request, "An error occurred. Please try again.")
+        return redirect('join_game_session')
 
 def check_race_status(request, race_id):
     """Check if the race has started - called by client-side polling"""
