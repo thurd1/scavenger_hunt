@@ -8,6 +8,7 @@
             <h1>Create Your Team</h1>
             <div class="lobby-info">
                 <p><strong>Lobby:</strong> {{ lobby.name }}</p>
+                <p><strong>Lobby Code:</strong> <span class="code-badge">{{ lobby.code }}</span></p>
                 <p><strong>Race:</strong> {{ lobby.race.name }}</p>
             </div>
         </div>
@@ -103,6 +104,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .lobby-info strong {
     color: #90C83C;
+}
+
+.code-badge {
+    background: rgba(144, 200, 60, 0.2);
+    color: #90C83C;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-weight: bold;
 }
 
 .teams-section {

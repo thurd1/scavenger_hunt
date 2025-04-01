@@ -50,7 +50,22 @@
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
             
             {% if lobby_code %}
-                <a href="{% url 'create_standalone_team' %}" class="create-team-btn">Create Team</a>
+                <a href="/lobby/{{ lobby.id }}/create-team/" class="create-team-btn" id="createTeamBtn">Create Team</a>
+                
+                {% if not lobby.id %}
+                <script>
+                    // Alternative method to find the lobby ID
+                    document.addEventListener('DOMContentLoaded', function() {
+                        fetch(`/api/get-lobby-by-code/?code={{ lobby_code }}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if(data.success && data.lobby_id) {
+                                    document.getElementById('createTeamBtn').href = `/lobby/${data.lobby_id}/create-team/`;
+                                }
+                            });
+                    });
+                </script>
+                {% endif %}
             {% else %}
                 <div class="no-lobby-message">
                     <p>You need to join a lobby first before creating a team.</p>

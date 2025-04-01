@@ -53,4 +53,7 @@ urlpatterns = [
     path('race-complete/', views.race_complete, name='race_complete'),
     path('race/<int:race_id>/questions/', views.race_questions, name='race_questions'),
     path('check-answer/', views.check_answer, name='check_answer'),
+    
+    # API endpoints
+    path('api/get-lobby-by-code/', views.get_lobby_by_code, name='get_lobby_by_code'),
 ]
