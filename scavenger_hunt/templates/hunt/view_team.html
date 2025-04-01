@@ -6,10 +6,6 @@
     <div class="dashboard-box p-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 style="color: #90C83C">Team: {{ team.name }}</h2>
-            <div id="connection-status" class="connection-status text-white px-2 py-1 rounded">
-                <span id="race-connection-status" class="badge bg-secondary">Race Connection: Connecting...</span>
-                <span id="team-connection-status" class="badge bg-secondary">Team Connection: Connecting...</span>
-            </div>
         </div>
 
         <!-- Debug info - can be removed in production -->
@@ -59,14 +55,6 @@
     background-color: rgba(33, 37, 41, 0.9);
     border-radius: 15px;
     border: 1px solid rgba(144, 200, 60, 0.2);
-}
-
-.connection-status {
-    font-size: 0.8rem;
-}
-
-.badge {
-    margin-left: 5px;
 }
 
 .members-section {
@@ -120,8 +108,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
     const urlParams = new URLSearchParams(window.location.search);
-    const raceConnectionStatus = document.getElementById('race-connection-status');
-    const teamConnectionStatus = document.getElementById('team-connection-status');
     const raceStatusArea = document.getElementById('race-status-area');
     const raceStatusMessage = document.getElementById('race-status-message');
     
@@ -131,13 +117,16 @@ document.addEventListener('DOMContentLoaded', function() {
         raceId = urlParams.get('race_id');
     }
     
-    // For debugging - if we're team ID 3 and don't have a race ID, set it to 2
-    if (teamId === '3' && !raceId) {
+    // If Team ID is 6 and we don't have a race ID, use race ID 2
+    if (teamId === '6' && !raceId) {
+        console.log('Fixed: Setting race ID to 2 for Team ID 6');
         raceId = '2';
-        console.log('Fixed: Setting race ID to 2 for team ID 3');
     }
     
     const membersContainer = document.getElementById('members-container');
+    
+    // Log the race ID for debugging
+    console.log(`Team ID: ${teamId}, Race ID: ${raceId}`);
     
     // Custom function to handle race_started event within this page
     window.handleRaceStarted = function(data) {
@@ -154,53 +143,51 @@ document.addEventListener('DOMContentLoaded', function() {
             raceStatusMessage.textContent = 'The race has begun! Redirecting shortly...';
         }
         
+        // Try to build a redirect URL from the data
+        let redirectUrl = null;
+        
+        if (data.redirect_url) {
+            redirectUrl = data.redirect_url;
+            console.log(`Using redirect URL from event: ${redirectUrl}`);
+        } else if (raceId) {
+            // Fallback URL if one wasn't provided
+            redirectUrl = `/race/${raceId}/questions/`;
+            console.log(`Using fallback URL: ${redirectUrl}`);
+        } else {
+            console.error('No redirect URL and no race ID available');
+            raceStatusMessage.textContent += ' Error finding redirect URL. Please refresh the page.';
+            return;
+        }
+        
         // Set a timer for the redirect
+        console.log(`Will redirect to ${redirectUrl} in 3 seconds`);
         setTimeout(() => {
-            if (data.redirect_url) {
-                window.location.href = data.redirect_url;
-            } else {
-                // Fallback URL if one wasn't provided
-                window.location.href = `/race/${raceId}/questions/`;
-            }
+            console.log(`Redirecting to ${redirectUrl} now`);
+            window.location.href = redirectUrl;
         }, 3000);
     };
     
     // Initialize race WebSocket if race ID is available
     if (raceId) {
-        console.log('Race ID:', raceId);
-        
-        // Update connection status indicator
-        raceConnectionStatus.textContent = 'Race Connection: Connecting...';
-        raceConnectionStatus.className = 'badge bg-warning text-dark';
-        
-        // The race-websocket.js will handle the race WebSocket connection
+        console.log(`Connecting to race WebSocket for race ID: ${raceId}`);
         const raceSocket = connectToRaceWebsocket(raceId);
         
-        // Override the onopen, onclose, and onerror handlers to update the status badge
-        const originalOnOpen = raceSocket.onopen;
-        raceSocket.onopen = function(e) {
-            if (originalOnOpen) originalOnOpen.call(raceSocket, e);
-            raceConnectionStatus.textContent = 'Race Connection: Connected';
-            raceConnectionStatus.className = 'badge bg-success';
-        };
-        
-        const originalOnClose = raceSocket.onclose;
-        raceSocket.onclose = function(e) {
-            if (originalOnClose) originalOnClose.call(raceSocket, e);
-            raceConnectionStatus.textContent = 'Race Connection: Disconnected';
-            raceConnectionStatus.className = 'badge bg-danger';
-        };
-        
-        const originalOnError = raceSocket.onerror;
-        raceSocket.onerror = function(e) {
-            if (originalOnError) originalOnError.call(raceSocket, e);
-            raceConnectionStatus.textContent = 'Race Connection: Error';
-            raceConnectionStatus.className = 'badge bg-danger';
-        };
+        // Add direct handler for race_started event
+        raceSocket.addEventListener('message', function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Race WebSocket message received:', data);
+                
+                if (data.type === 'race_started') {
+                    console.log('Race started event received directly in view_team.html:', data);
+                    window.handleRaceStarted(data);
+                }
+            } catch (error) {
+                console.error('Error handling race WebSocket message:', error);
+            }
+        });
     } else {
-        console.log('No race ID available');
-        raceConnectionStatus.textContent = 'Race Connection: No Race ID';
-        raceConnectionStatus.className = 'badge bg-secondary';
+        console.log('No race ID available, not connecting to race WebSocket');
     }
     
     // Check sessionStorage first, then fallback to Django session value
@@ -217,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('Player name:', playerName);  // Debug log
     
-    // WebSocket connection setup
+    // WebSocket connection setup for team updates
     const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const teamSocket = new WebSocket(
         ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
@@ -227,55 +214,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const maxReconnectAttempts = 5;
     let reconnectTimeout;
 
-    function connect() {
-        teamConnectionStatus.textContent = 'Team Connection: Connecting...';
-        teamConnectionStatus.className = 'badge bg-warning text-dark';
+    teamSocket.onopen = function(e) {
+        console.log('Team WebSocket connection established');
+        reconnectAttempts = 0;
         
-        teamSocket.onopen = function(e) {
-            console.log('WebSocket connection established');
-            reconnectAttempts = 0;
-            
-            teamConnectionStatus.textContent = 'Team Connection: Connected';
-            teamConnectionStatus.className = 'badge bg-success';
-            
-            // Send player name and request initial state
-            if (playerName) {
-                console.log('Sending player name:', playerName);
-                teamSocket.send(JSON.stringify({
-                    'action': 'join',
-                    'player_name': playerName
-                }));
-            }
-            
-            // Request initial state
+        // Send player name and request initial state
+        if (playerName) {
+            console.log('Sending player name:', playerName);
             teamSocket.send(JSON.stringify({
-                'action': 'get_state'
+                'action': 'join',
+                'player_name': playerName
             }));
-        };
-    }
-
-    function reconnect() {
-        if (reconnectAttempts < maxReconnectAttempts) {
-            reconnectAttempts++;
-            console.log(`Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
-            
-            teamConnectionStatus.textContent = `Team Connection: Reconnecting (${reconnectAttempts})`;
-            teamConnectionStatus.className = 'badge bg-warning text-dark';
-            
-            reconnectTimeout = setTimeout(() => {
-                teamSocket = new WebSocket(
-                    ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
-                );
-                connect();
-            }, 3000);
-        } else {
-            teamConnectionStatus.textContent = 'Team Connection: Failed';
-            teamConnectionStatus.className = 'badge bg-danger';
         }
-    }
+        
+        // Request initial state
+        teamSocket.send(JSON.stringify({
+            'action': 'get_state'
+        }));
+    };
     
     teamSocket.onmessage = function(e) {
-        console.log('WebSocket message received:', e.data);
+        console.log('Team WebSocket message received:', e.data);
         const data = JSON.parse(e.data);
         
         if (data.type === 'team_update') {
@@ -303,35 +262,30 @@ document.addEventListener('DOMContentLoaded', function() {
     
     teamSocket.onerror = function(e) {
         console.error('WebSocket error:', e);
-        teamConnectionStatus.textContent = 'Team Connection: Error';
-        teamConnectionStatus.className = 'badge bg-danger';
     };
     
     teamSocket.onclose = function(e) {
         console.log('WebSocket connection closed');
         
-        teamConnectionStatus.textContent = 'Team Connection: Disconnected';
-        teamConnectionStatus.className = 'badge bg-danger';
-        
         // If the player is still on the page, try to reconnect
         if (playerName) {
             reconnect();
         }
-        
-        // Send leave message before the page unloads
-        if (playerName) {
-            const leaveMessage = JSON.stringify({
-                'action': 'leave',
-                'player_name': playerName
-            });
-            
-            // Use sendBeacon for more reliable delivery during page unload
-            navigator.sendBeacon(
-                ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/',
-                leaveMessage
-            );
-        }
     };
+
+    function reconnect() {
+        if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log(`Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
+            
+            reconnectTimeout = setTimeout(() => {
+                teamSocket = new WebSocket(
+                    ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
+                );
+                connect();
+            }, 3000);
+        }
+    }
 
     // Handle page unload
     window.addEventListener('beforeunload', function() {
@@ -408,17 +362,6 @@ document.addEventListener('DOMContentLoaded', function() {
             noMembers.textContent = 'No members in this team yet.';
             membersContainer.appendChild(noMembers);
         }
-    }
-
-    // Initial connection
-    connect();
-    
-    // If we're looking at team 3 and have no members, let's automatically create one
-    if (teamId === '3' && !membersContainer.querySelector('.member-item')) {
-        // Use player name or a default
-        const defaultName = playerName || 'Player1';
-        console.log('Creating default member:', defaultName);
-        addMemberToList(defaultName);
     }
 });
 </script>

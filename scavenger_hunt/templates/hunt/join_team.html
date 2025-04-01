@@ -4,12 +4,17 @@
 <div class="container">
     <div class="join-header">
         <h1>Join or Create a Team</h1>
+        {% if lobby_code %}
+        <div class="lobby-info">
+            <p>Lobby Code: <span class="code-badge">{{ lobby_code }}</span></p>
+        </div>
+        {% endif %}
     </div>
 
     <div class="join-team-form-container">
         <!-- Existing teams section -->
         <div class="existing-teams-section">
-            <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Available Teams</h3>
+            <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Available Teams in This Lobby</h3>
             <div id="teamsContainer" class="teams-grid">
                 {% if teams %}
                     {% for team in teams %}
@@ -30,7 +35,7 @@
                     {% endfor %}
                 {% else %}
                     <div class="no-teams-message">
-                        <p>No teams available. Create one below!</p>
+                        <p>No teams available in this lobby. Create one below!</p>
                     </div>
                 {% endif %}
             </div>
@@ -44,7 +49,14 @@
         <div class="create-team-section">
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
             
-            <a href="/lobby/2/create-team/" class="create-team-btn">Create Team</a>
+            {% if lobby_code %}
+                <a href="{% url 'create_standalone_team' %}" class="create-team-btn">Create Team</a>
+            {% else %}
+                <div class="no-lobby-message">
+                    <p>You need to join a lobby first before creating a team.</p>
+                    <a href="{% url 'join_game_session' %}" class="btn btn-success">Join a Lobby</a>
+                </div>
+            {% endif %}
         </div>
         
         <!-- Back to Home button moved to bottom -->
@@ -75,7 +87,20 @@
 
 .join-header h1 {
     color: #90C83C;
-    margin-bottom: 0;
+    margin-bottom: 0.5rem;
+}
+
+.lobby-info {
+    color: #ffffff;
+    margin-top: 0.5rem;
+}
+
+.code-badge {
+    background: rgba(144, 200, 60, 0.2);
+    color: #90C83C;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-weight: bold;
 }
 
 .join-team-form-container {
@@ -83,6 +108,19 @@
     border: 2px solid rgba(144, 200, 60, 0.3);
     border-radius: 12px;
     padding: 2rem;
+}
+
+.no-lobby-message {
+    text-align: center;
+    padding: 1.5rem;
+    background: rgba(33, 37, 41, 0.7);
+    border-radius: 8px;
+    border: 1px solid rgba(144, 200, 60, 0.2);
+}
+
+.no-lobby-message p {
+    color: #ffffff;
+    margin-bottom: 1rem;
 }
 
 .existing-teams-section {
@@ -260,6 +298,10 @@ function setupWebSocket() {
         socket.close();
     }
     
+    // Get lobby code if available
+    const lobbyCode = '{{ lobby_code }}';
+    console.log('Current lobby code:', lobbyCode);
+    
     // Create new WebSocket connection
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/available-teams/`;
@@ -268,9 +310,10 @@ function setupWebSocket() {
     
     socket.onopen = function(e) {
         console.log("WebSocket connection established");
-        // Request initial state
+        // Request initial state with lobby code
         socket.send(JSON.stringify({
-            'type': 'request_update'
+            'type': 'request_update',
+            'lobby_code': lobbyCode
         }));
     };
     
@@ -319,9 +362,11 @@ function updateTeamsDisplay(teams) {
             teamsContainer.appendChild(teamCard);
         });
     } else {
+        // Update the message to mention lobby
+        const lobbyCode = '{{ lobby_code }}';
         teamsContainer.innerHTML = `
             <div class="no-teams-message">
-                <p>No teams available. Create one below!</p>
+                <p>No teams available in lobby ${lobbyCode}. Create one below!</p>
             </div>
         `;
     }

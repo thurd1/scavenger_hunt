@@ -270,12 +270,30 @@ def join_team(request):
             request.session['player_name'] = 'Player'
             request.session.modified = True
     
-    # Get all active teams
-    teams = Team.objects.all().prefetch_related('members')
+    # Check if we have a lobby code in the session
+    lobby_code = request.session.get('lobby_code')
+    
+    # Log for debugging
+    print(f"Looking for teams in lobby with code: {lobby_code}")
+    
+    if lobby_code:
+        # Get teams only for this lobby code
+        try:
+            lobby = Lobby.objects.get(code=lobby_code)
+            teams = lobby.teams.all().prefetch_related('members')
+            print(f"Found {teams.count()} teams in lobby {lobby.name}")
+        except Lobby.DoesNotExist:
+            print(f"Lobby with code {lobby_code} not found")
+            teams = Team.objects.none()
+    else:
+        # If no lobby code in session, don't show any teams
+        print("No lobby code in session, not showing any teams")
+        teams = Team.objects.none()
     
     return render(request, 'hunt/join_team.html', {
         'teams': teams,
-        'player_name': request.session['player_name']
+        'player_name': request.session['player_name'],
+        'lobby_code': lobby_code
     })
 
 @require_http_methods(["POST"])
@@ -333,8 +351,11 @@ def create_standalone_team(request):
         if not player_name:
             messages.error(request, "Please set your player name first.")
             return redirect('join_game_session')
-            
-        return render(request, 'hunt/create_standalone_team.html')
+        
+        # Get lobby code from session if available
+        lobby_code = request.session.get('lobby_code')
+        
+        return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
         
     # For POST requests, create the team
     elif request.method == 'POST':
@@ -370,6 +391,16 @@ def create_standalone_team(request):
                 role=player_name,
                 name=player_name
             )
+            
+            # Associate with lobby if a lobby code is in session
+            lobby_code = request.session.get('lobby_code')
+            if lobby_code:
+                try:
+                    lobby = Lobby.objects.get(code=lobby_code)
+                    lobby.teams.add(team)
+                    print(f"Added team {team.name} to lobby {lobby.name}")
+                except Lobby.DoesNotExist:
+                    print(f"Lobby with code {lobby_code} not found")
             
             # Store in session
             request.session['team_id'] = team.id
