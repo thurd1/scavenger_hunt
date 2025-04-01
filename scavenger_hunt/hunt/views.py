@@ -660,14 +660,36 @@ def view_team(request, team_id):
     lobby_code = None
     race_id = None  # Initialize race_id separately
     
-    # Check if team is part of any lobbies
-    lobbies = Lobby.objects.filter(teams=team).select_related('race')
-    if lobbies.exists():
-        lobby = lobbies.first()
-        lobby_code = lobby.code
-        race = lobby.race if hasattr(lobby, 'race') else None
-        if race:
-            race_id = race.id
+    # First try to get lobby code from session
+    lobby_code = request.session.get('lobby_code')
+    if lobby_code:
+        try:
+            lobby = Lobby.objects.get(code=lobby_code)
+            print(f"Found lobby {lobby.id} with code {lobby_code}")
+            
+            # If team is not in this lobby, add it
+            if not lobby.teams.filter(id=team.id).exists():
+                print(f"Adding team {team.id} to lobby {lobby.id}")
+                lobby.teams.add(team)
+            
+            # Get race from lobby
+            race = lobby.race
+            if race:
+                race_id = race.id
+                print(f"Found race {race_id} from lobby")
+        except Lobby.DoesNotExist:
+            print(f"Lobby with code {lobby_code} not found")
+    
+    # If we still don't have a lobby, check if team is part of any lobbies
+    if not lobby:
+        lobbies = Lobby.objects.filter(teams=team).select_related('race')
+        if lobbies.exists():
+            lobby = lobbies.first()
+            lobby_code = lobby.code
+            race = lobby.race if hasattr(lobby, 'race') else None
+            if race:
+                race_id = race.id
+                print(f"Found lobby {lobby.id} and race {race_id} from team's existing associations")
     
     # If we have a race ID but no race object, try to find it directly
     race_id_in_page = request.GET.get('race_id')

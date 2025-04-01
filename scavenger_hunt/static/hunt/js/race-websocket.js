@@ -15,14 +15,6 @@ function connectToRaceWebsocket(raceId) {
         
         socket.onopen = function(e) {
             console.log('Race WebSocket connection established');
-            const statusElement = document.getElementById('connection-status');
-            if (statusElement) {
-                statusElement.textContent = 'Connected';
-                statusElement.classList.remove('text-danger');
-                statusElement.classList.add('text-success');
-            }
-            
-            // Show connected message on screen for debugging
             showMessage('Race WebSocket connected!', 'success');
         };
         
@@ -57,12 +49,6 @@ function connectToRaceWebsocket(raceId) {
         
         socket.onclose = function(e) {
             console.log('Race WebSocket connection closed');
-            const statusElement = document.getElementById('connection-status');
-            if (statusElement) {
-                statusElement.textContent = 'Disconnected';
-                statusElement.classList.remove('text-success');
-                statusElement.classList.add('text-danger');
-            }
             
             // Try to reconnect after a delay
             showMessage('WebSocket disconnected. Attempting to reconnect...', 'warning');
@@ -73,12 +59,6 @@ function connectToRaceWebsocket(raceId) {
         
         socket.onerror = function(e) {
             console.error('Race WebSocket error:', e);
-            const statusElement = document.getElementById('connection-status');
-            if (statusElement) {
-                statusElement.textContent = 'Connection Error';
-                statusElement.classList.remove('text-success');
-                statusElement.classList.add('text-danger');
-            }
             showMessage('WebSocket error. Check console for details.', 'error');
         };
         
@@ -233,8 +213,8 @@ function showMessage(message, type = 'info') {
 // Initialize WebSocket connection when DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
     try {
-        // Get race ID with more aggressive fallbacks to ensure connection
-        let raceId = findRaceId();
+        // Get race ID from data attribute
+        const raceId = document.body.getAttribute('data-race-id');
         
         if (raceId) {
             console.log(`Connecting to race with ID: ${raceId}`);
@@ -243,99 +223,24 @@ document.addEventListener('DOMContentLoaded', function() {
             // Set up manual check for race status
             checkRaceStatus(raceId);
         } else {
-            console.log('No race ID found, not connecting to WebSocket');
+            console.log('No race ID found in data attribute');
+            
+            // Try to find race ID from URL
+            const raceMatch = window.location.pathname.match(/\/race\/(\d+)\//);
+            if (raceMatch && raceMatch[1]) {
+                const urlRaceId = raceMatch[1];
+                console.log(`Found race ID from URL: ${urlRaceId}`);
+                window.raceSocket = connectToRaceWebsocket(urlRaceId);
+                checkRaceStatus(urlRaceId);
+            } else {
+                console.log('No race ID found in URL');
+            }
         }
     } catch (error) {
         console.error('Error initializing WebSocket:', error);
         showMessage('Error initializing WebSocket: ' + error.message, 'error');
     }
 });
-
-/**
- * Aggressively look for a race ID from various sources
- */
-function findRaceId() {
-    // Try multiple ways to find the race ID
-    
-    // 1. Check data attribute on body
-    const bodyRaceId = document.body.getAttribute('data-race-id');
-    if (bodyRaceId) {
-        console.log('Found race ID from body data attribute:', bodyRaceId);
-        return bodyRaceId;
-    }
-    
-    // 2. Check race detail URL
-    const raceDetailMatch = window.location.pathname.match(/\/race\/(\d+)\/detail\//);
-    if (raceDetailMatch && raceDetailMatch[1]) {
-        console.log('Found race ID from race detail URL:', raceDetailMatch[1]);
-        return raceDetailMatch[1];
-    }
-    
-    // 3. Check race questions URL
-    const raceQuestionsMatch = window.location.pathname.match(/\/race\/(\d+)\/questions\//);
-    if (raceQuestionsMatch && raceQuestionsMatch[1]) {
-        console.log('Found race ID from race questions URL:', raceQuestionsMatch[1]);
-        return raceQuestionsMatch[1];
-    }
-    
-    // 4. Check if we have race ID as URL parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const raceIdParam = urlParams.get('race_id');
-    if (raceIdParam) {
-        console.log('Found race ID from URL parameter:', raceIdParam);
-        return raceIdParam;
-    }
-    
-    // 5. Check if we're in a team view to get race ID from API
-    const teamMatch = window.location.pathname.match(/\/team\/(\d+)\/view\//);
-    if (teamMatch && teamMatch[1]) {
-        const teamId = teamMatch[1];
-        console.log('Found team ID from URL:', teamId);
-        
-        // Make a synchronous request to get the race ID for this team
-        let raceId = null;
-        try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', `/api/team/${teamId}/race/`, false); // Synchronous request
-            xhr.send();
-            
-            if (xhr.status === 200) {
-                const response = JSON.parse(xhr.responseText);
-                if (response.success && response.race_id) {
-                    raceId = response.race_id;
-                    console.log(`Found race ID ${raceId} for team ${teamId} from API`);
-                }
-            }
-        } catch (e) {
-            console.error('Error getting race ID for team:', e);
-        }
-        
-        if (raceId) {
-            return raceId;
-        }
-    }
-    
-    // 6. Check if we're in the race detail page which might have the ID in the HTML
-    const raceIdElement = document.getElementById('race-id');
-    if (raceIdElement && raceIdElement.value) {
-        console.log('Found race ID from hidden input:', raceIdElement.value);
-        return raceIdElement.value;
-    }
-    
-    // 7. Look for debug info section
-    const debugInfoElement = document.querySelector('.debug-info');
-    if (debugInfoElement) {
-        const raceIdText = debugInfoElement.textContent;
-        const raceIdMatch = raceIdText.match(/Race ID: (\d+)/);
-        if (raceIdMatch && raceIdMatch[1]) {
-            console.log('Found race ID from debug info:', raceIdMatch[1]);
-            return raceIdMatch[1];
-        }
-    }
-    
-    console.warn('Could not find race ID');
-    return null;
-}
 
 /**
  * Periodically check if the race has started via REST API
@@ -365,7 +270,7 @@ function fetchRaceStatus(raceId) {
             if (data.started) {
                 console.log('Race has started according to status check!');
                 // Redirect to questions page if race has started
-                window.location.href = `/race/${raceId}/questions/`;
+                window.location.href = data.redirect_url || `/race/${raceId}/questions/`;
             }
         })
         .catch(error => {
