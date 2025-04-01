@@ -1,43 +1,61 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
 <div class="container">
     <div class="row">
         <div class="col-md-12">
             <div class="game-card">
-                <h1>Join or Create a Team</h1>
+                <h1>Team Options</h1>
+                <p>Welcome, {{ request.session.player_name }}!</p>
                 
-                <div class="player-info">
-                    <p>Player: {{ request.session.player_name }}</p>
-                    {% if lobby %}
-                        <p>Lobby: {{ lobby.name|default:"" }} (Code: {{ lobby.code }})</p>
-                    {% endif %}
-                </div>
+                {% if lobby %}
+                <p>You've joined lobby: <strong>{{ lobby.name|default:"Game Lobby" }}</strong> (Code: {{ lobby.code }})</p>
+                {% endif %}
                 
                 <div class="team-options">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="option-card">
-                                <h3>Create a New Team</h3>
-                                <p>Be a leader and start your own team!</p>
-                                <a href="{% url 'create_standalone_team' %}" class="btn btn-primary">Create Team</a>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="option-card">
-                                <h3>Join an Existing Team</h3>
-                                <p>Have a team code? Join your friends!</p>
-                                <a href="{% url 'join_team' %}" class="btn btn-primary">Join Team</a>
-                            </div>
-                        </div>
+                    <div class="option-card">
+                        <h3>Create a Team</h3>
+                        <p>Start your own team and invite others to join</p>
+                        <a href="{% url 'create_standalone_team' %}" class="btn btn-primary">Create Team</a>
+                    </div>
+                    
+                    <div class="option-card">
+                        <h3>Join an Existing Team</h3>
+                        <p>Join a team using its team code or select from available teams</p>
+                        <a href="{% url 'join_team' %}" class="btn btn-secondary">Join Team</a>
                     </div>
                 </div>
                 
-                <div class="back-link mt-4">
-                    <a href="{% url 'join_game_session' %}" class="btn btn-outline-secondary">Back to Game Session</a>
+                <div class="back-link">
+                    <a href="{% url 'join_game_session' %}">← Back to Join Game</a>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .team-options {
+        display: flex;
+        justify-content: space-around;
+        margin: 30px 0;
+        flex-wrap: wrap;
+    }
+    
+    .option-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 10px;
+        min-width: 250px;
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .back-link {
+        margin-top: 20px;
+        text-align: center;
+    }
+</style>
 {% endblock %} 

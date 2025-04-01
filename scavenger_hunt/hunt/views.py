@@ -236,29 +236,36 @@ def user_logout(request):
     return redirect('login')
 
 def join_game_session(request):
+    # First check if player name is already set in session
+    player_name = request.session.get('player_name')
+    print(f"Player name from session at start of join_game_session: {player_name}")
+    
     if request.method == 'POST':
         lobby_code = request.POST.get('lobby_code')
+        print(f"Received lobby code: {lobby_code}")
+        
         try:
             lobby = Lobby.objects.get(code=lobby_code, is_active=True)
             
             # Store lobby code in session
             request.session['lobby_code'] = lobby_code
             request.session.modified = True
+            print(f"Stored lobby code {lobby_code} in session")
             
-            # Check if player name is already set
-            player_name = request.session.get('player_name')
-            if not player_name:
-                # If no player name, show the player name form
-                return render(request, 'hunt/set_player_name.html', {
-                    'lobby': lobby,
-                    'lobby_code': lobby_code
-                })
+            # If player name is already set, redirect directly to team options
+            if player_name:
+                print(f"Player name {player_name} already in session, going directly to team options")
+                return redirect('team_options')
             
-            # If player name exists, redirect to team options
-            return redirect('team_options')
+            # If no player name, show the player name form
+            return render(request, 'hunt/set_player_name.html', {
+                'lobby': lobby,
+                'lobby_code': lobby_code
+            })
             
         except Lobby.DoesNotExist:
             messages.error(request, 'Invalid lobby code. Please try again.')
+    
     return render(request, 'hunt/join_game_session.html')
 
 def save_player_name(request):

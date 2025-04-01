@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
 <div class="container">
@@ -52,6 +53,6 @@
     // Store race ID for WebSocket connection
     window.raceId = "{{ race_id }}";
 </script>
-<script src="/static/hunt/js/race-websocket.js"></script>
+<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 {% endif %}
 {% endblock %} 
