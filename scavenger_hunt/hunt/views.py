@@ -232,14 +232,24 @@ def save_player_name(request):
             request.session.modified = True
             print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
         
-        lobby_code = request.session.get('lobby_code')
-        print(f"Lobby code in session: {lobby_code}")  # Debug print
+            # For AJAX requests, return JSON response
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'player_name': player_name})
         
-        if lobby_code:
-            lobby = get_object_or_404(Lobby, code=lobby_code)
-        return render(request, 'hunt/team_options.html', {'lobby': lobby})
-            
+            # If not AJAX and we have a lobby_code, render team_options
+            lobby_code = request.session.get('lobby_code')
+            if lobby_code:
+                try:
+                    lobby = Lobby.objects.get(code=lobby_code)
+                    return render(request, 'hunt/team_options.html', {'lobby': lobby})
+                except Lobby.DoesNotExist:
+                    # Lobby not found, redirect to join_game_session
+                    pass
+        
+        # If we got here, either no player_name was provided, or no valid lobby_code in session
         print("No player name provided or lobby code missing")  # Debug print
+    
+    # Default fallback
     return redirect('join_game_session')
 
 def broadcast_team_update(team_id):
