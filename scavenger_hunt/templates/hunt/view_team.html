@@ -340,7 +340,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             try {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const raceId = findRaceId() || '1'; // Fallback to race ID 1 if not found
+                // Use the race ID from the page directly
+                const raceId = '{{ race.id|default:"1" }}'; 
                 const wsUrl = `${protocol}//${window.location.host}/ws/race/${raceId}/`;
                 
                 addLog(`Attempting to connect to: ${wsUrl}`);
