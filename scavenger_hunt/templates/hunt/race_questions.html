@@ -4,6 +4,17 @@
 
 {% block content %}
 <div class="container">
+    <!-- Debug info section -->
+    <div class="alert alert-info mt-3 p-3">
+        <strong>Debug Info:</strong> 
+        <p>Race ID: {{ race.id }}</p>
+        <p>Team Code: {{ team.code }}</p>
+        <p>Player: {{ team_member.role }}</p>
+        <p>Questions Count: {{ questions_by_zone|length }}</p>
+        <p>WebSocket URL: ws://{{ request.get_host }}/ws/race/{{ race.id }}/</p>
+        <p>Check Answer URL: {% url 'check_answer' %}</p>
+    </div>
+    
     <div class="race-header">
         <h1>{{ race.name }}</h1>
         <div class="race-info">
@@ -299,17 +310,23 @@
 <script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    console.log("Race Questions Page Initialized");
+    
     // Global variables
     let currentQuestionIndex = 0;
     const questions = document.querySelectorAll('.question-card');
     const totalQuestions = questions.length;
     let teamScore = 0;
     
+    console.log(`Found ${totalQuestions} questions`);
+    
     // Initialize UI
     document.getElementById('total-questions').textContent = totalQuestions;
     if (totalQuestions > 0) {
         showQuestion(0);
         updateProgressBar();
+    } else {
+        console.error("No questions found!");
     }
     
     // Set up navigation buttons
@@ -317,32 +334,52 @@ document.addEventListener('DOMContentLoaded', function() {
     const nextButton = document.getElementById('next-question');
     
     if (prevButton) {
+        console.log("Setting up previous button");
         prevButton.addEventListener('click', function() {
+            console.log("Previous button clicked");
             if (currentQuestionIndex > 0) {
                 showQuestion(currentQuestionIndex - 1);
                 updateProgressBar();
             }
         });
+    } else {
+        console.error("Previous button not found!");
     }
     
     if (nextButton) {
+        console.log("Setting up next button");
         nextButton.addEventListener('click', function() {
+            console.log("Next button clicked");
             if (currentQuestionIndex < totalQuestions - 1) {
                 showQuestion(currentQuestionIndex + 1);
                 updateProgressBar();
             }
         });
+    } else {
+        console.error("Next button not found!");
     }
     
     // Function to show a specific question
     function showQuestion(index) {
         console.log(`Showing question at index ${index}`);
-        questions.forEach(q => q.style.display = 'none');
         
+        // Hide all questions first
+        questions.forEach((q, i) => {
+            q.style.display = 'none';
+            console.log(`Question ${i} hidden`);
+        });
+        
+        // Show the selected question
         if (questions[index]) {
             questions[index].style.display = 'block';
+            console.log(`Question ${index} displayed`);
             currentQuestionIndex = index;
-            document.getElementById('current-question-num').textContent = index + 1;
+            
+            // Update question counter
+            const currentElement = document.getElementById('current-question-num');
+            if (currentElement) {
+                currentElement.textContent = index + 1;
+            }
             
             // Update navigation buttons
             if (prevButton) {
@@ -353,6 +390,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 nextButton.disabled = index === totalQuestions - 1;
                 console.log(`Next button ${nextButton.disabled ? 'disabled' : 'enabled'}`);
             }
+        } else {
+            console.error(`Question at index ${index} not found!`);
         }
     }
     
@@ -362,12 +401,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (progressFill && totalQuestions > 0) {
             const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
             progressFill.style.width = progress + '%';
+            console.log(`Progress updated to ${progress}%`);
+        } else {
+            console.error("Progress bar element not found or no questions available");
         }
     }
     
     // Set up race timer
     const raceEndTime = new Date();
     raceEndTime.setMinutes(raceEndTime.getMinutes() + {{ race.time_limit_minutes }});
+    console.log(`Race end time set to ${raceEndTime}`);
     
     function updateTimer() {
         const now = new Date();
@@ -393,37 +436,78 @@ document.addEventListener('DOMContentLoaded', function() {
     updateTimer();
     
     // Set up answer form submission
-    document.querySelectorAll('.answer-form').forEach(form => {
+    const answerForms = document.querySelectorAll('.answer-form');
+    console.log(`Found ${answerForms.length} answer forms`);
+    
+    answerForms.forEach((form, index) => {
+        console.log(`Setting up submission handler for form ${index}`);
+        
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            console.log("Form submitted");
+            console.log(`Form ${index} submitted`);
             
             const questionId = this.dataset.questionId;
             const answerInput = this.querySelector('.answer-input');
-            const answer = answerInput.value.trim();
+            const answer = answerInput ? answerInput.value.trim() : '';
             const feedbackEl = this.nextElementSibling;
-            const questionCard = document.querySelector(`#question-${questionId}`);
-            const attemptsEl = this.querySelector('.attempts-count');
-            const photoSection = questionCard.querySelector('.photo-upload-section');
             
-            if (!answer) {
-                console.log("Empty answer, not submitting");
+            console.log(`Question ID: ${questionId}, Answer: ${answer}`);
+            
+            if (!answerInput) {
+                console.error("Answer input not found in form!");
                 return;
             }
             
-            // Get current attempts count
+            if (!answer) {
+                console.warn("Empty answer, not submitting");
+                return;
+            }
+            
+            // Get attempts element
+            const attemptsEl = this.querySelector('.attempts-count');
+            if (!attemptsEl) {
+                console.error("Attempts counter element not found!");
+                return;
+            }
+            
+            // Get current attempts count and increment
             let attempts = parseInt(attemptsEl.textContent) || 0;
             attempts++;
             attemptsEl.textContent = attempts;
             console.log(`Attempt ${attempts} for question ${questionId}`);
             
-            // Send answer to server for verification
-            console.log(`Submitting answer "${answer}" for question ${questionId}, team code ${'{{ team.code }}'}`);
-            fetch('{% url "check_answer" %}', {
+            // Find photo section for this question
+            const questionCard = document.querySelector(`#question-${questionId}`);
+            if (!questionCard) {
+                console.error(`Question card for ID ${questionId} not found!`);
+                return;
+            }
+            
+            const photoSection = questionCard.querySelector('.photo-upload-section');
+            if (!photoSection) {
+                console.error("Photo upload section not found!");
+            }
+            
+            // Disable the submit button while processing
+            const submitButton = this.querySelector('button');
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            
+            // Get CSRF token for the request
+            const csrftoken = getCookie('csrftoken');
+            if (!csrftoken) {
+                console.error("CSRF token not found!");
+            }
+            
+            console.log(`Submitting answer "${answer}" for question ${questionId}, team ${('{{ team.code }}')} [Attempt ${attempts}]`);
+            
+            // Make direct API call to check answer
+            fetch('/check-answer/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
+                    'X-CSRFToken': csrftoken
                 },
                 body: JSON.stringify({
                     question_id: questionId,
@@ -433,63 +517,114 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             })
             .then(response => {
-                console.log("Received response:", response);
+                console.log(`Response status: ${response.status}`);
+                if (!response.ok) {
+                    console.error(`Server responded with status ${response.status}`);
+                    throw new Error(`HTTP error ${response.status}`);
+                }
                 return response.json();
             })
             .then(data => {
-                console.log("Answer check response data:", data);
-                feedbackEl.style.display = 'block';
+                console.log("Answer check response:", data);
                 
-                if (data.correct) {
-                    feedbackEl.textContent = `Correct answer! You earned ${data.points} points.`;
-                    feedbackEl.className = 'answer-feedback correct';
+                // Re-enable submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                }
+                
+                // Show feedback
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
                     
-                    // Update score
-                    teamScore += data.points;
-                    document.getElementById('team-score').textContent = teamScore;
-                    
-                    // Disable the form
-                    answerInput.disabled = true;
-                    this.querySelector('button').disabled = true;
-                    
-                    // Enable next button if not on last question
-                    if (currentQuestionIndex < totalQuestions - 1) {
-                        nextButton.disabled = false;
+                    if (data.correct) {
+                        feedbackEl.textContent = `Correct answer! You earned ${data.points} points.`;
+                        feedbackEl.className = 'answer-feedback correct';
+                        
+                        // Update total score
+                        teamScore += data.points;
+                        document.getElementById('team-score').textContent = teamScore;
+                        
+                        // Disable the form
+                        answerInput.disabled = true;
+                        if (submitButton) {
+                            submitButton.disabled = true;
+                        }
+                        
+                        // Enable next button if not on last question
+                        if (nextButton && currentQuestionIndex < totalQuestions - 1) {
+                            nextButton.disabled = false;
+                        }
+                    } else {
+                        feedbackEl.textContent = `Incorrect answer. ${3 - attempts} attempts remaining.`;
+                        feedbackEl.className = 'answer-feedback incorrect';
+                        
+                        // Check if we've reached max attempts
+                        if (attempts >= 3) {
+                            // Disable form and show photo upload
+                            answerInput.disabled = true;
+                            if (submitButton) {
+                                submitButton.disabled = true;
+                            }
+                            feedbackEl.textContent = 'Maximum attempts reached. Please upload a photo instead.';
+                            
+                            if (photoSection) {
+                                photoSection.style.display = 'block';
+                            }
+                        }
                     }
                 } else {
-                    feedbackEl.textContent = `Incorrect answer. ${3 - attempts} attempts remaining.`;
-                    feedbackEl.className = 'answer-feedback incorrect';
-                    
-                    // Check if we've reached max attempts
-                    if (attempts >= 3) {
-                        // Disable form and show photo upload
-                        answerInput.disabled = true;
-                        this.querySelector('button').disabled = true;
-                        feedbackEl.textContent = 'Maximum attempts reached. Please upload a photo instead.';
-                        photoSection.style.display = 'block';
-                    }
+                    console.error("Feedback element not found!");
                 }
             })
             .catch(error => {
                 console.error('Error checking answer:', error);
-                feedbackEl.style.display = 'block';
-                feedbackEl.textContent = 'Error checking answer. Please try again.';
-                feedbackEl.className = 'answer-feedback incorrect';
+                
+                // Re-enable submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                }
+                
+                // Show error feedback
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.textContent = 'Error checking answer. Please try again.';
+                    feedbackEl.className = 'answer-feedback incorrect';
+                }
             });
         });
     });
     
     // Set up photo form submission
-    document.querySelectorAll('.photo-form').forEach(form => {
+    const photoForms = document.querySelectorAll('.photo-form');
+    console.log(`Found ${photoForms.length} photo forms`);
+    
+    photoForms.forEach((form, index) => {
+        console.log(`Setting up submission handler for photo form ${index}`);
+        
         form.addEventListener('submit', function(e) {
             e.preventDefault();
+            console.log(`Photo form ${index} submitted`);
             
             const questionId = this.dataset.questionId;
             const photoInput = this.querySelector('.photo-input');
             const feedbackEl = this.nextElementSibling;
             
-            if (!photoInput.files || !photoInput.files[0]) {
+            if (!photoInput) {
+                console.error("Photo input not found!");
                 return;
+            }
+            
+            if (!photoInput.files || !photoInput.files[0]) {
+                console.warn("No file selected");
+                return;
+            }
+            
+            console.log(`Uploading photo for question ${questionId}`);
+            
+            // Disable the submit button while processing
+            const submitButton = this.querySelector('button');
+            if (submitButton) {
+                submitButton.disabled = true;
             }
             
             const formData = new FormData();
@@ -503,42 +638,75 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log(`Upload response status: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
-                feedbackEl.style.display = 'block';
+                console.log("Photo upload response:", data);
                 
-                if (data.success) {
-                    feedbackEl.textContent = 'Photo uploaded successfully!';
-                    feedbackEl.className = 'photo-feedback success';
+                // Re-enable submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                }
+                
+                // Show feedback
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
                     
-                    // Disable the form
-                    photoInput.disabled = true;
-                    this.querySelector('button').disabled = true;
-                    
-                    // Enable next button if not on last question
-                    if (currentQuestionIndex < totalQuestions - 1) {
-                        nextButton.disabled = false;
+                    if (data.success) {
+                        feedbackEl.textContent = 'Photo uploaded successfully!';
+                        feedbackEl.className = 'photo-feedback success';
+                        
+                        // Disable the form
+                        photoInput.disabled = true;
+                        if (submitButton) {
+                            submitButton.disabled = true;
+                        }
+                        
+                        // Enable next button if not on last question
+                        if (nextButton && currentQuestionIndex < totalQuestions - 1) {
+                            nextButton.disabled = false;
+                        }
+                    } else {
+                        feedbackEl.textContent = data.error || 'Failed to upload photo. Please try again.';
+                        feedbackEl.className = 'photo-feedback error';
                     }
                 } else {
-                    feedbackEl.textContent = data.error || 'Failed to upload photo. Please try again.';
-                    feedbackEl.className = 'photo-feedback error';
+                    console.error("Photo feedback element not found!");
                 }
             })
             .catch(error => {
                 console.error('Error uploading photo:', error);
-                feedbackEl.style.display = 'block';
-                feedbackEl.textContent = 'Error uploading photo. Please try again.';
-                feedbackEl.className = 'photo-feedback error';
+                
+                // Re-enable submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                }
+                
+                // Show error feedback
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.textContent = 'Error uploading photo. Please try again.';
+                    feedbackEl.className = 'photo-feedback error';
+                }
             });
         });
     });
     
-    // Connect to the race socket for real-time updates
-    if (typeof connectToRaceWebsocket === 'function') {
-        window.raceSocket = connectToRaceWebsocket({{ race.id }});
+    // Display initial question (force visibility)
+    if (totalQuestions > 0 && questions[0]) {
+        setTimeout(() => {
+            console.log("Forcing display of first question");
+            questions[0].style.display = 'block';
+        }, 500);
     }
 });
 
+// Helper function to get cookies (for CSRF token)
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {

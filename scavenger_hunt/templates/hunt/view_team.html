@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Team: {{ team.name }}{% endblock %}
+{% block title %}Team {{ team.name }}{% endblock %}
 
 {% block head_extras %}
 <script src="{% static 'hunt/js/race-websocket.js' %}"></script>
@@ -16,16 +16,43 @@
 {% block content %}
 <div class="container py-4">
     <div class="dashboard-box p-4">
-        <div class="lobby-header">
-            <h1>{{ team.name }}</h1>
-            
-            <!-- Debug info - only visible during development -->
-            <div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa; text-align: left;">
-                <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
-                <p class="mb-1">Lobby: {{ lobby.name|default:"None" }}</p>
-                <p class="mb-1">Lobby Code: {{ lobby_code|default:"None" }}</p>
-                <p class="mb-1">Race ID: {{ race.id|default:"None" }}</p>
-                <p class="mb-0">Members count: {{ members|length }}</p>
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="mb-0">Team: {{ team.name }}</h1>
+                    <h4 class="mb-0">Code: <span id="team-code">{{ team.code }}</span></h4>
+                </div>
+                
+                <!-- Debugging section -->
+                <div id="debug-section" class="mb-4 p-3 border rounded bg-dark text-light">
+                    <h4>WebSocket Debugging</h4>
+                    <div class="d-flex mb-2">
+                        <button id="test-websocket" class="btn btn-sm btn-warning mr-2">Test WebSocket</button>
+                        <button id="test-check-answer" class="btn btn-sm btn-info mr-2">Test Answer API</button>
+                    </div>
+                    <div id="debug-log" class="small" style="max-height: 150px; overflow-y: auto; font-family: monospace;">
+                        Logs will appear here...
+                    </div>
+                </div>
+                
+                <!-- Race started notification overlay -->
+                <div id="race-started-notification" class="race-started-notification">
+                    <div class="notification-content">
+                        <h2>Race Started!</h2>
+                        <p>You are being redirected to the race questions page...</p>
+                        <div class="countdown" id="redirect-countdown">Redirecting in <span id="countdown-seconds">5</span> seconds</div>
+                        <a href="/race/{{ race.id }}/questions/" class="btn btn-primary btn-lg" id="manual-redirect-btn">Go to Race Now</a>
+                    </div>
+                </div>
+                
+                <!-- Debug info - only visible during development -->
+                <div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa; text-align: left;">
+                    <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
+                    <p class="mb-1">Lobby: {{ lobby.name|default:"None" }}</p>
+                    <p class="mb-1">Lobby Code: {{ lobby_code|default:"None" }}</p>
+                    <p class="mb-1">Race ID: {{ race.id|default:"None" }}</p>
+                    <p class="mb-0">Members count: {{ members|length }}</p>
+                </div>
             </div>
         </div>
 
@@ -54,19 +81,6 @@
         <div id="race-status-area" class="race-status-area mt-4 p-3 rounded" style="display: none;">
             <h5 class="text-center" id="race-status-title">Race Status</h5>
             <p id="race-status-message" class="text-center mb-0"></p>
-        </div>
-        
-        <!-- Add a prominent race started notification that will appear when race starts -->
-        <div id="race-started-notification" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(33, 37, 41, 0.95); border: 3px solid #90C83C; border-radius: 15px; padding: 30px; max-width: 90%; width: 500px; text-align: center;">
-                <h2 style="color: #90C83C; margin-bottom: 20px;">Race Started!</h2>
-                <p style="color: white; font-size: 1.2rem; margin-bottom: 20px;">The race has begun! You will be redirected to the questions page.</p>
-                <div class="spinner" style="margin: 20px auto; border: 5px solid rgba(144, 200, 60, 0.3); border-radius: 50%; border-top: 5px solid #90C83C; width: 60px; height: 60px; animation: spin 1s linear infinite;"></div>
-                <p id="race-countdown" style="color: white; font-size: 1.1rem; margin: 20px 0;">Redirecting in 5 seconds...</p>
-                <a id="race-manual-redirect" href="/race/{{ race.id|default:race_id }}/questions/" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;" onclick="goToRaceNow(event)">
-                    <i class="fas fa-play"></i> Go to Race Now
-                </a>
-            </div>
         </div>
 
         <div class="back-button-container">
@@ -302,5 +316,117 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 });
+
+// Debug functions for troubleshooting
+document.addEventListener('DOMContentLoaded', function() {
+    const debugLog = document.getElementById('debug-log');
+    const testWebsocketBtn = document.getElementById('test-websocket');
+    const testCheckAnswerBtn = document.getElementById('test-check-answer');
+    
+    // Function to add log message
+    function addLog(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const logItem = document.createElement('div');
+        logItem.className = type === 'error' ? 'text-danger' : (type === 'success' ? 'text-success' : 'text-info');
+        logItem.innerHTML = `[${timestamp}] ${message}`;
+        debugLog.appendChild(logItem);
+        debugLog.scrollTop = debugLog.scrollHeight;
+    }
+    
+    // Test WebSocket connectivity
+    if (testWebsocketBtn) {
+        testWebsocketBtn.addEventListener('click', function() {
+            addLog('Testing WebSocket connection...');
+            
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const raceId = findRaceId() || '1'; // Fallback to race ID 1 if not found
+                const wsUrl = `${protocol}//${window.location.host}/ws/race/${raceId}/`;
+                
+                addLog(`Attempting to connect to: ${wsUrl}`);
+                
+                const testSocket = new WebSocket(wsUrl);
+                
+                testSocket.onopen = function() {
+                    addLog('WebSocket connection established!', 'success');
+                    
+                    // Send a test message
+                    testSocket.send(JSON.stringify({
+                        type: 'ping',
+                        message: 'Testing connection'
+                    }));
+                    
+                    // Close after a short delay
+                    setTimeout(() => {
+                        testSocket.close();
+                        addLog('WebSocket test completed and connection closed.', 'success');
+                    }, 2000);
+                };
+                
+                testSocket.onmessage = function(e) {
+                    addLog(`Received response: ${e.data}`, 'success');
+                };
+                
+                testSocket.onerror = function(e) {
+                    addLog(`WebSocket error: ${e}`, 'error');
+                };
+                
+                testSocket.onclose = function() {
+                    addLog('WebSocket connection closed.');
+                };
+            } catch (error) {
+                addLog(`Error testing WebSocket: ${error.message}`, 'error');
+            }
+        });
+    }
+    
+    // Test the check_answer API endpoint
+    if (testCheckAnswerBtn) {
+        testCheckAnswerBtn.addEventListener('click', function() {
+            addLog('Testing check_answer API...');
+            
+            fetch('/check-answer/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    question_id: '1', // Using a test question ID
+                    answer: 'test',
+                    team_code: '{{ team.code }}',
+                    attempt_number: 1
+                })
+            })
+            .then(response => {
+                addLog(`Response status: ${response.status} ${response.statusText}`, 
+                       response.ok ? 'success' : 'error');
+                return response.json();
+            })
+            .then(data => {
+                addLog(`Response data: ${JSON.stringify(data)}`, 'success');
+            })
+            .catch(error => {
+                addLog(`API error: ${error.message}`, 'error');
+            });
+        });
+    }
+});
+
+// Helper function to get cookies for CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 </script>
 {% endblock %} 
