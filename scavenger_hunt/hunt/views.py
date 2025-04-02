@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question, TeamAnswer, TeamRaceProgress
+from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question, TeamAnswer
 from django.http import JsonResponse
 from .forms import JoinLobbyForm, LobbyForm, TeamForm
 from django.http import HttpResponse
@@ -78,85 +78,61 @@ def lobby_details(request, lobby_id):
     }
     return render(request, 'hunt/lobby_details.html', context)
 
-@require_http_methods(["POST"])
+@login_required
 def start_race(request, lobby_id):
-    """Start the race for a lobby."""
-    try:
-        # Get the lobby
-        lobby = get_object_or_404(Lobby, id=lobby_id)
-        
-        # Check if user is authenticated - remove host check
-        if not request.user.is_authenticated:
-            return JsonResponse({
-                'success': False,
-                'message': 'You are not authorized to start this race.'
-            }, status=403)
-        
-        # Get the race from the lobby
-        race = lobby.race
-        if not race:
-            return JsonResponse({
-                'success': False,
-                'message': 'No race assigned to this lobby.'
-            }, status=400)
-        
-        # Update race state
-        race.state = 'active'
-        race.save()
-        
-        # Update lobby state
-        lobby.state = 'hunt_started'
-        lobby.start_time = timezone.now()
-        lobby.save()
-        
-        # Construct the redirect URL for participants
-        redirect_url = reverse('race_questions', kwargs={'race_id': race.id})
-        
-        # Send notifications to connected clients
-        channel_layer = get_channel_layer()
-        
-        # Send to lobby channel
-        async_to_sync(channel_layer.group_send)(
-            f"lobby_{lobby.id}",
-            {
-                "type": "lobby_message",
-                "message": {
-                    "type": "race_started",
-                    "lobby_id": lobby.id,
-                    "race_id": race.id,
-                    "redirect_url": redirect_url
+    if request.method == 'POST':
+        try:
+            lobby = get_object_or_404(Lobby, id=lobby_id)
+            
+            # Validate user permissions (must be leader/admin)
+            if not request.user.is_authenticated:
+                return JsonResponse({'success': False, 'error': 'Authentication required'})
+            
+            # Update lobby state
+            lobby.hunt_started = True
+            lobby.start_time = timezone.now()
+            lobby.save()
+            
+            # Get the race
+            race = lobby.race
+            if not race:
+                return JsonResponse({'success': False, 'error': 'No race assigned to this lobby'})
+            
+            # Build the redirect URL for participants
+            redirect_url = reverse('race_questions', kwargs={'race_id': race.id})
+            
+            # Notify all connected clients through WebSocket
+            channel_layer = get_channel_layer()
+            
+            # Send to lobby channel
+            async_to_sync(channel_layer.group_send)(
+                f'lobby_{lobby_id}',
+                {
+                    'type': 'race_started',
+                    'redirect_url': redirect_url
                 }
-            }
-        )
-        
-        # Send to race channel
-        async_to_sync(channel_layer.group_send)(
-            f"race_{race.id}",
-            {
-                "type": "race_message",
-                "message": {
-                    "type": "race_started",
-                    "race_id": race.id,
-                    "redirect_url": redirect_url
+            )
+            
+            # Also send to race channel
+            async_to_sync(channel_layer.group_send)(
+                f'race_{race.id}',
+                {
+                    'type': 'race_started',
+                    'redirect_url': redirect_url
                 }
-            }
-        )
-        
-        print(f"Race {race.id} started in lobby {lobby.id}")
-        print(f"Redirect URL: {redirect_url}")
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'Race started successfully',
-            'redirect_url': redirect_url
-        })
-        
-    except Exception as e:
-        print(f"Error starting race: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'message': f'Error starting race: {str(e)}'
-        }, status=500)
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Race started successfully',
+                'redirect_url': redirect_url
+            })
+            
+        except Exception as e:
+            logger.error(f"Error starting race: {e}")
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 class LobbyDetailsView(DetailView):
     model = Lobby
@@ -236,82 +212,44 @@ def user_logout(request):
     return redirect('login')
 
 def join_game_session(request):
-    # First check if player name is already set in session
-    player_name = request.session.get('player_name')
-    print(f"Player name from session at start of join_game_session: {player_name}")
-    
     if request.method == 'POST':
         lobby_code = request.POST.get('lobby_code')
-        print(f"Received lobby code: {lobby_code}")
-        
         try:
             lobby = Lobby.objects.get(code=lobby_code, is_active=True)
-            
-            # Store lobby code in session
             request.session['lobby_code'] = lobby_code
-            request.session.modified = True
-            print(f"Stored lobby code {lobby_code} in session")
-            
-            # If player name is already set, redirect directly to team options
-            if player_name:
-                print(f"Player name {player_name} already in session, going directly to team options")
-                return redirect('team_options')
-            
-            # If no player name, show the player name form
-            return render(request, 'hunt/set_player_name.html', {
-                'lobby': lobby,
-                'lobby_code': lobby_code
-            })
-            
+            return render(request, 'hunt/team_options.html', {'lobby': lobby})
         except Lobby.DoesNotExist:
             messages.error(request, 'Invalid lobby code. Please try again.')
-    
     return render(request, 'hunt/join_game_session.html')
 
 def save_player_name(request):
     if request.method == 'POST':
-        # Check if player name is already set in session
-        if request.session.get('player_name'):
-            print("Player name already set in session, redirecting to team options")
-            return redirect('team_options')
-            
         player_name = request.POST.get('player_name')
         print(f"Attempting to save player name: {player_name}")  # Debug print
         
         if player_name:
-            # Save player name in session
             request.session['player_name'] = player_name
             request.session.modified = True
             print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
-            
-            # Get lobby code from POST or session
-            lobby_code = request.POST.get('lobby_code') or request.session.get('lobby_code')
-            print(f"Lobby code from POST/session: {lobby_code}")  # Debug print
-            
+        
+            # For AJAX requests, return JSON response
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'player_name': player_name})
+        
+            # If not AJAX and we have a lobby_code, render team_options
+            lobby_code = request.session.get('lobby_code')
             if lobby_code:
                 try:
                     lobby = Lobby.objects.get(code=lobby_code)
-                    print(f"Found lobby: {lobby.name} (ID: {lobby.id})")  # Debug print
-                    
-                    # Ensure lobby code is in session
-                    request.session['lobby_code'] = lobby_code
-                    request.session.modified = True
-                    
-                    # Redirect to team options
-                    return redirect('team_options')
+                    return render(request, 'hunt/team_options.html', {'lobby': lobby})
                 except Lobby.DoesNotExist:
-                    print(f"Lobby with code {lobby_code} not found")  # Debug print
-                    messages.error(request, 'Lobby not found. Please try again.')
-                    return redirect('join_game_session')
-            else:
-                print("No lobby code found")  # Debug print
-                messages.error(request, 'No lobby code found. Please join a lobby first.')
-                return redirect('join_game_session')
-        else:
-            print("No player name provided")  # Debug print
-            messages.error(request, 'Please enter your name.')
-            return redirect('join_game_session')
-            
+                    # Lobby not found, redirect to join_game_session
+                    pass
+        
+        # If we got here, either no player_name was provided, or no valid lobby_code in session
+        print("No player name provided or lobby code missing")  # Debug print
+    
+    # Default fallback
     return redirect('join_game_session')
 
 def broadcast_team_update(team_id):
@@ -368,16 +306,30 @@ def join_team(request):
         # Get teams only for this lobby code
         try:
             lobby = Lobby.objects.get(code=lobby_code)
-            teams = lobby.teams.all().prefetch_related('members')
-            print(f"Found {teams.count()} teams in lobby {lobby.name}")
+            
+            # Get all teams in this lobby
+            teams = list(lobby.teams.all())
+            print(f"Found {len(teams)} teams in lobby")
+            
+            # For each team, attach the members directly
+            for team in teams:
+                # Get members for this team
+                members = list(TeamMember.objects.filter(team=team).only('role', 'team'))
+                
+                # Attach members list directly to the team object
+                team.member_list = members
+                
+                # Add a method to count members
+                team.member_count = len(members)
+            
         except Lobby.DoesNotExist:
             print(f"Lobby with code {lobby_code} not found")
-            teams = Team.objects.none()
+            teams = []
             lobby = None
     else:
         # If no lobby code in session, don't show any teams
         print("No lobby code in session, not showing any teams")
-        teams = Team.objects.none()
+        teams = []
         lobby = None
     
     return render(request, 'hunt/join_team.html', {
@@ -425,8 +377,8 @@ def join_existing_team(request):
                     'redirect_url': reverse('view_team', args=[team.id])
                 })
                 
-            # Create team member
-            TeamMember.objects.create(team=team, role=player_name, name=player_name)
+            # Create team member - removed name field
+            TeamMember.objects.create(team=team, role=player_name)
             
             # Store player name in session
             request.session['player_name'] = player_name
@@ -448,21 +400,17 @@ def join_existing_team(request):
 @require_http_methods(["GET", "POST"])
 def create_standalone_team(request):
     """Create a new team with the current player as a member."""
-    print("\n=== create_standalone_team ===")
-    # Check if player has a name in session
-    player_name = request.session.get('player_name')
-    print(f"Player name from session: {player_name}")
-    
-    if not player_name:
-        messages.error(request, "Please set your player name first.")
-        return redirect('join_game_session')
-    
-    # Get lobby code from session if available
-    lobby_code = request.session.get('lobby_code')
-    print(f"Lobby code from session: {lobby_code}")
-    
     # For GET requests, render the form
     if request.method == 'GET':
+        # Ensure player has a name in session
+        player_name = request.session.get('player_name')
+        if not player_name:
+            messages.error(request, "Please set your player name first.")
+            return redirect('join_game_session')
+        
+        # Get lobby code from session if available
+        lobby_code = request.session.get('lobby_code')
+        
         return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
         
     # For POST requests, create the team
@@ -470,16 +418,16 @@ def create_standalone_team(request):
         try:
             # Get data from form 
             team_name = request.POST.get('team_name')
-            print(f"Creating team - Team name: {team_name}, Player name: {player_name}")
+            player_name = request.POST.get('player_name') or request.session.get('player_name')
             
-            if not team_name:
-                messages.error(request, 'Team name is required')
-                return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
+            if not team_name or not player_name:
+                messages.error(request, 'Both team name and player name are required')
+                return render(request, 'hunt/create_standalone_team.html')
                 
             # Check if team name already exists
             if Team.objects.filter(name=team_name).exists():
                 messages.error(request, 'A team with this name already exists')
-                return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
+                return render(request, 'hunt/create_standalone_team.html')
                 
             # Generate a unique code
             while True:
@@ -492,61 +440,37 @@ def create_standalone_team(request):
                 name=team_name,
                 code=code
             )
-            print(f"Created team: {team.name} (ID: {team.id})")
             
-            # Check if a team member with this name already exists
-            if not TeamMember.objects.filter(team=team, role=player_name).exists():
-                # Create the team member
-                TeamMember.objects.create(
-                    team=team,
-                    role=player_name,
-                    name=player_name
-                )
-                print(f"Created team member: {player_name} for team {team.name}")
-            else:
-                print(f"Team member {player_name} already exists in team {team.name}")
+            # Create the team member - removed name field
+            TeamMember.objects.create(
+                team=team,
+                role=player_name
+            )
             
             # Associate with lobby if a lobby code is in session
-            lobby = None
+            lobby_code = request.session.get('lobby_code')
             if lobby_code:
                 try:
                     lobby = Lobby.objects.get(code=lobby_code)
-                    print(f"Found lobby: {lobby.name} (ID: {lobby.id}) with code {lobby_code}")
-                    
-                    # Check if team is already in lobby
-                    if lobby.teams.filter(id=team.id).exists():
-                        print(f"Team {team.name} is already in lobby {lobby.name}")
-                    else:
-                        # Add team to lobby
-                        lobby.teams.add(team)
-                        print(f"Added team {team.name} (ID: {team.id}) to lobby {lobby.name} (ID: {lobby.id})")
-                    
-                    # Get race from lobby
-                    race = lobby.race
-                    if race:
-                        print(f"Found race {race.id} from lobby {lobby.id}")
-                    else:
-                        print(f"No race found in lobby {lobby.id}")
-                        
+                    lobby.teams.add(team)
+                    print(f"Added team {team.name} to lobby {lobby.name}")
                 except Lobby.DoesNotExist:
                     print(f"Lobby with code {lobby_code} not found")
-            else:
-                print("No lobby code found in session")
             
             # Store in session
             request.session['team_id'] = team.id
+            request.session['player_name'] = player_name
             request.session.modified = True
             
             messages.success(request, f'Team "{team_name}" created successfully! Your team code is: {code}')
             return redirect('view_team', team_id=team.id)
             
         except Exception as e:
-            print(f"Error creating team: {str(e)}")
             messages.error(request, f'Error creating team: {str(e)}')
-            return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
+            return render(request, 'hunt/create_standalone_team.html')
     
     # Should never reach here
-    return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
+    return render(request, 'hunt/create_standalone_team.html')
 
 def register(request):
     if request.method == 'POST':
@@ -618,12 +542,18 @@ def create_team(request, lobby_id):
             team = form.save()
             lobby.teams.add(team)
             
-            # Create a team member for the creator
+            # Create a team member for the creator - removed name field
             team_member = TeamMember.objects.create(
+<<<<<<< HEAD
                         team=team,
                 role=player_name,
                 name=player_name
                     )
+=======
+                team=team,
+                role=player_name
+            )
+>>>>>>> faa6a47ee8e566760b285857a70b925cd0e57b33
             print(f"Created team member: {player_name} for team {team.name}")
             
             # Store team info in session
@@ -721,14 +651,10 @@ def edit_team(request, team_id):
 
 def view_team(request, team_id):
     # Get team with all related information
-    team = get_object_or_404(Team.objects.prefetch_related('members', 'participating_lobbies'), id=team_id)
-    
-    print(f"\n=== View Team Debug Info ===")
-    print(f"Team: {team.name} (ID: {team.id})")
+    team = get_object_or_404(Team.objects.prefetch_related('members'), id=team_id)
     
     # Get the team members
     members = list(team.members.all())
-    print(f"Members: {[m.role for m in members]}")
     
     # If the player has a name in the session but isn't in the team yet, add them
     player_name = request.session.get('player_name')
@@ -739,8 +665,7 @@ def view_team(request, team_id):
             if not TeamMember.objects.filter(team=team, role=player_name).exists():
                 new_member = TeamMember.objects.create(
                     team=team,
-                    role=player_name,
-                    name=player_name
+                    role=player_name
                 )
                 print(f"Created new team member: {player_name} for team {team.name}")
                 members.append(new_member)
@@ -751,62 +676,34 @@ def view_team(request, team_id):
     lobby = None
     race = None
     lobby_code = None
-    race_id = None
+    race_id = None  # Initialize race_id separately
     
-    # First try to get lobby code from session
-    lobby_code = request.session.get('lobby_code')
-    print(f"Lobby code from session: {lobby_code}")
+    # Check if team is part of any lobbies
+    lobbies = Lobby.objects.filter(teams=team).select_related('race')
+    if lobbies.exists():
+        lobby = lobbies.first()
+        lobby_code = lobby.code
+        race = lobby.race if hasattr(lobby, 'race') else None
+        if race:
+            race_id = race.id
     
-    if lobby_code:
+    # If we have a race ID but no race object, try to find it directly
+    race_id_in_page = request.GET.get('race_id')
+    if race_id_in_page:
+        race_id = race_id_in_page
         try:
-            lobby = Lobby.objects.get(code=lobby_code)
-            print(f"Found lobby: {lobby.name} (ID: {lobby.id}) with code {lobby_code}")
-            
-            # If team is not in this lobby, add it
-            if not lobby.teams.filter(id=team.id).exists():
-                print(f"Adding team {team.id} to lobby {lobby.id}")
-                lobby.teams.add(team)
-                # Save the changes
-                lobby.save()
-            
-            # Get race from lobby
-            race = lobby.race
-            if race:
-                race_id = race.id
-                print(f"Found race {race_id} from lobby")
-            else:
-                print(f"No race found in lobby {lobby.id}")
-        except Lobby.DoesNotExist:
-            print(f"Lobby with code {lobby_code} not found")
-    
-    # If we still don't have a lobby, check if team is part of any lobbies
-    if not lobby:
-        lobbies = Lobby.objects.filter(teams=team).select_related('race')
-        print(f"Checking existing lobby associations for team {team.id}")
-        print(f"Found {lobbies.count()} lobbies")
-        
-        if lobbies.exists():
-            lobby = lobbies.first()
-            lobby_code = lobby.code
-            race = lobby.race
-            if race:
-                race_id = race.id
-                print(f"Found lobby {lobby.id} and race {race_id} from team's existing associations")
-            else:
-                print(f"Found lobby {lobby.id} but no race associated")
-        else:
-            print(f"No existing lobby associations found for team {team.id}")
+            race = Race.objects.get(id=race_id_in_page)
+            print(f"Found race from URL parameter: {race.id}")
+        except Race.DoesNotExist:
+            pass
     
     # Debug logging
-    print(f"\nFinal State:")
-    print(f"Team: {team.name}, Team ID: {team.id}")
+    print(f"View team: {team.name}, Team ID: {team.id}")
     print(f"Members: {[m.role for m in members]}")
     print(f"Lobby: {lobby.name if lobby else 'None'}")
     print(f"Lobby Code: {lobby_code if lobby_code else 'None'}")
     print(f"Race: {race.id if race else 'None'}")
     print(f"Race ID: {race_id}")
-    print(f"Team's participating lobbies: {[l.id for l in team.participating_lobbies.all()]}")
-    print("=== End Debug Info ===\n")
     
     context = {
         'team': team,
@@ -814,7 +711,7 @@ def view_team(request, team_id):
         'lobby': lobby,
         'lobby_code': lobby_code,
         'race': race,
-        'race_id': race_id
+        'race_id': race_id  # Always include race_id
     }
     return render(request, 'hunt/view_team.html', context)
 
@@ -1190,7 +1087,7 @@ def student_question(request, lobby_id, question_id):
         
         # Get the team for this player
         try:
-            team_member = TeamMember.objects.get(name=player_name, team__lobby=lobby)
+            team_member = TeamMember.objects.get(role=player_name, team__lobby=lobby)
             team = team_member.team
             
             # Prepare the context
@@ -1303,7 +1200,7 @@ def upload_photo(request, lobby_id, question_id):
         
         # Find the team for this player
         try:
-            team_member = TeamMember.objects.get(name=player_name, team__lobby=lobby)
+            team_member = TeamMember.objects.get(role=player_name, team__lobby=lobby)
             team = team_member.team
             
             # Save the photo
@@ -1400,55 +1297,55 @@ def race_questions(request, race_id):
             if not team_in_race:
                 # Team is not part of this race
                 messages.warning(request, "Your team is not participating in this race.")
-                return redirect('join_game_session')
+                # Continue anyway to show questions
             
             try:
                 team_member = TeamMember.objects.get(team=team, role=player_name)
                 print(f"Found team member {player_name} in team {team.name}")
             except TeamMember.DoesNotExist:
-                # Create a team member if they don't exist yet
-                team_member = TeamMember.objects.create(team=team, role=player_name, name=player_name)
+                # Create a team member if they don't exist yet - removed name field
+                team_member = TeamMember.objects.create(team=team, role=player_name)
                 print(f"Created new team member {player_name} for team {team.name}")
         else:
-            messages.error(request, "No team found. Please join a team first.")
-            return redirect('join_game_session')
+            # Fallback: try to find any team this player is part of
+            team_member = TeamMember.objects.filter(role=player_name).first()
             
-        # Get or create team progress for this race
-        team_progress, created = TeamRaceProgress.objects.get_or_create(
-            team=team,
-            race=race,
-            defaults={'current_question_index': 0, 'total_points': 0}
-        )
-        
-        # Get all questions for this race
-        questions = Question.objects.filter(zone__race=race).order_by('zone__created_at', 'created_at')
-        
-        # Get current question based on progress
-        current_question = questions[team_progress.current_question_index] if questions.exists() else None
-        
-        # Get team's answers for this race
-        team_answers = TeamAnswer.objects.filter(
-            team=team,
-            question__zone__race=race
-        ).select_related('question')
-        
-        context = {
-            'race': race,
-            'team': team,
-            'team_member': team_member,
-            'current_question': current_question,
-            'team_answers': team_answers,
-            'team_progress': team_progress,
-            'total_questions': questions.count(),
-            'current_question_index': team_progress.current_question_index + 1
-        }
-        
-        return render(request, 'hunt/race_questions.html', context)
-        
+            if not team_member:
+                print(f"No team found for player {player_name}")
+                messages.error(request, "You are not part of any team. Please join a team first.")
+                return redirect('join_team')
+            
+            team = team_member.team
+            print(f"Found team {team.name} for player {player_name}")
+    except Team.DoesNotExist:
+        messages.error(request, "Team not found.")
+        return redirect('join_team')
     except Exception as e:
-        logger.error(f"Error in race_questions view: {e}")
-        messages.error(request, "An error occurred. Please try again.")
-        return redirect('join_game_session')
+        print(f"Error finding team: {e}")
+        messages.error(request, f"Error finding your team: {str(e)}")
+        return redirect('join_team')
+    
+    # Get zones and questions for this race
+    zones = Zone.objects.filter(race=race).order_by('created_at')
+    questions = Question.objects.filter(zone__race=race).select_related('zone').order_by('zone__created_at')
+    
+    # Group questions by zone
+    questions_by_zone = {}
+    for zone in zones:
+        questions_by_zone[zone.id] = []
+    
+    for question in questions:
+        questions_by_zone[question.zone.id].append(question)
+    
+    context = {
+        'race': race,
+        'team': team,
+        'team_member': team_member,
+        'zones': zones,
+        'questions_by_zone': questions_by_zone,
+    }
+    
+    return render(request, 'hunt/race_questions.html', context)
 
 def check_race_status(request, race_id):
     """Check if the race has started - called by client-side polling"""
@@ -1518,24 +1415,3 @@ def get_team_race(request, team_id):
         return JsonResponse({'success': False, 'error': 'Team not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
-
-def team_options(request):
-    """View for team options after player name is set"""
-    # Check if player name is set
-    player_name = request.session.get('player_name')
-    if not player_name:
-        messages.error(request, "Please set your player name first.")
-        return redirect('join_game_session')
-    
-    # Get lobby code from session
-    lobby_code = request.session.get('lobby_code')
-    if not lobby_code:
-        messages.error(request, "No lobby code found. Please join a lobby first.")
-        return redirect('join_game_session')
-    
-    try:
-        lobby = Lobby.objects.get(code=lobby_code, is_active=True)
-        return render(request, 'hunt/team_options.html', {'lobby': lobby})
-    except Lobby.DoesNotExist:
-        messages.error(request, "Invalid lobby code. Please try again.")
-        return redirect('join_game_session')

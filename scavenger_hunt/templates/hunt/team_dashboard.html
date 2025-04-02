@@ -151,7 +151,7 @@
             membersList.innerHTML = members.map(member => `
                 <div class="member-item">
                     <i class="fas fa-user"></i>
-                    <span>${member.name || member.role}</span>
+                    <span>${member.role}</span>
                 </div>
             `).join('');
         } else {

@@ -48,15 +48,83 @@ function submitName() {
     if (name) {
         sessionStorage.setItem('playerName', name);
         document.getElementById('namePrompt').style.display = 'none';
+        
+        // Send the player name to the server to save in Django's session
+        fetch('{% url "save_player_name" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: 'player_name=' + encodeURIComponent(name)
+        })
+        .then(response => {
+            if (!response.ok) {
+                console.error('Error saving player name to server session');
+                alert('There was a problem saving your name to the server. The game may not work properly.');
+            } else {
+                console.log('Player name saved to server successfully');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('There was a problem saving your name to the server. The game may not work properly.');
+        });
     } else {
         alert('Please enter a valid name');
     }
 }
 
 function checkPlayerName(event) {
+    // Always prevent the default navigation initially
+    event.preventDefault();
+    
     if (!sessionStorage.getItem('playerName')) {
-        event.preventDefault();
         document.getElementById('namePrompt').style.display = 'block';
+    } else {
+        const playerName = sessionStorage.getItem('playerName');
+        const destination = event.currentTarget.href;
+        
+        // Show loading indicator or disable button if needed
+        event.currentTarget.classList.add('disabled');
+        
+        // Wait for the fetch to complete before navigating
+        fetch('{% url "save_player_name" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: 'player_name=' + encodeURIComponent(playerName)
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json().catch(() => {
+                    // If not JSON, just continue with navigation
+                    return { success: true };
+                });
+            } else {
+                throw new Error('Server responded with an error');
+            }
+        })
+        .then(data => {
+            if (data.success) {
+                // Only redirect after confirmed save
+                console.log('Player name saved successfully, redirecting to:', destination);
+                window.location.href = destination;
+            } else {
+                console.error('Failed to save player name to server session');
+                alert('There was a problem saving your name. Please try again.');
+                event.currentTarget.classList.remove('disabled');
+            }
+        })
+        .catch(error => {
+            console.error('Error saving player name to server session:', error);
+            alert('There was a problem connecting to the server. Please try again.');
+            event.currentTarget.classList.remove('disabled');
+        });
     }
 }
 </script>
@@ -134,6 +202,12 @@ function checkPlayerName(event) {
 
 .btn i {
     margin-right: 0.5rem;
+}
+
+.btn.disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 .modal {

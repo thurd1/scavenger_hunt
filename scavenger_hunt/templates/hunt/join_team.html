@@ -21,12 +21,12 @@
                         <div class="team-card">
                             <div class="team-header">
                                 <h4>{{ team.name }}</h4>
-                                <span class="member-count">{{ team.members.count }} member(s)</span>
+                                <span class="member-count">{{ team.member_count }} member(s)</span>
                             </div>
                             <div class="team-members">
                                 <ul class="members-list">
-                                    {% for member in team.members.all %}
-                                        <li><i class="fas fa-user"></i> {{ member.name }}</li>
+                                    {% for member in team.member_list %}
+                                        <li><i class="fas fa-user"></i> {{ member.role }}</li>
                                     {% endfor %}
                                 </ul>
                                 <button onclick="joinTeam('{{ team.code }}')" class="join-btn">Join Team</button>
@@ -367,7 +367,7 @@ function updateTeamsDisplay(teams) {
                 <div class="team-members">
                     <ul class="members-list">
                         ${team.members.map(member => `
-                            <li><i class="fas fa-user"></i> ${member.name || member.role}</li>
+                            <li><i class="fas fa-user"></i> ${member.role}</li>
                         `).join('')}
                     </ul>
                     <button onclick="joinTeam('${team.code}')" class="join-btn">Join Team</button>
