@@ -278,37 +278,95 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function checkRaceStatus() {
         console.log('Checking race status...');
-        fetch(`/race/${raceId}/status/`)
-            .then(response => response.json())
+        
+        // Try a few different potential endpoints for checking race status
+        const statusEndpoints = [
+            `/race/${raceId}/status/`,
+            `/race/${raceId}/check_status/`,
+            `/race/check_status/?race_id=${raceId}`
+        ];
+        
+        // Use the first endpoint by default
+        let statusUrl = statusEndpoints[0];
+        
+        fetch(statusUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Status check failed with status ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 console.log('Race status check:', data);
-                if (data.started) {
+                if (data.started || data.hunt_started || data.race_started) {
                     console.log('Race has started according to polling!');
-                    handleRaceStartedFromPolling();
+                    
+                    // Get the redirect URL from the response if available
+                    let redirectUrl;
+                    if (data.redirect_url) {
+                        redirectUrl = data.redirect_url;
+                    } else {
+                        redirectUrl = `/race/${raceId}/questions/`;
+                    }
+                    
+                    // Stop polling and show notification
+                    if (raceCheckInterval) {
+                        clearInterval(raceCheckInterval);
+                    }
+                    showRaceStartedNotification(redirectUrl);
                 }
             })
             .catch(error => {
                 console.error('Error checking race status:', error);
+                
+                // If there's an error with the first endpoint, try the next one
+                // This creates a fallback mechanism
+                if (statusUrl === statusEndpoints[0]) {
+                    console.log('Trying alternative status endpoint...');
+                    statusUrl = statusEndpoints[1];
+                    fetch(statusUrl)
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Race status check (alternative):', data);
+                            if (data.started || data.hunt_started || data.race_started) {
+                                console.log('Race has started according to polling (alternative)!');
+                                
+                                if (raceCheckInterval) {
+                                    clearInterval(raceCheckInterval);
+                                }
+                                
+                                // Use a direct URL to questions
+                                const redirectUrl = `/race/${raceId}/questions/`;
+                                showRaceStartedNotification(redirectUrl);
+                            }
+                        })
+                        .catch(err => console.error('Error with alternative endpoint:', err));
+                }
             });
-    }
-    
-    function handleRaceStartedFromPolling() {
-        // Clear interval to stop polling
-        if (raceCheckInterval) {
-            clearInterval(raceCheckInterval);
-        }
-        
-        // Build the redirect URL
-        const redirectUrl = `/race/${raceId}/questions/`;
-        
-        // Show the notification and handle redirection
-        showRaceStartedNotification(redirectUrl);
     }
     
     // Function to show the race started notification
     function showRaceStartedNotification(redirectUrl) {
         // Display the fullscreen notification
         raceNotification.style.display = 'flex';
+        
+        // Make sure the URL is absolute if it's not already
+        if (!redirectUrl.startsWith('http') && !redirectUrl.startsWith('/')) {
+            redirectUrl = '/' + redirectUrl;
+        }
+        
+        console.log('Race redirect URL (before fixing):', redirectUrl);
+        
+        // Ensure the URL is correct by checking if /questions/ is in it
+        if (!redirectUrl.includes('/questions/')) {
+            if (redirectUrl.endsWith('/')) {
+                redirectUrl = redirectUrl + 'questions/';
+            } else {
+                redirectUrl = redirectUrl + '/questions/';
+            }
+        }
+        
+        console.log('Race redirect URL (after fixing):', redirectUrl);
         
         // Update the manual redirect button
         raceManualRedirect.href = redirectUrl;
@@ -324,7 +382,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (countdown <= 0) {
                 clearInterval(countdownInterval);
                 console.log(`Redirecting to ${redirectUrl} now`);
-                window.location.href = redirectUrl;
+                // Force redirection by setting location directly
+                window.location.replace(redirectUrl);
             }
         }, 1000);
         
@@ -332,7 +391,9 @@ document.addEventListener('DOMContentLoaded', function() {
         raceManualRedirect.addEventListener('click', function(e) {
             e.preventDefault();
             clearInterval(countdownInterval);
-            window.location.href = redirectUrl;
+            console.log(`Manual redirect to ${redirectUrl}`);
+            // Force redirection by setting location directly
+            window.location.replace(redirectUrl);
         });
     }
     
@@ -566,6 +627,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 membersContainer.appendChild(noMembersMsg);
             }
         }
+    }
+
+    // Initialize the direct race access button
+    if (raceId) {
+        const directAccessUrl = `/race/${raceId}/questions/`;
+        document.querySelectorAll('.btn-success').forEach(button => {
+            if (button.textContent.includes('Access Race Questions')) {
+                button.href = directAccessUrl;
+                console.log('Updated direct access button with URL:', directAccessUrl);
+            }
+        });
     }
 });
 </script>
