@@ -544,16 +544,9 @@ def create_team(request, lobby_id):
             
             # Create a team member for the creator - removed name field
             team_member = TeamMember.objects.create(
-<<<<<<< HEAD
-                        team=team,
-                role=player_name,
-                name=player_name
-                    )
-=======
                 team=team,
                 role=player_name
             )
->>>>>>> faa6a47ee8e566760b285857a70b925cd0e57b33
             print(f"Created team member: {player_name} for team {team.name}")
             
             # Store team info in session
