@@ -57,13 +57,13 @@
         </div>
         
         <!-- Add a prominent race started notification that will appear when race starts -->
-        <div id="race-started-notification" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-            <div style="background: rgba(33, 37, 41, 0.95); border: 3px solid #90C83C; border-radius: 15px; padding: 30px; max-width: 90%; width: 500px; text-align: center;">
+        <div id="race-started-notification" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(33, 37, 41, 0.95); border: 3px solid #90C83C; border-radius: 15px; padding: 30px; max-width: 90%; width: 500px; text-align: center;">
                 <h2 style="color: #90C83C; margin-bottom: 20px;">Race Started!</h2>
                 <p style="color: white; font-size: 1.2rem; margin-bottom: 20px;">The race has begun! You will be redirected to the questions page.</p>
                 <div class="spinner" style="margin: 20px auto; border: 5px solid rgba(144, 200, 60, 0.3); border-radius: 50%; border-top: 5px solid #90C83C; width: 60px; height: 60px; animation: spin 1s linear infinite;"></div>
                 <p id="race-countdown" style="color: white; font-size: 1.1rem; margin: 20px 0;">Redirecting in 5 seconds...</p>
-                <a id="race-manual-redirect" href="#" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;">
+                <a id="race-manual-redirect" href="/race/{{ race.id|default:race_id }}/questions/" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;" onclick="goToRaceNow(event)">
                     <i class="fas fa-play"></i> Go to Race Now
                 </a>
             </div>
@@ -236,409 +236,126 @@
 </style>
 
 <script>
+// Add direct redirect function
+function goToRaceNow(event) {
+    if (event) {
+        event.preventDefault();
+    }
+    const raceId = '{{ race.id|default:race_id }}';
+    // Try to navigate directly
+    window.location.href = `/race/${raceId}/questions/`;
+}
+
+// Initialize the team and race functionality
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
-    const urlParams = new URLSearchParams(window.location.search);
-    const raceStatusArea = document.getElementById('race-status-area');
-    const raceStatusMessage = document.getElementById('race-status-message');
+    const raceId = '{{ race.id|default:race_id }}';
     const raceNotification = document.getElementById('race-started-notification');
-    const raceManualRedirect = document.getElementById('race-manual-redirect');
     const raceCountdown = document.getElementById('race-countdown');
     
-    // Check race ID from multiple sources
-    let raceId = '{{ race.id|default:"" }}';
-    if (!raceId) {
-        raceId = '{{ race_id|default:"" }}';
-    }
-    if (!raceId) {
-        raceId = urlParams.get('race_id');
-    }
-    
-    const membersContainer = document.getElementById('members-container');
-    
-    // Log the race ID for debugging
-    console.log(`Team ID: ${teamId}, Race ID: ${raceId}`);
-
-    // Setup polling for race status as a backup
-    let isCheckingRaceStatus = false;
-    let raceCheckInterval = null;
-    
-    function startRaceStatusPolling() {
-        if (isCheckingRaceStatus || !raceId) return;
+    // Function to handle race start
+    function handleRaceStart() {
+        console.log('Race started event detected!');
         
-        isCheckingRaceStatus = true;
-        console.log('Starting race status polling');
+        // Show the notification
+        raceNotification.style.display = 'block';
         
-        // Check immediately
-        checkRaceStatus();
-        
-        // Then check every 5 seconds
-        raceCheckInterval = setInterval(checkRaceStatus, 5000);
-    }
-    
-    function checkRaceStatus() {
-        console.log('Checking race status...');
-        
-        // Try a few different potential endpoints for checking race status
-        const statusEndpoints = [
-            `/race/${raceId}/status/`,
-            `/race/${raceId}/check_status/`,
-            `/race/check_status/?race_id=${raceId}`
-        ];
-        
-        // Use the first endpoint by default
-        let statusUrl = statusEndpoints[0];
-        
-        fetch(statusUrl)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Status check failed with status ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Race status check:', data);
-                if (data.started || data.hunt_started || data.race_started) {
-                    console.log('Race has started according to polling!');
-                    
-                    // Get the redirect URL from the response if available
-                    let redirectUrl;
-                    if (data.redirect_url) {
-                        redirectUrl = data.redirect_url;
-                    } else {
-                        redirectUrl = `/race/${raceId}/questions/`;
-                    }
-                    
-                    // Stop polling and show notification
-                    if (raceCheckInterval) {
-                        clearInterval(raceCheckInterval);
-                    }
-                    showRaceStartedNotification(redirectUrl);
-                }
-            })
-            .catch(error => {
-                console.error('Error checking race status:', error);
-                
-                // If there's an error with the first endpoint, try the next one
-                // This creates a fallback mechanism
-                if (statusUrl === statusEndpoints[0]) {
-                    console.log('Trying alternative status endpoint...');
-                    statusUrl = statusEndpoints[1];
-                    fetch(statusUrl)
-                        .then(response => response.json())
-                        .then(data => {
-                            console.log('Race status check (alternative):', data);
-                            if (data.started || data.hunt_started || data.race_started) {
-                                console.log('Race has started according to polling (alternative)!');
-                                
-                                if (raceCheckInterval) {
-                                    clearInterval(raceCheckInterval);
-                                }
-                                
-                                // Use a direct URL to questions
-                                const redirectUrl = `/race/${raceId}/questions/`;
-                                showRaceStartedNotification(redirectUrl);
-                            }
-                        })
-                        .catch(err => console.error('Error with alternative endpoint:', err));
-                }
-            });
-    }
-    
-    // Function to show the race started notification
-    function showRaceStartedNotification(redirectUrl) {
-        // Display the fullscreen notification
-        raceNotification.style.display = 'flex';
-        
-        // Make sure the URL is absolute if it's not already
-        if (!redirectUrl.startsWith('http') && !redirectUrl.startsWith('/')) {
-            redirectUrl = '/' + redirectUrl;
-        }
-        
-        console.log('Race redirect URL (before fixing):', redirectUrl);
-        
-        // Ensure the URL is correct by checking if /questions/ is in it
-        if (!redirectUrl.includes('/questions/')) {
-            if (redirectUrl.endsWith('/')) {
-                redirectUrl = redirectUrl + 'questions/';
-            } else {
-                redirectUrl = redirectUrl + '/questions/';
-            }
-        }
-        
-        console.log('Race redirect URL (after fixing):', redirectUrl);
-        
-        // Update the manual redirect button
-        raceManualRedirect.href = redirectUrl;
-        
-        // Set up countdown
+        // Set up countdown for redirect
         let countdown = 5;
-        
-        // Update the countdown text
-        const countdownInterval = setInterval(() => {
+        const countdownTimer = setInterval(function() {
             countdown--;
             raceCountdown.textContent = `Redirecting in ${countdown} seconds...`;
             
             if (countdown <= 0) {
-                clearInterval(countdownInterval);
-                console.log(`Redirecting to ${redirectUrl} now`);
-                // Force redirection by setting location directly
-                window.location.replace(redirectUrl);
+                clearInterval(countdownTimer);
+                // Try different redirection methods
+                try {
+                    // Method 1: Direct assignment
+                    window.location.href = `/race/${raceId}/questions/`;
+                    
+                    // Method 2 (after a brief delay if method 1 fails)
+                    setTimeout(function() {
+                        try {
+                            window.location.replace(`/race/${raceId}/questions/`);
+                        } catch (e) {
+                            console.error('Error with redirect method 2:', e);
+                        }
+                    }, 200);
+                } catch (e) {
+                    console.error('Error redirecting:', e);
+                }
             }
         }, 1000);
-        
-        // Also handle manual redirect click
-        raceManualRedirect.addEventListener('click', function(e) {
-            e.preventDefault();
-            clearInterval(countdownInterval);
-            console.log(`Manual redirect to ${redirectUrl}`);
-            // Force redirection by setting location directly
-            window.location.replace(redirectUrl);
-        });
     }
     
-    // Custom function to handle race_started event within this page
-    window.handleRaceStarted = function(data) {
-        console.log('🚀 Race started event handled in view_team.html:', data);
-        
-        // Show race status notification (the small one)
-        raceStatusArea.style.display = 'block';
-        raceStatusArea.classList.add('active');
-        document.getElementById('race-status-title').textContent = 'Race Started!';
-        
-        if (data.message) {
-            raceStatusMessage.textContent = data.message;
-        } else {
-            raceStatusMessage.textContent = 'The race has begun! Redirecting to questions page...';
-        }
-        
-        // Try to build a redirect URL from the data
-        let redirectUrl;
-        
-        if (data.redirect_url) {
-            redirectUrl = data.redirect_url;
-            console.log(`Using redirect URL from event: ${redirectUrl}`);
-        } else if (data.race_id) {
-            redirectUrl = `/race/${data.race_id}/questions/`;
-            console.log(`Using race ID from event: ${redirectUrl}`);
-        } else if (raceId) {
-            // Use a direct URL to the questions page
-            redirectUrl = `/race/${raceId}/questions/`;
-            console.log(`Using questions URL: ${redirectUrl}`);
-        } else {
-            console.error('No redirect URL and no race ID available');
-            raceStatusMessage.textContent += ' Error finding redirect URL. Please refresh the page.';
-            return;
-        }
-        
-        // Show the fullscreen notification
-        showRaceStartedNotification(redirectUrl);
-    };
-    
-    // Initialize race WebSocket if race ID is available
+    // Connect to WebSocket for race updates
     if (raceId) {
-        console.log(`Connecting to race WebSocket for race ID: ${raceId}`);
-        const raceSocket = connectToRaceWebsocket(raceId);
+        // WebSocket for race start notification
+        const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const raceSocket = new WebSocket(
+            `${wsScheme}//${window.location.host}/ws/race/${raceId}/`
+        );
         
-        // Start polling as a fallback
-        startRaceStatusPolling();
+        raceSocket.onopen = function() {
+            console.log('Race WebSocket connected');
+        };
         
-        // Add direct handler for race_started event
-        raceSocket.addEventListener('message', function(event) {
+        raceSocket.onmessage = function(event) {
             try {
                 const data = JSON.parse(event.data);
-                console.log('Race WebSocket message received:', data);
+                console.log('Race message received:', data);
                 
                 if (data.type === 'race_started') {
-                    console.log('Race started event received directly in view_team.html:', data);
-                    window.handleRaceStarted(data);
+                    handleRaceStart();
                 }
-            } catch (error) {
-                console.error('Error handling race WebSocket message:', error);
+            } catch (e) {
+                console.error('Error handling message:', e);
             }
-        });
-    } else {
-        console.log('No race ID available, not connecting to race WebSocket');
-    }
-    
-    // Check sessionStorage first, then fallback to Django session value
-    let playerName = sessionStorage.getItem('playerName');
-    
-    if (!playerName) {
-        const sessionValue = document.getElementById('sessionPlayerName').value;
-        if (sessionValue) {
-            playerName = sessionValue;
-            // Save to sessionStorage for future use
-            sessionStorage.setItem('playerName', playerName);
-        }
-    }
-    
-    console.log('Player name:', playerName);  // Debug log
-    
-    // WebSocket connection setup for team updates
-    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const teamSocket = new WebSocket(
-        ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
-    );
-
-    teamSocket.onopen = function(e) {
-        console.log('WebSocket connection established');
-    };
-
-    teamSocket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        console.log('WebSocket message received:', data);
+        };
         
-        if (data.type === 'team_update') {
-            if (data.action === 'state') {
-                // Full team state update
-                updateMembersList(data.members);
-            } else if (data.action === 'join') {
-                // Add a single member
-                addMember(data.player_name);
-            } else if (data.action === 'leave') {
-                // Remove a single member
-                removeMember(data.player_name);
-            } else {
-                // Generic update - refresh the whole list
-                if (data.members) {
-                    updateMembersList(data.members);
-                }
-            }
-        }
-    };
-
-    teamSocket.onclose = function(e) {
-        console.log('WebSocket connection closed');
+        raceSocket.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
         
-        // Try to reconnect after a delay
-        setTimeout(function() {
-            console.log('Attempting to reconnect WebSocket...');
-            const newSocket = new WebSocket(
-                ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
-            );
-            teamSocket = newSocket;
-        }, 3000);
-    };
-
-    // Send join message when page loads if we have a player name
-    if (playerName) {
-        setTimeout(function() {
-            if (teamSocket.readyState === WebSocket.OPEN) {
-                teamSocket.send(JSON.stringify({
-                    'action': 'join',
-                    'player_name': playerName
-                }));
-            } else {
-                console.log('WebSocket not open yet, waiting...');
-                // Try again in a moment
-                setTimeout(function() {
-                    if (teamSocket.readyState === WebSocket.OPEN) {
-                        teamSocket.send(JSON.stringify({
-                            'action': 'join',
-                            'player_name': playerName
-                        }));
-                    } else {
-                        console.log('WebSocket still not open, giving up on sending join message');
+        // Setup polling as backup
+        setInterval(function() {
+            fetch(`/race/${raceId}/status/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.started || data.hunt_started || data.race_started) {
+                        handleRaceStart();
                     }
-                }, 1000);
-            }
-        }, 500);
-    }
-
-    // When user leaves the page, send a leave message
-    window.addEventListener('beforeunload', function() {
-        if (playerName && teamSocket.readyState === WebSocket.OPEN) {
-            teamSocket.send(JSON.stringify({
-                'action': 'leave',
-                'player_name': playerName
-            }));
-        }
-    });
-
-    function updateMembersList(members) {
-        if (!membersContainer) return;
+                })
+                .catch(error => {
+                    console.log('Poll error (expected if endpoint not configured):', error);
+                });
+        }, 3000);
         
-        // Clear current members
-        membersContainer.innerHTML = '';
-        
-        if (members && members.length > 0) {
-            members.forEach(function(member) {
-                const memberCard = document.createElement('div');
-                memberCard.className = 'member-card';
-                memberCard.setAttribute('data-member', member);
-                
-                const memberHeader = document.createElement('div');
-                memberHeader.className = 'member-header';
-                
-                const memberName = document.createElement('h3');
-                memberName.innerHTML = `<i class="fas fa-user"></i> ${member}`;
-                
-                memberHeader.appendChild(memberName);
-                memberCard.appendChild(memberHeader);
-                membersContainer.appendChild(memberCard);
-            });
-        } else {
-            const noMembersMsg = document.createElement('div');
-            noMembersMsg.className = 'no-members-message';
-            noMembersMsg.innerHTML = '<p>No members in this team yet.</p>';
-            membersContainer.appendChild(noMembersMsg);
-        }
-    }
-
-    function addMember(memberName) {
-        // Check if member already exists
-        if (document.querySelector(`.member-card[data-member="${memberName}"]`)) {
-            return;
-        }
-        
-        // Remove "no members" message if it exists
-        const noMembersMsg = membersContainer.querySelector('.no-members-message');
-        if (noMembersMsg) {
-            membersContainer.removeChild(noMembersMsg);
-        }
-        
-        // Create and add the new member card
-        const memberCard = document.createElement('div');
-        memberCard.className = 'member-card';
-        memberCard.setAttribute('data-member', memberName);
-        
-        const memberHeader = document.createElement('div');
-        memberHeader.className = 'member-header';
-        
-        const memberNameElem = document.createElement('h3');
-        memberNameElem.innerHTML = `<i class="fas fa-user"></i> ${memberName}`;
-        
-        memberHeader.appendChild(memberNameElem);
-        memberCard.appendChild(memberHeader);
-        membersContainer.appendChild(memberCard);
-    }
-
-    function removeMember(memberName) {
-        const memberCard = document.querySelector(`.member-card[data-member="${memberName}"]`);
-        if (memberCard) {
-            membersContainer.removeChild(memberCard);
-            
-            // If no members left, show the message
-            if (membersContainer.children.length === 0) {
-                const noMembersMsg = document.createElement('div');
-                noMembersMsg.className = 'no-members-message';
-                noMembersMsg.innerHTML = '<p>No members in this team yet.</p>';
-                membersContainer.appendChild(noMembersMsg);
-            }
-        }
-    }
-
-    // Initialize the direct race access button
-    if (raceId) {
-        const directAccessUrl = `/race/${raceId}/questions/`;
+        // Manual check: Add event listeners to all race buttons
         document.querySelectorAll('.btn-success').forEach(button => {
-            if (button.textContent.includes('Access Race Questions')) {
-                button.href = directAccessUrl;
-                console.log('Updated direct access button with URL:', directAccessUrl);
+            if (button.textContent.includes('Race') || button.textContent.includes('Questions')) {
+                const originalHref = button.getAttribute('href');
+                button.setAttribute('href', `/race/${raceId}/questions/`);
+                console.log(`Updated button href from ${originalHref} to /race/${raceId}/questions/`);
             }
         });
     }
+    
+    // Force check race status immediately for testing
+    setTimeout(function() {
+        const testButton = document.createElement('button');
+        testButton.style.position = 'fixed';
+        testButton.style.bottom = '10px';
+        testButton.style.right = '10px';
+        testButton.style.zIndex = '1000';
+        testButton.style.padding = '5px';
+        testButton.style.opacity = '0.5';
+        testButton.textContent = 'Test Race Start';
+        testButton.addEventListener('click', function() {
+            handleRaceStart();
+        });
+        document.body.appendChild(testButton);
+    }, 2000);
 });
 </script>
 {% endblock %} 
