@@ -56,6 +56,19 @@
             <p id="race-status-message" class="text-center mb-0"></p>
         </div>
         
+        <!-- Add a prominent race started notification that will appear when race starts -->
+        <div id="race-started-notification" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <div style="background: rgba(33, 37, 41, 0.95); border: 3px solid #90C83C; border-radius: 15px; padding: 30px; max-width: 90%; width: 500px; text-align: center;">
+                <h2 style="color: #90C83C; margin-bottom: 20px;">Race Started!</h2>
+                <p style="color: white; font-size: 1.2rem; margin-bottom: 20px;">The race has begun! You will be redirected to the questions page.</p>
+                <div class="spinner" style="margin: 20px auto; border: 5px solid rgba(144, 200, 60, 0.3); border-radius: 50%; border-top: 5px solid #90C83C; width: 60px; height: 60px; animation: spin 1s linear infinite;"></div>
+                <p id="race-countdown" style="color: white; font-size: 1.1rem; margin: 20px 0;">Redirecting in 5 seconds...</p>
+                <a id="race-manual-redirect" href="#" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;">
+                    <i class="fas fa-play"></i> Go to Race Now
+                </a>
+            </div>
+        </div>
+        
         <!-- Race access section -->
         {% if race.id or race_id %}
         <div class="actions-section">
@@ -210,6 +223,11 @@
     text-decoration: none;
 }
 
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
 @keyframes pulse {
     0% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.4); }
     70% { box-shadow: 0 0 0 10px rgba(144, 200, 60, 0); }
@@ -223,6 +241,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const raceStatusArea = document.getElementById('race-status-area');
     const raceStatusMessage = document.getElementById('race-status-message');
+    const raceNotification = document.getElementById('race-started-notification');
+    const raceManualRedirect = document.getElementById('race-manual-redirect');
+    const raceCountdown = document.getElementById('race-countdown');
     
     // Check race ID from multiple sources
     let raceId = '{{ race.id|default:"" }}';
@@ -237,12 +258,89 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Log the race ID for debugging
     console.log(`Team ID: ${teamId}, Race ID: ${raceId}`);
+
+    // Setup polling for race status as a backup
+    let isCheckingRaceStatus = false;
+    let raceCheckInterval = null;
+    
+    function startRaceStatusPolling() {
+        if (isCheckingRaceStatus || !raceId) return;
+        
+        isCheckingRaceStatus = true;
+        console.log('Starting race status polling');
+        
+        // Check immediately
+        checkRaceStatus();
+        
+        // Then check every 5 seconds
+        raceCheckInterval = setInterval(checkRaceStatus, 5000);
+    }
+    
+    function checkRaceStatus() {
+        console.log('Checking race status...');
+        fetch(`/race/${raceId}/status/`)
+            .then(response => response.json())
+            .then(data => {
+                console.log('Race status check:', data);
+                if (data.started) {
+                    console.log('Race has started according to polling!');
+                    handleRaceStartedFromPolling();
+                }
+            })
+            .catch(error => {
+                console.error('Error checking race status:', error);
+            });
+    }
+    
+    function handleRaceStartedFromPolling() {
+        // Clear interval to stop polling
+        if (raceCheckInterval) {
+            clearInterval(raceCheckInterval);
+        }
+        
+        // Build the redirect URL
+        const redirectUrl = `/race/${raceId}/questions/`;
+        
+        // Show the notification and handle redirection
+        showRaceStartedNotification(redirectUrl);
+    }
+    
+    // Function to show the race started notification
+    function showRaceStartedNotification(redirectUrl) {
+        // Display the fullscreen notification
+        raceNotification.style.display = 'flex';
+        
+        // Update the manual redirect button
+        raceManualRedirect.href = redirectUrl;
+        
+        // Set up countdown
+        let countdown = 5;
+        
+        // Update the countdown text
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            raceCountdown.textContent = `Redirecting in ${countdown} seconds...`;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                console.log(`Redirecting to ${redirectUrl} now`);
+                window.location.href = redirectUrl;
+            }
+        }, 1000);
+        
+        // Also handle manual redirect click
+        raceManualRedirect.addEventListener('click', function(e) {
+            e.preventDefault();
+            clearInterval(countdownInterval);
+            window.location.href = redirectUrl;
+        });
+    }
     
     // Custom function to handle race_started event within this page
     window.handleRaceStarted = function(data) {
         console.log('🚀 Race started event handled in view_team.html:', data);
         
-        // Show race status notification
+        // Show race status notification (the small one)
         raceStatusArea.style.display = 'block';
         raceStatusArea.classList.add('active');
         document.getElementById('race-status-title').textContent = 'Race Started!';
@@ -272,39 +370,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Create a visible button users can click
-        const redirectButton = document.createElement('a');
-        redirectButton.href = redirectUrl;
-        redirectButton.className = 'btn btn-success mt-3';
-        redirectButton.textContent = 'Go to Questions';
-        redirectButton.style.display = 'inline-block';
-        raceStatusArea.appendChild(redirectButton);
-        
-        // Set a timer for the redirect
-        console.log(`Will redirect to ${redirectUrl} in 3 seconds`);
-        let countdown = 3;
-        
-        const countdownElement = document.createElement('p');
-        countdownElement.textContent = `Redirecting in ${countdown} seconds...`;
-        countdownElement.className = 'mt-2';
-        raceStatusArea.appendChild(countdownElement);
-        
-        const countdownInterval = setInterval(() => {
-            countdown--;
-            countdownElement.textContent = `Redirecting in ${countdown} seconds...`;
-            
-            if (countdown <= 0) {
-                clearInterval(countdownInterval);
-                console.log(`Redirecting to ${redirectUrl} now`);
-                window.location.href = redirectUrl;
-            }
-        }, 1000);
+        // Show the fullscreen notification
+        showRaceStartedNotification(redirectUrl);
     };
     
     // Initialize race WebSocket if race ID is available
     if (raceId) {
         console.log(`Connecting to race WebSocket for race ID: ${raceId}`);
         const raceSocket = connectToRaceWebsocket(raceId);
+        
+        // Start polling as a fallback
+        startRaceStatusPolling();
         
         // Add direct handler for race_started event
         raceSocket.addEventListener('message', function(event) {
