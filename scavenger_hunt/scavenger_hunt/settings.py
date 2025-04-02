@@ -101,9 +101,6 @@ AUTH_USER_MODEL = 'hunt.CustomUser'
 ASGI_APPLICATION = "scavenger_hunt.asgi.application"
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
     },
 }

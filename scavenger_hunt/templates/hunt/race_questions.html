@@ -336,6 +336,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Function to show a specific question
     function showQuestion(index) {
+        console.log(`Showing question at index ${index}`);
         questions.forEach(q => q.style.display = 'none');
         
         if (questions[index]) {
@@ -344,8 +345,14 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('current-question-num').textContent = index + 1;
             
             // Update navigation buttons
-            if (prevButton) prevButton.disabled = index === 0;
-            if (nextButton) nextButton.disabled = index === totalQuestions - 1;
+            if (prevButton) {
+                prevButton.disabled = index === 0;
+                console.log(`Previous button ${prevButton.disabled ? 'disabled' : 'enabled'}`);
+            }
+            if (nextButton) {
+                nextButton.disabled = index === totalQuestions - 1;
+                console.log(`Next button ${nextButton.disabled ? 'disabled' : 'enabled'}`);
+            }
         }
     }
     
@@ -389,6 +396,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.answer-form').forEach(form => {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
+            console.log("Form submitted");
             
             const questionId = this.dataset.questionId;
             const answerInput = this.querySelector('.answer-input');
@@ -398,15 +406,20 @@ document.addEventListener('DOMContentLoaded', function() {
             const attemptsEl = this.querySelector('.attempts-count');
             const photoSection = questionCard.querySelector('.photo-upload-section');
             
-            if (!answer) return;
+            if (!answer) {
+                console.log("Empty answer, not submitting");
+                return;
+            }
             
             // Get current attempts count
             let attempts = parseInt(attemptsEl.textContent) || 0;
             attempts++;
             attemptsEl.textContent = attempts;
+            console.log(`Attempt ${attempts} for question ${questionId}`);
             
             // Send answer to server for verification
-            fetch('/check-answer/', {
+            console.log(`Submitting answer "${answer}" for question ${questionId}, team code ${'{{ team.code }}'}`);
+            fetch('{% url "check_answer" %}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -419,8 +432,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     attempt_number: attempts
                 })
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log("Received response:", response);
+                return response.json();
+            })
             .then(data => {
+                console.log("Answer check response data:", data);
                 feedbackEl.style.display = 'block';
                 
                 if (data.correct) {
