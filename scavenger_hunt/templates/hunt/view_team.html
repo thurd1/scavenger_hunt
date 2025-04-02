@@ -68,23 +68,6 @@
                 </a>
             </div>
         </div>
-        
-        <!-- Race access section -->
-        {% if race.id or race_id %}
-        <div class="actions-section">
-            <div class="action-buttons">
-                {% if race.id %}
-                <a href="{% url 'race_questions' race.id %}" class="btn btn-success">
-                    <i class="fas fa-play"></i> Access Race Questions
-                </a>
-                {% elif race_id %}
-                <a href="{% url 'race_questions' race_id %}" class="btn btn-success">
-                    <i class="fas fa-play"></i> Access Race Questions
-                </a>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
 
         <div class="back-button-container">
             <a href="{% url 'join_team' %}" class="btn btn-success">
@@ -181,19 +164,6 @@
 .race-status-area.active {
     background-color: rgba(144, 200, 60, 0.2);
     animation: pulse 2s infinite;
-}
-
-.actions-section {
-    padding: 20px;
-    max-width: 800px;
-    margin: 0 auto;
-}
-
-.action-buttons {
-    display: flex;
-    gap: 15px;
-    justify-content: center;
-    flex-wrap: wrap;
 }
 
 .back-button-container {
@@ -330,32 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('Poll error (expected if endpoint not configured):', error);
                 });
         }, 3000);
-        
-        // Manual check: Add event listeners to all race buttons
-        document.querySelectorAll('.btn-success').forEach(button => {
-            if (button.textContent.includes('Race') || button.textContent.includes('Questions')) {
-                const originalHref = button.getAttribute('href');
-                button.setAttribute('href', `/race/${raceId}/questions/`);
-                console.log(`Updated button href from ${originalHref} to /race/${raceId}/questions/`);
-            }
-        });
     }
-    
-    // Force check race status immediately for testing
-    setTimeout(function() {
-        const testButton = document.createElement('button');
-        testButton.style.position = 'fixed';
-        testButton.style.bottom = '10px';
-        testButton.style.right = '10px';
-        testButton.style.zIndex = '1000';
-        testButton.style.padding = '5px';
-        testButton.style.opacity = '0.5';
-        testButton.textContent = 'Test Race Start';
-        testButton.addEventListener('click', function() {
-            handleRaceStart();
-        });
-        document.body.appendChild(testButton);
-    }, 2000);
 });
 </script>
 {% endblock %} 

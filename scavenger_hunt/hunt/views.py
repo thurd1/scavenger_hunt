@@ -122,6 +122,18 @@ def start_race(request, lobby_id):
                 }
             )
             
+            # Notify the lobbies management WebSocket
+            async_to_sync(channel_layer.group_send)(
+                'lobbies_management',
+                {
+                    'type': 'race_started',
+                    'lobby_id': lobby.id,
+                    'race_id': race.id,
+                    'hunt_started': True,
+                    'message': 'Race has started for this lobby'
+                }
+            )
+            
             return JsonResponse({
                 'success': True,
                 'message': 'Race started successfully',
@@ -385,6 +397,24 @@ def join_existing_team(request):
             request.session['player_name'] = player_name
             request.session.modified = True
             
+            # If team is part of a lobby, notify the lobbies management WebSocket
+            lobbies = team.participating_lobbies.all()
+            if lobbies.exists():
+                lobby = lobbies.first()
+                
+                # Send WebSocket notification about the new team member
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    'lobbies_management',
+                    {
+                        'type': 'team_joined',
+                        'lobby_id': lobby.id,
+                        'team_id': team.id,
+                        'team_name': team.name,
+                        'message': f'Player {player_name} joined team {team.name}'
+                    }
+                )
+            
             return JsonResponse({
                 'success': True,
                 'redirect_url': reverse('view_team', args=[team.id])
@@ -449,12 +479,26 @@ def create_standalone_team(request):
             )
             
             # Associate with lobby if a lobby code is in session
+            lobby = None
             lobby_code = request.session.get('lobby_code')
             if lobby_code:
                 try:
                     lobby = Lobby.objects.get(code=lobby_code)
                     lobby.teams.add(team)
                     print(f"Added team {team.name} to lobby {lobby.name}")
+                    
+                    # Notify the lobbies management WebSocket about the new team
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        'lobbies_management',
+                        {
+                            'type': 'team_joined',
+                            'lobby_id': lobby.id,
+                            'team_id': team.id,
+                            'team_name': team.name,
+                            'message': f'New team {team.name} joined lobby'
+                        }
+                    )
                 except Lobby.DoesNotExist:
                     print(f"Lobby with code {lobby_code} not found")
             
@@ -592,12 +636,39 @@ def toggle_lobby(request, lobby_id):
         lobby = get_object_or_404(Lobby, id=lobby_id)
         lobby.is_active = not lobby.is_active
         lobby.save()
+        
+        # Broadcast update via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            'lobbies_management',
+            {
+                'type': 'lobby_update',
+                'lobby_id': lobby.id,
+                'is_active': lobby.is_active,
+                'message': f'Lobby status updated to {"active" if lobby.is_active else "inactive"}'
+            }
+        )
+        
         messages.success(request, f'Lobby "{lobby.name}" has been {"activated" if lobby.is_active else "deactivated"}.')
     return redirect('manage_lobbies')
 
 @require_POST
 def delete_lobby(request, lobby_id):
         lobby = get_object_or_404(Lobby, id=lobby_id)
+        lobby_name = getattr(lobby, 'name', f'Lobby #{lobby.id}') 
+        
+        # Broadcast deletion via WebSocket before deleting
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            'lobbies_management',
+            {
+                'type': 'lobby_update',
+                'lobby_id': lobby.id,
+                'deleted': True,
+                'message': f'Lobby {lobby_name} was deleted'
+            }
+        )
+        
         lobby.delete()
         return JsonResponse({'status': 'success'})
 

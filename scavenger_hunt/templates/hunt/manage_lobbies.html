@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block head_extras %}
+<script src="{% static 'hunt/js/lobbies-websocket.js' %}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="page-header">
@@ -9,7 +13,7 @@
 
     <div class="lobbies-section">
         <h2 class="section-title">Active Lobbies</h2>
-        <div class="lobbies-grid">
+        <div class="lobbies-grid" id="lobbies-container">
             {% for lobby in lobbies %}
             <div class="lobby-card" data-lobby-id="{{ lobby.id }}">
                 <button class="delete-lobby-btn" onclick="confirmDeleteLobby({{ lobby.id }})">
@@ -21,15 +25,23 @@
                 </div>
                 <div class="lobby-info">
                     <p><i class="fas fa-clock"></i> Created: {{ lobby.created_at|date:"F d, Y" }}</p>
-                    <p><i class="fas fa-users"></i> Teams: {{ lobby.teams.count }}</p>
-                    <p>
+                    <p><i class="fas fa-users"></i> Teams: <span class="team-count">{{ lobby.teams.count }}</span></p>
+                    <p class="lobby-status">
                         <i class="fas {% if lobby.is_active %}fa-check-circle{% else %}fa-times-circle{% endif %}"></i>
-                        Status: {% if lobby.is_active %}Active{% else %}Inactive{% endif %}
+                        Status: <span class="status-text">{% if lobby.is_active %}Active{% else %}Inactive{% endif %}</span>
+                    </p>
+                    <p class="hunt-status" style="{% if not lobby.hunt_started %}display: none;{% endif %}">
+                        <i class="fas fa-play-circle"></i>
+                        Race: <span class="hunt-status-text">{% if lobby.hunt_started %}Started{% else %}Not Started{% endif %}</span>
                     </p>
                 </div>
                 <div class="lobby-actions">
-                    <button class="start-race-btn" onclick="startRace({{ lobby.id }})">
+                    <button class="start-race-btn" onclick="startRace({{ lobby.id }})" {% if lobby.hunt_started %}disabled style="background-color: rgba(144, 200, 60, 0.3);"{% endif %}>
+                        {% if lobby.hunt_started %}
+                        <i class="fas fa-check"></i> Race Started
+                        {% else %}
                         <i class="fas fa-play"></i> Start Race
+                        {% endif %}
                     </button>
                     <a href="{% url 'lobby_details' lobby.id %}" class="btn view-btn">
                         <i class="fas fa-eye"></i> View Details
@@ -68,6 +80,12 @@
             <button class="cancel-btn" onclick="closeDeleteModal()">Cancel</button>
         </div>
     </div>
+</div>
+
+<!-- Success Notification -->
+<div id="notification" class="notification" style="display: none;">
+    <span id="notification-message"></span>
+    <button class="notification-close" onclick="closeNotification()">×</button>
 </div>
 
 <style>
@@ -111,11 +129,48 @@
     border: 2px solid rgba(144, 200, 60, 0.3);
     border-radius: 12px;
     padding: 20px;
-    transition: transform 0.2s;
+    transition: transform 0.2s, border-color 0.3s;
 }
 
 .lobby-card:hover {
     transform: translateY(-5px);
+}
+
+.lobby-card.updated {
+    border-color: #90C83C;
+    box-shadow: 0 0 15px rgba(144, 200, 60, 0.5);
+    animation: highlight 2s ease-out;
+}
+
+@keyframes highlight {
+    0% { background-color: rgba(144, 200, 60, 0.2); }
+    100% { background-color: rgba(33, 37, 41, 0.95); }
+}
+
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    background: rgba(144, 200, 60, 0.9);
+    color: white;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 300px;
+    transition: all 0.3s ease;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-left: 15px;
 }
 
 .delete-lobby-btn {
@@ -205,6 +260,11 @@
     transform: translateY(-2px);
 }
 
+.start-race-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
 .view-btn {
     background: rgba(144, 200, 60, 0.1);
     color: #90C83C;
@@ -250,38 +310,110 @@
     .lobbies-grid {
         grid-template-columns: 1fr;
     }
+    
+    .lobby-card {
+        width: 100%;
+    }
 }
 
-.back-button-container {
-    text-align: center;
-    margin-top: 40px;
-    margin-bottom: 20px;
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
 }
 
-.back-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(144, 200, 60, 0.1);
+.modal-content {
+    position: relative;
+    background-color: rgba(33, 37, 41, 0.95);
+    margin: 10% auto;
+    padding: 0;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 500px;
+    animation: animatetop 0.3s;
+}
+
+@keyframes animatetop {
+    from {top: -300px; opacity: 0}
+    to {top: 0; opacity: 1}
+}
+
+.modal-header {
+    padding: 15px 20px;
+    background-color: rgba(144, 200, 60, 0.1);
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    position: relative;
+}
+
+.modal-header h3 {
     color: #90C83C;
-    padding: 12px 24px;
-    border-radius: 6px;
-    text-decoration: none;
-    transition: all 0.2s;
+    margin: 0;
 }
 
-.back-btn:hover {
-    background: rgba(144, 200, 60, 0.2);
-    transform: translateY(-2px);
+.close-btn {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    background: none;
+    border: none;
+    color: #90C83C;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid rgba(144, 200, 60, 0.2);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.delete-confirm-btn {
+    background: rgba(220, 53, 69, 0.7);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.delete-confirm-btn:hover {
+    background: rgba(220, 53, 69, 0.9);
+}
+
+.cancel-btn {
+    background: rgba(108, 117, 125, 0.3);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cancel-btn:hover {
+    background: rgba(108, 117, 125, 0.5);
 }
 
 .btn-success {
     background: linear-gradient(135deg, #90C83C, #7AAF2F);
     color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
+    padding: 8px 15px;
+    border-radius: 5px;
     text-decoration: none;
+    display: inline-block;
     transition: all 0.2s;
 }
 
@@ -292,111 +424,256 @@
     text-decoration: none;
 }
 
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 1000;
-}
-
-.modal-content {
-    background: rgba(33, 37, 41, 0.95);
-    border: 2px solid rgba(144, 200, 60, 0.3);
-    border-radius: 12px;
-    width: 90%;
-    max-width: 400px;
-    margin: 50px auto;
-    padding: 20px;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.modal-header h3 {
-    color: #90C83C;
-    margin: 0;
-}
-
-.close-btn {
-    background: none;
-    border: none;
-    color: #ffffff;
-    font-size: 24px;
-    cursor: pointer;
-}
-
-.modal-body {
-    color: #ffffff;
-    margin-bottom: 20px;
+.back-button-container {
+    margin-top: 20px;
     text-align: center;
-}
-
-.modal-footer {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-}
-
-.delete-confirm-btn {
-    background: #dc3545;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.delete-confirm-btn:hover {
-    background: #c82333;
-}
-
-.cancel-btn {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.cancel-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
 }
 </style>
 
 <script>
+// Variables to store current state
+let currentLobbyId = null;
+let lobbiesData = {};
+
+// Initialize the lobbies data from the server
+document.addEventListener('DOMContentLoaded', function() {
+    // Get all lobbies and store their data
+    const lobbyCards = document.querySelectorAll('.lobby-card');
+    lobbyCards.forEach(card => {
+        const lobbyId = card.getAttribute('data-lobby-id');
+        const teamCount = card.querySelector('.team-count').textContent;
+        const statusText = card.querySelector('.status-text').textContent;
+        const huntStatusEl = card.querySelector('.hunt-status');
+        const huntStatus = huntStatusEl ? huntStatusEl.style.display !== 'none' : false;
+        
+        lobbiesData[lobbyId] = {
+            teamCount: parseInt(teamCount),
+            active: statusText === 'Active',
+            huntStarted: huntStatus
+        };
+    });
+    
+    // Set up WebSocket connection
+    setupWebSocket();
+});
+
+function setupWebSocket() {
+    const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const lobbySocket = new WebSocket(
+        `${wsScheme}//${window.location.host}/ws/lobbies/`
+    );
+    
+    lobbySocket.onopen = function() {
+        console.log('Lobbies WebSocket connected');
+        showNotification('Real-time updates connected', 'success');
+    };
+    
+    lobbySocket.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            console.log('Lobby message received:', data);
+            
+            // Handle different types of updates
+            if (data.type === 'lobby_update') {
+                handleLobbyUpdate(data);
+            } else if (data.type === 'team_joined') {
+                handleTeamJoined(data);
+            } else if (data.type === 'race_started') {
+                handleRaceStarted(data);
+            }
+        } catch (e) {
+            console.error('Error handling WebSocket message:', e);
+        }
+    };
+    
+    lobbySocket.onclose = function() {
+        console.warn('Lobbies WebSocket disconnected. Reconnecting in 5 seconds...');
+        setTimeout(setupWebSocket, 5000);
+    };
+    
+    lobbySocket.onerror = function(error) {
+        console.error('WebSocket error:', error);
+        showNotification('Connection error. Reconnecting...', 'error');
+    };
+}
+
+function handleLobbyUpdate(data) {
+    const lobbyId = data.lobby_id;
+    const lobbyCard = document.querySelector(`.lobby-card[data-lobby-id="${lobbyId}"]`);
+    
+    if (!lobbyCard) {
+        // Lobby not in the current view, might need to refresh
+        console.log(`Lobby ${lobbyId} was updated but not found in the current view`);
+        return;
+    }
+    
+    // Apply the updated class for visual feedback
+    lobbyCard.classList.add('updated');
+    setTimeout(() => {
+        lobbyCard.classList.remove('updated');
+    }, 2000);
+    
+    // Update the status if needed
+    if (data.is_active !== undefined && data.is_active !== lobbiesData[lobbyId]?.active) {
+        const statusText = lobbyCard.querySelector('.status-text');
+        const statusIcon = statusText.parentElement.querySelector('i');
+        
+        statusText.textContent = data.is_active ? 'Active' : 'Inactive';
+        statusIcon.className = data.is_active ? 'fas fa-check-circle' : 'fas fa-times-circle';
+        
+        lobbiesData[lobbyId].active = data.is_active;
+        showNotification(`Lobby status updated to ${data.is_active ? 'Active' : 'Inactive'}`, 'success');
+    }
+    
+    // Update hunt started status if needed
+    if (data.hunt_started !== undefined && data.hunt_started !== lobbiesData[lobbyId]?.huntStarted) {
+        const huntStatusEl = lobbyCard.querySelector('.hunt-status');
+        const startRaceBtn = lobbyCard.querySelector('.start-race-btn');
+        
+        if (data.hunt_started) {
+            // If hunt started, update UI
+            if (huntStatusEl) {
+                huntStatusEl.style.display = 'block';
+                huntStatusEl.querySelector('.hunt-status-text').textContent = 'Started';
+            }
+            
+            // Update start race button
+            if (startRaceBtn) {
+                startRaceBtn.innerHTML = '<i class="fas fa-check"></i> Race Started';
+                startRaceBtn.disabled = true;
+                startRaceBtn.style.backgroundColor = 'rgba(144, 200, 60, 0.3)';
+            }
+            
+            showNotification('Race has been started', 'success');
+        }
+        
+        lobbiesData[lobbyId].huntStarted = data.hunt_started;
+    }
+}
+
+function handleTeamJoined(data) {
+    const lobbyId = data.lobby_id;
+    const lobbyCard = document.querySelector(`.lobby-card[data-lobby-id="${lobbyId}"]`);
+    
+    if (!lobbyCard) return;
+    
+    // Update team count
+    const teamCountEl = lobbyCard.querySelector('.team-count');
+    if (teamCountEl) {
+        const currentCount = parseInt(teamCountEl.textContent);
+        const newCount = currentCount + 1;
+        teamCountEl.textContent = newCount;
+        lobbiesData[lobbyId].teamCount = newCount;
+        
+        // Apply updated class
+        lobbyCard.classList.add('updated');
+        setTimeout(() => {
+            lobbyCard.classList.remove('updated');
+        }, 2000);
+        
+        showNotification(`New team joined Lobby #${lobbyId}`, 'success');
+    }
+}
+
+function handleRaceStarted(data) {
+    const lobbyId = data.lobby_id;
+    const lobbyCard = document.querySelector(`.lobby-card[data-lobby-id="${lobbyId}"]`);
+    
+    if (!lobbyCard) return;
+    
+    // Update race status
+    const huntStatusEl = lobbyCard.querySelector('.hunt-status');
+    if (huntStatusEl) {
+        huntStatusEl.style.display = 'block';
+        huntStatusEl.querySelector('.hunt-status-text').textContent = 'Started';
+    }
+    
+    // Update start race button
+    const startRaceBtn = lobbyCard.querySelector('.start-race-btn');
+    if (startRaceBtn) {
+        startRaceBtn.innerHTML = '<i class="fas fa-check"></i> Race Started';
+        startRaceBtn.disabled = true;
+        startRaceBtn.style.backgroundColor = 'rgba(144, 200, 60, 0.3)';
+    }
+    
+    // Apply updated class
+    lobbyCard.classList.add('updated');
+    setTimeout(() => {
+        lobbyCard.classList.remove('updated');
+    }, 2000);
+    
+    lobbiesData[lobbyId].huntStarted = true;
+    
+    showNotification(`Race started for Lobby #${lobbyId}`, 'success');
+}
+
+function showNotification(message, type = 'success') {
+    const notification = document.getElementById('notification');
+    const messageEl = document.getElementById('notification-message');
+    
+    // Set message and style
+    messageEl.textContent = message;
+    
+    if (type === 'error') {
+        notification.style.background = 'rgba(220, 53, 69, 0.9)';
+    } else {
+        notification.style.background = 'rgba(144, 200, 60, 0.9)';
+    }
+    
+    // Show notification
+    notification.style.display = 'flex';
+    
+    // Auto hide after 3 seconds
+    setTimeout(closeNotification, 3000);
+}
+
+function closeNotification() {
+    const notification = document.getElementById('notification');
+    notification.style.display = 'none';
+}
+
 let lobbyToDelete = null;
 
 function confirmDeleteLobby(lobbyId) {
     lobbyToDelete = lobbyId;
-    document.getElementById('deleteModal').style.display = 'block';
+    const modal = document.getElementById('deleteModal');
+    modal.style.display = 'block';
 }
 
 function closeDeleteModal() {
-    document.getElementById('deleteModal').style.display = 'none';
+    const modal = document.getElementById('deleteModal');
+    modal.style.display = 'none';
     lobbyToDelete = null;
 }
 
 function deleteLobby() {
     if (!lobbyToDelete) return;
     
+    // Find the lobby card and add a deleting class
+    const lobbyCard = document.querySelector(`.lobby-card[data-lobby-id="${lobbyToDelete}"]`);
+    if (lobbyCard) {
+        lobbyCard.style.opacity = '0.5';
+    }
+    
+    // Make the delete request
     fetch(`/lobby/${lobbyToDelete}/delete/`, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': getCookie('csrftoken')
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
         }
     })
-    .then(response => {
-        if (response.ok) {
-            window.location.reload();
+    .then(response => response.json())
+    .then(data => {
+        // Close the modal
+        closeDeleteModal();
+        
+        if (data.status === 'success') {
+            // Remove the lobby card from the UI
+            if (lobbyCard) {
+                lobbyCard.remove();
+                showNotification('Lobby deleted successfully', 'success');
+            }
         } else {
             alert('Failed to delete lobby');
         }
@@ -485,6 +762,16 @@ function startRace(lobbyId) {
                     startBtn.disabled = true;
                     startBtn.style.backgroundColor = 'rgba(144, 200, 60, 0.3)';
                 }
+                
+                // Update hunt status
+                const huntStatusEl = lobbyEl.querySelector('.hunt-status');
+                if (huntStatusEl) {
+                    huntStatusEl.style.display = 'block';
+                    huntStatusEl.querySelector('.hunt-status-text').textContent = 'Started';
+                }
+                
+                // Update our local data
+                lobbiesData[lobbyId].huntStarted = true;
             }
             
             // Remove notification after 3 seconds

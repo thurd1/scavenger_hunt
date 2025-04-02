@@ -458,4 +458,102 @@ class RaceConsumer(AsyncWebsocketConsumer):
             'message': 'Race has started! Get ready to answer questions.'
         }))
         
-        logging.info(f"Sent race_started event to client in race {self.race_id}") 
+        logging.info(f"Sent race_started event to client in race {self.race_id}")
+
+# Add this new consumer class
+class LobbiesConsumer(AsyncWebsocketConsumer):
+    """
+    WebSocket consumer for managing multiple lobbies in real-time.
+    This consumer doesn't track a specific lobby, but instead broadcasts
+    updates about all lobbies to connected clients.
+    """
+    
+    async def connect(self):
+        # Group name for all lobbies management connections
+        self.group_name = 'lobbies_management'
+        
+        logger.info(f"WebSocket connecting to lobbies management")
+        
+        # Join the group
+        await self.channel_layer.group_add(
+            self.group_name,
+            self.channel_name
+        )
+        
+        # Accept the connection
+        await self.accept()
+        
+        # Send current lobbies data
+        await self.send_lobbies_data()
+    
+    async def disconnect(self, close_code):
+        logger.info(f"WebSocket disconnected from lobbies management with code {close_code}")
+        
+        # Leave the group
+        await self.channel_layer.group_discard(
+            self.group_name,
+            self.channel_name
+        )
+    
+    @database_sync_to_async
+    def get_all_lobbies_data(self):
+        """Get data for all lobbies"""
+        lobbies_data = []
+        
+        try:
+            lobbies = Lobby.objects.all().prefetch_related('teams', 'race')
+            
+            for lobby in lobbies:
+                lobbies_data.append({
+                    'id': lobby.id,
+                    'name': lobby.name if hasattr(lobby, 'name') else f"Lobby {lobby.id}",
+                    'code': lobby.code,
+                    'is_active': lobby.is_active,
+                    'hunt_started': lobby.hunt_started,
+                    'teams_count': lobby.teams.count(),
+                    'race_id': lobby.race.id if lobby.race else None,
+                    'race_name': lobby.race.name if lobby.race else None,
+                    'created_at': lobby.created_at.isoformat() if lobby.created_at else None
+                })
+            
+            return lobbies_data
+        except Exception as e:
+            logger.error(f"Error getting lobbies data: {e}")
+            return []
+    
+    async def send_lobbies_data(self):
+        """Send current lobbies data to connected client"""
+        lobbies = await self.get_all_lobbies_data()
+        
+        await self.send(text_data=json.dumps({
+            'type': 'lobbies_update',
+            'lobbies': lobbies
+        }))
+    
+    async def receive(self, text_data):
+        """Handle received messages"""
+        try:
+            data = json.loads(text_data)
+            logger.info(f"Received data in LobbiesConsumer: {data}")
+            
+            # Handle message types
+            if data.get('type') == 'request_update':
+                await self.send_lobbies_data()
+            
+        except json.JSONDecodeError:
+            logger.error("Failed to decode JSON in LobbiesConsumer")
+        except Exception as e:
+            logger.error(f"Error in LobbiesConsumer receive: {e}")
+    
+    async def lobby_update(self, event):
+        """Handle lobby update event - broadcast to all clients"""
+        # Forward the update to the client
+        await self.send(text_data=json.dumps(event))
+    
+    async def team_joined(self, event):
+        """Handle team joined event"""
+        await self.send(text_data=json.dumps(event))
+    
+    async def race_started(self, event):
+        """Handle race started event"""
+        await self.send(text_data=json.dumps(event)) 
