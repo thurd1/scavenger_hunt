@@ -96,6 +96,8 @@ function connectToRaceWebsocket(raceId) {
  * @param {number} raceId - The race ID
  */
 function handleRaceStartedEvent(data, raceId) {
+    console.log('🔥🔥 Race started event handler called with data:', data);
+    
     // Create a visible notification that will persist
     const notification = document.createElement('div');
     notification.style.position = 'fixed';
@@ -137,10 +139,14 @@ function handleRaceStartedEvent(data, raceId) {
     if (data.redirect_url) {
         redirectUrl = data.redirect_url;
         console.log(`Using redirect URL from event: ${redirectUrl}`);
+    } else if (data.race_id) {
+        // Use race ID from the event data if available
+        redirectUrl = `/race/${data.race_id}/questions/`;
+        console.log(`Using race ID from event data: ${redirectUrl}`);
     } else {
-        // Construct it from the race ID
+        // Construct it from the race ID parameter
         redirectUrl = `/race/${raceId}/questions/`;
-        console.log(`Using constructed URL: ${redirectUrl}`);
+        console.log(`Using race ID from parameter: ${redirectUrl}`);
     }
     
     // Create a direct link that users can click if auto-redirect fails

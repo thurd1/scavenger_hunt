@@ -1,10 +1,14 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Team View{% endblock %}
+{% block title %}Team: {{ team.name }}{% endblock %}
 
 {% block head_extras %}
 <script src="{% static 'hunt/js/race-websocket.js' %}"></script>
+{% endblock %}
+
+{% block welcome_text %}
+    <p style="color: #90C83C">Team Information</p>
 {% endblock %}
 
 {% block body_attributes %}data-race-id="{{ race_id }}"{% endblock %}
@@ -12,44 +16,39 @@
 {% block content %}
 <div class="container py-4">
     <div class="dashboard-box p-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 style="color: #90C83C">Team: {{ team.name }}</h2>
-        </div>
-
-        <!-- Debug info - can be removed in production -->
-        <div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa;">
-            <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
-            <p class="mb-1">Lobby: {{ lobby.name|default:"None" }}</p>
-            <p class="mb-1">Lobby Code: {{ lobby_code|default:"None" }}</p>
-            <p class="mb-1">Race ID: {{ race.id|default:"None" }}</p>
-            <p class="mb-0">Members count: {{ members|length }}</p>
-        </div>
-        
-        <div class="row">
-            <div class="col-12">
-                <div class="members-section">
-                    <h4 style="color: #90C83C">Team Members</h4>
-                    <div class="members-list" id="members-container">
-                        {% if members %}
-                            {% for member in members %}
-                            <div class="member-item mb-2 p-2 bg-dark rounded" data-member="{{ member.role }}">
-                                <i class="fas fa-user me-2"></i>
-                                {{ member.role }}
-                            </div>
-                            {% endfor %}
-                        {% else %}
-                            <p class="text-muted">No members in this team yet.</p>
-                        {% endif %}
-                    </div>
-                </div>
+        <div class="lobby-header">
+            <h1>{{ team.name }}</h1>
+            
+            <!-- Debug info - only visible during development -->
+            <div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa; text-align: left;">
+                <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
+                <p class="mb-1">Lobby: {{ lobby.name|default:"None" }}</p>
+                <p class="mb-1">Lobby Code: {{ lobby_code|default:"None" }}</p>
+                <p class="mb-1">Race ID: {{ race.id|default:"None" }}</p>
+                <p class="mb-0">Members count: {{ members|length }}</p>
             </div>
         </div>
-        <input type="hidden" id="sessionPlayerName" value="{{ request.session.player_name }}">
-        <div class="text-center mt-4">
-            <a href="{% url 'join_team' %}" class="btn btn-success">
-                <i class="fas fa-arrow-left"></i> Back to Teams
-            </a>
+
+        <div class="members-section">
+            <h2 class="section-title">Team Members</h2>
+            <div class="members-grid" id="members-container">
+                {% if members %}
+                    {% for member in members %}
+                    <div class="member-card" data-member="{{ member.role }}">
+                        <div class="member-header">
+                            <h3><i class="fas fa-user"></i> {{ member.role }}</h3>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-members-message">
+                        <p>No members in this team yet.</p>
+                    </div>
+                {% endif %}
+            </div>
         </div>
+        
+        <input type="hidden" id="sessionPlayerName" value="{{ request.session.player_name }}">
         
         <!-- Race status notification area -->
         <div id="race-status-area" class="race-status-area mt-4 p-3 rounded" style="display: none;">
@@ -57,20 +56,28 @@
             <p id="race-status-message" class="text-center mb-0"></p>
         </div>
         
-        <!-- Manual race access button (for fallback) -->
-        {% if race.id %}
-        <div class="text-center mt-3">
-            <a href="{% url 'race_questions' race.id %}" class="btn btn-sm btn-success">
-                <i class="fas fa-play"></i> Access Race Questions
-            </a>
-        </div>
-        {% elif race_id %}
-        <div class="text-center mt-3">
-            <a href="{% url 'race_questions' race_id %}" class="btn btn-sm btn-success">
-                <i class="fas fa-play"></i> Access Race Questions
-            </a>
+        <!-- Race access section -->
+        {% if race.id or race_id %}
+        <div class="actions-section">
+            <div class="action-buttons">
+                {% if race.id %}
+                <a href="{% url 'race_questions' race.id %}" class="btn btn-success">
+                    <i class="fas fa-play"></i> Access Race Questions
+                </a>
+                {% elif race_id %}
+                <a href="{% url 'race_questions' race_id %}" class="btn btn-success">
+                    <i class="fas fa-play"></i> Access Race Questions
+                </a>
+                {% endif %}
+            </div>
         </div>
         {% endif %}
+
+        <div class="back-button-container">
+            <a href="{% url 'join_team' %}" class="btn btn-success">
+                <i class="fas fa-arrow-left"></i> Back to Teams
+            </a>
+        </div>
     </div>
 </div>
 
@@ -81,44 +88,126 @@
     border: 1px solid rgba(144, 200, 60, 0.2);
 }
 
+.lobby-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.lobby-header h1 {
+    color: #90C83C;
+    margin: 0 0 15px 0;
+}
+
 .members-section {
-    background-color: rgba(33, 37, 41, 0.5);
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.section-title {
+    color: #90C83C;
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.members-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 10px;
+}
+
+.member-card {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.member-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(144, 200, 60, 0.2);
+}
+
+.member-header {
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    padding-bottom: 10px;
+}
+
+.member-header h3 {
+    color: #90C83C;
+    margin: 0 0 5px 0;
+    font-size: 1.2rem;
+}
+
+.no-members-message {
+    text-align: center;
+    color: #999;
+    padding: 2rem;
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 10px;
-    padding: 1.5rem;
-    border: 1px solid rgba(144, 200, 60, 0.2);
-}
-
-.member-item {
-    border: 1px solid rgba(144, 200, 60, 0.2);
-    transition: all 0.3s ease;
-    opacity: 1;
-}
-
-.member-item:hover {
-    transform: translateX(5px);
-    background-color: rgba(144, 200, 60, 0.1) !important;
-}
-
-.btn-success {
-    background: linear-gradient(135deg, #90C83C, #7AAF2F);
-    border: none;
-    padding: 10px 20px;
-    transition: all 0.3s;
-}
-
-.btn-success:hover {
-    background: linear-gradient(135deg, #7AAF2F, #90C83C);
-    transform: translateY(-2px);
+    grid-column: 1 / -1;
 }
 
 .race-status-area {
     background-color: rgba(33, 37, 41, 0.7);
     border: 1px solid rgba(144, 200, 60, 0.3);
+    max-width: 800px;
+    margin: 1rem auto;
+    border-radius: 12px;
 }
 
 .race-status-area.active {
     background-color: rgba(144, 200, 60, 0.2);
     animation: pulse 2s infinite;
+}
+
+.actions-section {
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.back-button-container {
+    text-align: center;
+    padding: 20px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
 }
 
 @keyframes pulse {
@@ -127,6 +216,7 @@
     100% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0); }
 }
 </style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
@@ -136,6 +226,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Check race ID from multiple sources
     let raceId = '{{ race.id|default:"" }}';
+    if (!raceId) {
+        raceId = '{{ race_id|default:"" }}';
+    }
     if (!raceId) {
         raceId = urlParams.get('race_id');
     }
@@ -166,6 +259,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data.redirect_url) {
             redirectUrl = data.redirect_url;
             console.log(`Using redirect URL from event: ${redirectUrl}`);
+        } else if (data.race_id) {
+            redirectUrl = `/race/${data.race_id}/questions/`;
+            console.log(`Using race ID from event: ${redirectUrl}`);
         } else if (raceId) {
             // Use a direct URL to the questions page
             redirectUrl = `/race/${raceId}/questions/`;
@@ -248,84 +344,72 @@ document.addEventListener('DOMContentLoaded', function() {
         ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
     );
 
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
-    let reconnectTimeout;
-
     teamSocket.onopen = function(e) {
-        console.log('Team WebSocket connection established');
-        reconnectAttempts = 0;
-        
-        // Send player name and request initial state
-        if (playerName) {
-            console.log('Sending player name:', playerName);
-            teamSocket.send(JSON.stringify({
-                'action': 'join',
-                'player_name': playerName
-            }));
-        }
-        
-        // Request initial state
-        teamSocket.send(JSON.stringify({
-            'action': 'get_state'
-        }));
+        console.log('WebSocket connection established');
     };
-    
+
     teamSocket.onmessage = function(e) {
-        console.log('Team WebSocket message received:', e.data);
         const data = JSON.parse(e.data);
+        console.log('WebSocket message received:', data);
         
         if (data.type === 'team_update') {
-            switch(data.action) {
-                case 'join':
-                    console.log('Member joined:', data.player_name);
-                    addMemberToList(data.player_name);
-                    break;
-                    
-                case 'leave':
-                    console.log('Member left:', data.player_name);
-                    removeMemberFromList(data.player_name);
-                    break;
-                    
-                case 'state':
-                    console.log('Received state update:', data);
+            if (data.action === 'state') {
+                // Full team state update
+                updateMembersList(data.members);
+            } else if (data.action === 'join') {
+                // Add a single member
+                addMember(data.player_name);
+            } else if (data.action === 'leave') {
+                // Remove a single member
+                removeMember(data.player_name);
+            } else {
+                // Generic update - refresh the whole list
+                if (data.members) {
                     updateMembersList(data.members);
-                    break;
+                }
             }
-        } else if (data.type === 'race_started') {
-            console.log('Race started message received in team socket:', data);
-            window.handleRaceStarted(data);
         }
     };
-    
-    teamSocket.onerror = function(e) {
-        console.error('WebSocket error:', e);
-    };
-    
+
     teamSocket.onclose = function(e) {
         console.log('WebSocket connection closed');
         
-        // If the player is still on the page, try to reconnect
-        if (playerName) {
-            reconnect();
-        }
+        // Try to reconnect after a delay
+        setTimeout(function() {
+            console.log('Attempting to reconnect WebSocket...');
+            const newSocket = new WebSocket(
+                ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
+            );
+            teamSocket = newSocket;
+        }, 3000);
     };
 
-    function reconnect() {
-        if (reconnectAttempts < maxReconnectAttempts) {
-            reconnectAttempts++;
-            console.log(`Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
-            
-            reconnectTimeout = setTimeout(() => {
-                teamSocket = new WebSocket(
-                    ws_scheme + '://' + window.location.host + '/ws/team/' + teamId + '/'
-                );
-                connect();
-            }, 3000);
-        }
+    // Send join message when page loads if we have a player name
+    if (playerName) {
+        setTimeout(function() {
+            if (teamSocket.readyState === WebSocket.OPEN) {
+                teamSocket.send(JSON.stringify({
+                    'action': 'join',
+                    'player_name': playerName
+                }));
+            } else {
+                console.log('WebSocket not open yet, waiting...');
+                // Try again in a moment
+                setTimeout(function() {
+                    if (teamSocket.readyState === WebSocket.OPEN) {
+                        teamSocket.send(JSON.stringify({
+                            'action': 'join',
+                            'player_name': playerName
+                        }));
+                    } else {
+                        console.log('WebSocket still not open, giving up on sending join message');
+                    }
+                }, 1000);
+            }
+        }, 500);
     }
 
-    // Handle page unload
+    // When user leaves the page, send a leave message
     window.addEventListener('beforeunload', function() {
         if (playerName && teamSocket.readyState === WebSocket.OPEN) {
             teamSocket.send(JSON.stringify({
@@ -334,71 +418,77 @@ document.addEventListener('DOMContentLoaded', function() {
             }));
         }
     });
-    
-    function addMemberToList(memberName) {
-        // Don't add if already exists
-        if (!document.querySelector(`.member-item[data-member="${memberName}"]`)) {
-            const memberItem = document.createElement('div');
-            memberItem.className = 'member-item mb-2 p-2 bg-dark rounded';
-            memberItem.setAttribute('data-member', memberName);
-            memberItem.innerHTML = `<i class="fas fa-user me-2"></i> ${memberName}`;
-            
-            // Add with animation
-            memberItem.style.opacity = '0';
-            membersContainer.appendChild(memberItem);
-            setTimeout(() => memberItem.style.opacity = '1', 10);
-            
-            // Remove "No members" message if it exists
-            const noMembers = membersContainer.querySelector('.text-muted');
-            if (noMembers) {
-                noMembers.remove();
-            }
-        }
-    }
-    
-    function removeMemberFromList(memberName) {
-        const memberItem = document.querySelector(`.member-item[data-member="${memberName}"]`);
-        if (memberItem) {
-            // Remove with animation
-            memberItem.style.opacity = '0';
-            setTimeout(() => {
-                memberItem.remove();
-                
-                // Add "No members" message if list is empty
-                if (!membersContainer.querySelector('.member-item')) {
-                    const noMembers = document.createElement('p');
-                    noMembers.className = 'text-muted';
-                    noMembers.textContent = 'No members in this team yet.';
-                    membersContainer.appendChild(noMembers);
-                }
-            }, 300);
-        }
-    }
-    
-    // Function to update the members list
+
     function updateMembersList(members) {
-        console.log('Updating members list with:', members);
-        
         if (!membersContainer) return;
         
-        // Clear existing content
+        // Clear current members
         membersContainer.innerHTML = '';
         
         if (members && members.length > 0) {
-            // Add each member to the list
-            members.forEach(member => {
-                const memberItem = document.createElement('div');
-                memberItem.className = 'member-item mb-2 p-2 bg-dark rounded';
-                memberItem.setAttribute('data-member', member);
-                memberItem.innerHTML = `<i class="fas fa-user me-2"></i> ${member}`;
-                membersContainer.appendChild(memberItem);
+            members.forEach(function(member) {
+                const memberCard = document.createElement('div');
+                memberCard.className = 'member-card';
+                memberCard.setAttribute('data-member', member);
+                
+                const memberHeader = document.createElement('div');
+                memberHeader.className = 'member-header';
+                
+                const memberName = document.createElement('h3');
+                memberName.innerHTML = `<i class="fas fa-user"></i> ${member}`;
+                
+                memberHeader.appendChild(memberName);
+                memberCard.appendChild(memberHeader);
+                membersContainer.appendChild(memberCard);
             });
         } else {
-            // No members
-            const noMembers = document.createElement('p');
-            noMembers.className = 'text-muted';
-            noMembers.textContent = 'No members in this team yet.';
-            membersContainer.appendChild(noMembers);
+            const noMembersMsg = document.createElement('div');
+            noMembersMsg.className = 'no-members-message';
+            noMembersMsg.innerHTML = '<p>No members in this team yet.</p>';
+            membersContainer.appendChild(noMembersMsg);
+        }
+    }
+
+    function addMember(memberName) {
+        // Check if member already exists
+        if (document.querySelector(`.member-card[data-member="${memberName}"]`)) {
+            return;
+        }
+        
+        // Remove "no members" message if it exists
+        const noMembersMsg = membersContainer.querySelector('.no-members-message');
+        if (noMembersMsg) {
+            membersContainer.removeChild(noMembersMsg);
+        }
+        
+        // Create and add the new member card
+        const memberCard = document.createElement('div');
+        memberCard.className = 'member-card';
+        memberCard.setAttribute('data-member', memberName);
+        
+        const memberHeader = document.createElement('div');
+        memberHeader.className = 'member-header';
+        
+        const memberNameElem = document.createElement('h3');
+        memberNameElem.innerHTML = `<i class="fas fa-user"></i> ${memberName}`;
+        
+        memberHeader.appendChild(memberNameElem);
+        memberCard.appendChild(memberHeader);
+        membersContainer.appendChild(memberCard);
+    }
+
+    function removeMember(memberName) {
+        const memberCard = document.querySelector(`.member-card[data-member="${memberName}"]`);
+        if (memberCard) {
+            membersContainer.removeChild(memberCard);
+            
+            // If no members left, show the message
+            if (membersContainer.children.length === 0) {
+                const noMembersMsg = document.createElement('div');
+                noMembersMsg.className = 'no-members-message';
+                noMembersMsg.innerHTML = '<p>No members in this team yet.</p>';
+                membersContainer.appendChild(noMembersMsg);
+            }
         }
     }
 });
