@@ -253,17 +253,18 @@ def save_player_name(request):
     return redirect('join_game_session')
 
 def broadcast_team_update(team_id):
-                    channel_layer = get_channel_layer()
-team = Team.objects.prefetch_related('team_members').get(id=team_id)
-members = list(team.team_members.values_list('role', flat=True))
-                    
-async_to_sync(channel_layer.group_send)(
+    """Send team update to websocket channel"""
+    channel_layer = get_channel_layer()
+    team = Team.objects.prefetch_related('members').get(id=team_id)
+    members = list(team.members.values_list('role', flat=True))
+    
+    async_to_sync(channel_layer.group_send)(
         f'team_{team_id}',
-                        {
-                            'type': 'team_update',
-                            'members': members
-                        }
-                    )
+        {
+            'type': 'team_update',
+            'members': members
+        }
+    )
 
 def get_lobby_by_code(request):
     """API endpoint to get a lobby by its code"""
