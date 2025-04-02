@@ -228,7 +228,7 @@ def save_player_name(request):
         print(f"Attempting to save player name: {player_name}")  # Debug print
         
         if player_name:
-        request.session['player_name'] = player_name
+            request.session['player_name'] = player_name
             request.session.modified = True
             print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
         
@@ -240,8 +240,8 @@ def save_player_name(request):
             lobby_code = request.session.get('lobby_code')
             if lobby_code:
                 try:
-                    lobby = Lobby.objects.get(code=lobby_code)
-        return render(request, 'hunt/team_options.html', {'lobby': lobby})
+                    lobby = Lobby.objects.get(code=lobby_code)  
+                    return render(request, 'hunt/team_options.html', {'lobby': lobby})
                 except Lobby.DoesNotExist:
                     # Lobby not found, redirect to join_game_session
                     pass
@@ -254,17 +254,17 @@ def save_player_name(request):
 
 def broadcast_team_update(team_id):
     """Send team update to websocket channel"""
-                    channel_layer = get_channel_layer()
+    channel_layer = get_channel_layer()
     team = Team.objects.prefetch_related('members').get(id=team_id)
     members = list(team.members.values_list('role', flat=True))
     
-                    async_to_sync(channel_layer.group_send)(
+    async_to_sync(channel_layer.group_send)(
         f'team_{team_id}',
-                        {
-                            'type': 'team_update',
-                            'members': members
-                        }
-                    )
+        {
+            'type': 'team_update',
+            'members': members
+        }
+    )
 
 def get_lobby_by_code(request):
     """API endpoint to get a lobby by its code"""
@@ -292,7 +292,7 @@ def join_team(request):
         if request.method == 'POST' and 'player_name' in request.POST:
             request.session['player_name'] = request.POST.get('player_name')
             request.session.modified = True
-                else:
+        else:
             # We won't set a default name here
             # Let's send the user back to set their name properly
             return redirect('join_game_session')
@@ -544,7 +544,7 @@ def create_team(request, lobby_id):
             lobby.teams.add(team)
             
             # Create a team member for the creator - removed name field
-                    team_member = TeamMember.objects.create(
+            team_member = TeamMember.objects.create(
                         team=team,
                         role=player_name
                     )
@@ -1342,35 +1342,48 @@ def race_questions(request, race_id):
     return render(request, 'hunt/race_questions.html', context)
 
 def check_race_status(request, race_id):
-    """Check if the race has started - called by client-side polling"""
-    race = get_object_or_404(Race, id=race_id)
-    
-    # Check if the race is connected to any lobby that has started
-    started = False
-    redirect_url = None
-    
+    """API endpoint to check if a race has started"""
     try:
+        race = get_object_or_404(Race, id=race_id)
+        
+        # Check if race is active
+        is_active = race.is_active
+        
         # Check if any lobby with this race has started the hunt
+        hunt_started = False
+        redirect_url = None
+        
         lobbies = Lobby.objects.filter(race=race)
         for lobby in lobbies:
             if lobby.hunt_started:
-                started = True
+                hunt_started = True
                 redirect_url = reverse('race_questions', kwargs={'race_id': race_id})
                 break
-                
-        # If we don't have lobbies, check the race directly
+        
+        # If we don't have lobbies or direct start, check the race directly
         if not lobbies.exists():
-            started = race.is_active
-            if started:
+            hunt_started = race.is_active
+            if hunt_started:
                 redirect_url = reverse('race_questions', kwargs={'race_id': race_id})
+        
+        # Return status as JSON
+        return JsonResponse({
+            'race_id': race_id,
+            'started': hunt_started,
+            'hunt_started': hunt_started,  # Alias for compatibility
+            'redirect_url': redirect_url,
+            'is_active': is_active
+        })
     except Exception as e:
-        print(f"Error checking race status: {e}")
-    
-    return JsonResponse({
-        'started': started,
-        'redirect_url': redirect_url,
-        'race_id': race_id
-    })
+        return JsonResponse({
+            'error': str(e),
+            'started': False
+        })
+
+# Add alias for compatibility with existing code
+def race_status(request, race_id):
+    """Alias for check_race_status"""
+    return check_race_status(request, race_id)
 
 def get_team_race(request, team_id):
     """API endpoint to get race associated with a team"""
