@@ -1190,7 +1190,7 @@ function getCookie(name) {
 }
 
 function toggleRaceStatus() {
-    fetch(`/race/{{ race.id }}/toggle-status/`, {
+    fetch(`/race/{{ race.id }}/toggle/`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1198,15 +1198,20 @@ function toggleRaceStatus() {
         }
     })
     .then(response => {
-        if (response.ok) {
-            window.location.reload();
-        } else {
-            alert('Failed to toggle race status. Please try again.');
+        if (response.redirected) {
+            window.location.href = response.url;
+            return;
         }
+        
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        
+        window.location.reload();
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while updating the race status.');
+        alert('Failed to toggle race status. Please try again.');
     });
 }
 </script>

@@ -65,7 +65,7 @@
                             });
                     });
                 </script>
-                {% endif %}
+        {% endif %}
             {% else %}
                 <div class="no-lobby-message">
                     <p>You need to join a lobby first before creating a team.</p>
@@ -73,7 +73,7 @@
                 </div>
             {% endif %}
         </div>
-        
+
         <!-- Back to Home button moved to bottom -->
         <div class="back-button-container" style="margin-top: 2rem; text-align: center;">
             <a href="{% url 'join_game_session' %}" class="btn btn-success" style="background: linear-gradient(135deg, #90C83C, #7AAF2F); border: none;">
@@ -545,9 +545,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .modal-content h3 {
             color: #90C83C;
             margin-bottom: 20px;
-            text-align: center;
-        }
-        
+    text-align: center;
+}
+
         .modal-buttons {
             display: flex;
             justify-content: space-between;

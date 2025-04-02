@@ -315,11 +315,11 @@ def save_player_name(request):
     return redirect('join_game_session')
 
 def broadcast_team_update(team_id):
-    channel_layer = get_channel_layer()
-    team = Team.objects.prefetch_related('team_members').get(id=team_id)
-    members = list(team.team_members.values_list('role', flat=True))
+                    channel_layer = get_channel_layer()
+team = Team.objects.prefetch_related('team_members').get(id=team_id)
+members = list(team.team_members.values_list('role', flat=True))
                     
-    async_to_sync(channel_layer.group_send)(
+async_to_sync(channel_layer.group_send)(
         f'team_{team_id}',
                         {
                             'type': 'team_update',
@@ -620,10 +620,10 @@ def create_team(request, lobby_id):
             
             # Create a team member for the creator
             team_member = TeamMember.objects.create(
-                team=team,
+                        team=team,
                 role=player_name,
                 name=player_name
-            )
+                    )
             print(f"Created team member: {player_name} for team {team.name}")
             
             # Store team info in session
