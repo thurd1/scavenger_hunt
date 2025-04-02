@@ -4,7 +4,6 @@
 {% block title %}Team: {{ team.name }}{% endblock %}
 
 {% block head_extras %}
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 {% endblock %}
 
@@ -57,20 +56,18 @@
             <p id="race-status-message" class="text-center mb-0"></p>
         </div>
         
-        <!-- Race started notification -->
-        <div id="race-started-notification" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
-            <div style="background-color: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 400px; box-shadow: 0 0 20px rgba(0,0,0,0.5);">
-                <h2 style="color: #2c3e50; font-size: 24px; margin-bottom: 15px;">🏁 Race Has Started! 🏁</h2>
-                <p id="countdown-display" style="font-size: 18px; margin: 15px 0; color: #e74c3c; font-weight: bold;">Redirecting in 5 seconds...</p>
-                <p style="margin: 10px 0; font-size: 16px;">If you're not redirected automatically, please tap the button below:</p>
-                <a id="go-to-race-btn" href="/race/{{ race.id }}/questions/" style="display: block; padding: 15px 30px; margin: 20px auto; background-color: #90C83C; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-                    Go to Race Now
+        <!-- Add a prominent race started notification that will appear when race starts -->
+        <div id="race-started-notification" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(33, 37, 41, 0.95); border: 3px solid #90C83C; border-radius: 15px; padding: 30px; max-width: 90%; width: 500px; text-align: center;">
+                <h2 style="color: #90C83C; margin-bottom: 20px;">Race Started!</h2>
+                <p style="color: white; font-size: 1.2rem; margin-bottom: 20px;">The race has begun! You will be redirected to the questions page.</p>
+                <div class="spinner" style="margin: 20px auto; border: 5px solid rgba(144, 200, 60, 0.3); border-radius: 50%; border-top: 5px solid #90C83C; width: 60px; height: 60px; animation: spin 1s linear infinite;"></div>
+                <p id="race-countdown" style="color: white; font-size: 1.1rem; margin: 20px 0;">Redirecting in 5 seconds...</p>
+                <a id="race-manual-redirect" href="/race/{{ race.id|default:race_id }}/questions/" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;" onclick="goToRaceNow(event)">
+                    <i class="fas fa-play"></i> Go to Race Now
                 </a>
             </div>
         </div>
-        
-        <!-- Hidden race ID for JavaScript -->
-        <input type="hidden" id="race-id" value="{{ race.id }}">
         
         <!-- Race access section -->
         {% if race.id or race_id %}
@@ -232,15 +229,9 @@
 }
 
 @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-
-#go-to-race-btn:active, 
-#go-to-race-btn:hover {
-    background-color: #7db52d !important;
-    transform: scale(0.98);
+    0% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(144, 200, 60, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0); }
 }
 </style>
 
@@ -251,36 +242,8 @@ function goToRaceNow(event) {
         event.preventDefault();
     }
     const raceId = '{{ race.id|default:race_id }}';
-    
-    console.log('Manual redirect triggered to race questions');
-    
-    // Try multiple redirection approaches for best mobile compatibility
-    try {
-        // Method 1: Direct assignment - most compatible
-        window.location.href = `/race/${raceId}/questions/`;
-        
-        // Method 2: Use replace (backup)
-        setTimeout(function() {
-            window.location.replace(`/race/${raceId}/questions/`);
-        }, 100);
-        
-        // Method 3: For stubborn mobile browsers, create and click a link
-        setTimeout(function() {
-            const tempLink = document.createElement('a');
-            tempLink.href = `/race/${raceId}/questions/`;
-            tempLink.setAttribute('target', '_self');
-            tempLink.style.display = 'none';
-            document.body.appendChild(tempLink);
-            tempLink.click();
-            document.body.removeChild(tempLink);
-        }, 200);
-    } catch (e) {
-        console.error('Error with redirect:', e);
-        // Last resort - direct the user to click manually
-        alert('Please tap the "Go to Race Now" button to continue to the race.');
-    }
-    
-    return false; // Prevent default behavior
+    // Try to navigate directly
+    window.location.href = `/race/${raceId}/questions/`;
 }
 
 // Initialize the team and race functionality
@@ -288,104 +251,41 @@ document.addEventListener('DOMContentLoaded', function() {
     const teamId = '{{ team.id }}';
     const raceId = '{{ race.id|default:race_id }}';
     const raceNotification = document.getElementById('race-started-notification');
-    const raceCountdown = document.getElementById('countdown-display');
+    const raceCountdown = document.getElementById('race-countdown');
     
     // Function to handle race start
     function handleRaceStart() {
-        console.log("Race started! Attempting to redirect...");
+        console.log('Race started event detected!');
         
-        // Get the race ID from the data attribute or URL
-        const raceId = document.getElementById('race-id').value;
-        if (!raceId) {
-            console.error("No race ID found for redirection");
-            return;
-        }
-
-        // Show notification with countdown
-        const notification = document.getElementById('race-started-notification');
-        notification.style.display = 'flex';
+        // Show the notification
+        raceNotification.style.display = 'block';
         
-        // Make go-to-race button more prominent for mobile
-        const goToRaceBtn = document.getElementById('go-to-race-btn');
-        goToRaceBtn.style.padding = '20px 30px';
-        goToRaceBtn.style.fontSize = '20px';
-        goToRaceBtn.style.backgroundColor = '#90C83C';
-        goToRaceBtn.style.color = 'white';
-        goToRaceBtn.style.border = 'none';
-        goToRaceBtn.style.borderRadius = '10px';
-        goToRaceBtn.style.margin = '20px auto';
-        goToRaceBtn.style.display = 'block';
-        goToRaceBtn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-        goToRaceBtn.style.textDecoration = 'none';
-        goToRaceBtn.style.textAlign = 'center';
-        
-        // URL to redirect to
-        const redirectUrl = `/race/${raceId}/questions/`;
-        console.log("Redirect URL:", redirectUrl);
-        
-        // Set the href directly
-        goToRaceBtn.href = redirectUrl;
-        
-        // Countdown display
-        const countdownElement = document.getElementById('countdown-display');
-        let secondsLeft = 5;
-        
-        function updateCountdown() {
-            countdownElement.textContent = `Redirecting in ${secondsLeft} seconds...`;
-            if (secondsLeft <= 0) {
-                clearInterval(countdownInterval);
-                performRedirects();
-            }
-            secondsLeft--;
-        }
-        
-        // Start countdown
-        updateCountdown();
-        const countdownInterval = setInterval(updateCountdown, 1000);
-        
-        // Try multiple methods for redirection (after countdown)
-        function performRedirects() {
-            countdownElement.textContent = "Redirecting now...";
+        // Set up countdown for redirect
+        let countdown = 5;
+        const countdownTimer = setInterval(function() {
+            countdown--;
+            raceCountdown.textContent = `Redirecting in ${countdown} seconds...`;
             
-            // Method 1: Direct location change
-            try {
-                console.log("Trying redirect method 1: window.location.href");
-                window.location.href = redirectUrl;
-            } catch (e) {
-                console.error("Method 1 failed:", e);
-            }
-            
-            // Method 2: location.replace (after short delay)
-            setTimeout(function() {
+            if (countdown <= 0) {
+                clearInterval(countdownTimer);
+                // Try different redirection methods
                 try {
-                    console.log("Trying redirect method 2: location.replace");
-                    window.location.replace(redirectUrl);
-                } catch (e) {
-                    console.error("Method 2 failed:", e);
-                }
-            }, 300);
-            
-            // Method 3: Create and click a temporary link (for stubborn mobile browsers)
-            setTimeout(function() {
-                try {
-                    console.log("Trying redirect method 3: link creation and click");
-                    const tempLink = document.createElement('a');
-                    tempLink.href = redirectUrl;
-                    tempLink.style.display = 'none';
-                    document.body.appendChild(tempLink);
-                    tempLink.click();
+                    // Method 1: Direct assignment
+                    window.location.href = `/race/${raceId}/questions/`;
                     
-                    // If we're still here after 1 second, show the manual button more prominently
+                    // Method 2 (after a brief delay if method 1 fails)
                     setTimeout(function() {
-                        countdownElement.textContent = "Unable to redirect automatically. Please tap the button below:";
-                        goToRaceBtn.style.animation = 'pulse 1s infinite';
-                        goToRaceBtn.style.boxShadow = '0 0 20px #ff9900';
-                    }, 1000);
+                        try {
+                            window.location.replace(`/race/${raceId}/questions/`);
+                        } catch (e) {
+                            console.error('Error with redirect method 2:', e);
+                        }
+                    }, 200);
                 } catch (e) {
-                    console.error("Method 3 failed:", e);
+                    console.error('Error redirecting:', e);
                 }
-            }, 600);
-        }
+            }
+        }, 1000);
     }
     
     // Connect to WebSocket for race updates
@@ -445,29 +345,15 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         const testButton = document.createElement('button');
         testButton.style.position = 'fixed';
-        testButton.style.bottom = '20px';
-        testButton.style.right = '20px';
+        testButton.style.bottom = '10px';
+        testButton.style.right = '10px';
         testButton.style.zIndex = '1000';
-        testButton.style.padding = '15px';
-        testButton.style.fontSize = '16px';
-        testButton.style.opacity = '0.8';
-        testButton.style.backgroundColor = '#90C83C';
-        testButton.style.color = 'white';
-        testButton.style.border = 'none';
-        testButton.style.borderRadius = '8px';
-        testButton.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+        testButton.style.padding = '5px';
+        testButton.style.opacity = '0.5';
         testButton.textContent = 'Test Race Start';
-        
-        // Add both click and touch events
-        testButton.addEventListener('click', function(e) {
-            e.preventDefault();
+        testButton.addEventListener('click', function() {
             handleRaceStart();
         });
-        testButton.addEventListener('touchstart', function(e) {
-            e.preventDefault();
-            handleRaceStart();
-        });
-        
         document.body.appendChild(testButton);
     }, 2000);
 });

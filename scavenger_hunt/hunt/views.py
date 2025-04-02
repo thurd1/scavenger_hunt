@@ -228,7 +228,7 @@ def save_player_name(request):
         print(f"Attempting to save player name: {player_name}")  # Debug print
         
         if player_name:
-            request.session['player_name'] = player_name
+        request.session['player_name'] = player_name
             request.session.modified = True
             print(f"Player name saved in session: {request.session.get('player_name')}")  # Debug print
         
@@ -241,7 +241,7 @@ def save_player_name(request):
             if lobby_code:
                 try:
                     lobby = Lobby.objects.get(code=lobby_code)
-                    return render(request, 'hunt/team_options.html', {'lobby': lobby})
+        return render(request, 'hunt/team_options.html', {'lobby': lobby})
                 except Lobby.DoesNotExist:
                     # Lobby not found, redirect to join_game_session
                     pass
@@ -254,17 +254,17 @@ def save_player_name(request):
 
 def broadcast_team_update(team_id):
     """Send team update to websocket channel"""
-    channel_layer = get_channel_layer()
+                    channel_layer = get_channel_layer()
     team = Team.objects.prefetch_related('members').get(id=team_id)
     members = list(team.members.values_list('role', flat=True))
     
-    async_to_sync(channel_layer.group_send)(
+                    async_to_sync(channel_layer.group_send)(
         f'team_{team_id}',
-        {
-            'type': 'team_update',
-            'members': members
-        }
-    )
+                        {
+                            'type': 'team_update',
+                            'members': members
+                        }
+                    )
 
 def get_lobby_by_code(request):
     """API endpoint to get a lobby by its code"""
@@ -292,7 +292,7 @@ def join_team(request):
         if request.method == 'POST' and 'player_name' in request.POST:
             request.session['player_name'] = request.POST.get('player_name')
             request.session.modified = True
-        else:
+                else:
             # We won't set a default name here
             # Let's send the user back to set their name properly
             return redirect('join_game_session')
@@ -544,10 +544,10 @@ def create_team(request, lobby_id):
             lobby.teams.add(team)
             
             # Create a team member for the creator - removed name field
-            team_member = TeamMember.objects.create(
-                team=team,
-                role=player_name
-            )
+                    team_member = TeamMember.objects.create(
+                        team=team,
+                        role=player_name
+                    )
             print(f"Created team member: {player_name} for team {team.name}")
             
             # Store team info in session
