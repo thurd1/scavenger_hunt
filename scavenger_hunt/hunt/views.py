@@ -402,6 +402,9 @@ def join_existing_team(request):
             if lobbies.exists():
                 lobby = lobbies.first()
                 
+                # Get accurate team count for the lobby
+                team_count = lobby.teams.count()
+                
                 # Send WebSocket notification about the new team member
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
@@ -411,7 +414,8 @@ def join_existing_team(request):
                         'lobby_id': lobby.id,
                         'team_id': team.id,
                         'team_name': team.name,
-                        'message': f'Player {player_name} joined team {team.name}'
+                        'message': f'Player {player_name} joined team {team.name}',
+                        'team_count': team_count
                     }
                 )
             
@@ -487,6 +491,9 @@ def create_standalone_team(request):
                     lobby.teams.add(team)
                     print(f"Added team {team.name} to lobby {lobby.name}")
                     
+                    # Get accurate team count after adding the team
+                    team_count = lobby.teams.count()
+                    
                     # Notify the lobbies management WebSocket about the new team
                     channel_layer = get_channel_layer()
                     async_to_sync(channel_layer.group_send)(
@@ -496,7 +503,8 @@ def create_standalone_team(request):
                             'lobby_id': lobby.id,
                             'team_id': team.id,
                             'team_name': team.name,
-                            'message': f'New team {team.name} joined lobby'
+                            'message': f'New team {team.name} joined lobby',
+                            'team_count': team_count
                         }
                     )
                 except Lobby.DoesNotExist:
@@ -657,6 +665,9 @@ def delete_lobby(request, lobby_id):
         lobby = get_object_or_404(Lobby, id=lobby_id)
         lobby_name = getattr(lobby, 'name', f'Lobby #{lobby.id}') 
         
+        # Get all teams in this lobby to delete them
+        teams_to_delete = list(lobby.teams.all())
+        
         # Broadcast deletion via WebSocket before deleting
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
@@ -669,6 +680,11 @@ def delete_lobby(request, lobby_id):
             }
         )
         
+        # Delete all teams associated with this lobby
+        for team in teams_to_delete:
+            team.delete()
+            
+        # Then delete the lobby
         lobby.delete()
         return JsonResponse({'status': 'success'})
 
@@ -1188,6 +1204,7 @@ def check_answer(request):
             question_id = data.get('question_id')
             answer = data.get('answer')
             team_code = data.get('team_code')
+            attempt_number = data.get('attempt_number', 1)  # Default to first attempt if not provided
             
             if not all([question_id, answer, team_code]):
                 return JsonResponse({'success': False, 'error': 'Missing required fields'})
@@ -1204,23 +1221,46 @@ def check_answer(request):
             # Check if the answer is correct (case-insensitive comparison)
             is_correct = answer.lower() == question.answer.lower()
             
-            # If correct, record the answer
+            # Points calculation based on attempt number
+            points = 0
             if is_correct:
-                # Check if we already have this answer recorded
-                answer_record, created = TeamAnswer.objects.get_or_create(
-                    team=team,
-                    question=question,
-                    defaults={'answered_correctly': True}
-                )
+                # Award points based on attempt number: 3 for first, 2 for second, 1 for third
+                if attempt_number == 1:
+                    points = 3
+                elif attempt_number == 2:
+                    points = 2
+                elif attempt_number == 3:
+                    points = 1
+                else:
+                    points = 0  # No points for more than 3 attempts
                 
-                if not created:
-                    # Update existing record
-                    answer_record.answered_correctly = True
-                    answer_record.save()
+                # Record the answer and points
+                try:
+                    # Check if we already have this answer recorded
+                    answer_record, created = TeamAnswer.objects.get_or_create(
+                        team=team,
+                        question=question,
+                        defaults={
+                            'answered_correctly': True,
+                            'points': points,
+                            'attempts': attempt_number
+                        }
+                    )
+                    
+                    if not created:
+                        # Update existing record only if this attempt has more points
+                        if points > answer_record.points:
+                            answer_record.points = points
+                            answer_record.attempts = attempt_number
+                            answer_record.save()
+                except Exception as e:
+                    print(f"Error recording answer: {e}")
             
             return JsonResponse({
                 'success': True,
-                'correct': is_correct
+                'correct': is_correct,
+                'points': points if is_correct else 0,
+                'attempt_number': attempt_number
             })
             
         except json.JSONDecodeError:

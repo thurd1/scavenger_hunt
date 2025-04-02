@@ -552,7 +552,29 @@ class LobbiesConsumer(AsyncWebsocketConsumer):
     
     async def team_joined(self, event):
         """Handle team joined event"""
+        lobby_id = event.get('lobby_id')
+        
+        # Get the current accurate team count from the database
+        team_count = await self.get_lobby_team_count(lobby_id)
+        
+        # Update the event with the accurate count
+        event['team_count'] = team_count
+        
+        # Forward the event with accurate data
         await self.send(text_data=json.dumps(event))
+    
+    @database_sync_to_async
+    def get_lobby_team_count(self, lobby_id):
+        """Get accurate team count for a lobby"""
+        try:
+            lobby = Lobby.objects.get(id=lobby_id)
+            return lobby.teams.count()
+        except Lobby.DoesNotExist:
+            logger.error(f"Lobby {lobby_id} not found when trying to get team count")
+            return 0
+        except Exception as e:
+            logger.error(f"Error getting team count for lobby {lobby_id}: {e}")
+            return 0
     
     async def race_started(self, event):
         """Handle race started event"""

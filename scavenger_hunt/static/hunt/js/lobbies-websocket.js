@@ -143,14 +143,16 @@ function handleTeamJoined(data) {
     
     if (!lobbyCard) return;
     
-    // Update team count
+    // Update team count with the accurate count from server
     const teamCountEl = lobbyCard.querySelector('.team-count');
     if (teamCountEl) {
-        // Parse current count and increment
-        const currentCount = parseInt(teamCountEl.textContent);
-        teamCountEl.textContent = currentCount + 1;
+        // Use the team_count provided by the server instead of incrementing
+        if (data.team_count !== undefined) {
+            teamCountEl.textContent = data.team_count;
+            lobbiesData[lobbyId].teamCount = data.team_count;
+        }
         
-        // Highlight the updated lobby
+        // Apply updated class
         lobbyCard.classList.add('updated');
         setTimeout(() => {
             lobbyCard.classList.remove('updated');

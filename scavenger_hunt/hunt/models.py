@@ -179,8 +179,8 @@ class TeamAnswer(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='team_answers')
     answered_correctly = models.BooleanField(default=False)
     answered_at = models.DateTimeField(auto_now_add=True)
-    attempts = models.IntegerField(default=0)
-    points_awarded = models.IntegerField(default=0)
+    attempts = models.IntegerField(default=1)
+    points = models.IntegerField(default=0)
     requires_photo = models.BooleanField(default=False)
     photo = models.ImageField(upload_to='answer_photos/', null=True, blank=True)
     
