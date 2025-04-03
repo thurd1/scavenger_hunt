@@ -10,6 +10,15 @@ def get_item(dictionary, key):
     """
     return dictionary.get(key, []) 
 
+# Add an alias for get_item as 'get'
+@register.filter
+def get(dictionary, key):
+    """
+    Alias for get_item. Gets an item from a dictionary using a key.
+    Usage in template: {{ my_dict|get:key_variable }}
+    """
+    return get_item(dictionary, key)
+
 @register.filter
 def filter_by(items, field_name):
     """
