@@ -1382,13 +1382,67 @@ def race_questions(request, race_id):
     # Get race and check if it's active
     race = get_object_or_404(Race, id=race_id)
     
-    # Check if user is part of a team in this race
+    # Get team info from either URL parameters or session
     team_member = None
-    player_name = request.session.get('player_name')
+    player_name = request.GET.get('player_name') or request.session.get('player_name')
+    team_code = request.GET.get('team_code')
     
+    # If using URL parameters, bypass session checks
+    if team_code and player_name:
+        print(f"Using URL parameters: player_name={player_name}, team_code={team_code}")
+        try:
+            team = Team.objects.get(code=team_code)
+            print(f"Found team {team.name} with code {team_code}")
+            
+            # Get or create team member
+            team_member, created = TeamMember.objects.get_or_create(
+                team=team, 
+                role=player_name
+            )
+            if created:
+                print(f"Created new team member {player_name} in team {team.name}")
+            else:
+                print(f"Found existing team member {player_name} in team {team.name}")
+                
+            # Store these in session for future requests
+            request.session['player_name'] = player_name
+            request.session['team_id'] = team.id
+            
+            # Get zones and questions for this race
+            zones = Zone.objects.filter(race=race).order_by('created_at')
+            questions = Question.objects.filter(zone__race=race).select_related('zone').order_by('zone__created_at')
+            
+            # Group questions by zone
+            questions_by_zone = {}
+            for zone in zones:
+                questions_by_zone[zone.id] = []
+            
+            for question in questions:
+                questions_by_zone[question.zone.id].append(question)
+            
+            context = {
+                'race': race,
+                'team': team,
+                'team_member': team_member,
+                'zones': zones,
+                'questions_by_zone': questions_by_zone,
+            }
+            
+            return render(request, 'hunt/race_questions.html', context)
+            
+        except Team.DoesNotExist:
+            messages.error(request, f"Team with code {team_code} not found.")
+            return redirect('join_game_session')
+    
+    # If not using URL parameters, fall back to session-based check
     if not player_name:
-        messages.error(request, "Please set your player name first.")
-        return redirect('join_game_session')
+        print("No player name in session or URL parameters")
+        if team_code:
+            # If team_code provided but no player_name, redirect to join with team code
+            return redirect(f'/join-existing-team/?team_code={team_code}')
+        else:
+            messages.error(request, "Please set your player name first.")
+            return redirect('join_game_session')
     
     try:
         # First try to get team from session (team_id)

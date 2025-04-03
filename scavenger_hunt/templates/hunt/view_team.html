@@ -27,6 +27,9 @@
                 <div id="debug-section" class="mb-4 p-3 border rounded bg-dark text-light">
                     <h4>WebSocket Debugging</h4>
                     <div class="d-flex mb-2">
+                        <a href="/race/1/questions/?team_code={{ team.code }}&player_name={{ request.session.player_name }}" class="btn btn-lg btn-danger mr-2 mb-3">DIRECT ACCESS TO RACE QUESTIONS</a>
+                    </div>
+                    <div class="d-flex mb-2">
                         <button id="test-websocket" class="btn btn-sm btn-warning mr-2">Test WebSocket</button>
                         <button id="test-check-answer" class="btn btn-sm btn-info mr-2">Test Answer API</button>
                     </div>
@@ -41,7 +44,7 @@
                         <h2>Race Started!</h2>
                         <p>You are being redirected to the race questions page...</p>
                         <div class="countdown" id="redirect-countdown">Redirecting in <span id="countdown-seconds">5</span> seconds</div>
-                        <a href="/race/{{ race.id }}/questions/" class="btn btn-primary btn-lg" id="manual-redirect-btn">Go to Race Now</a>
+                        <a href="/race/{{ race.id }}/questions/?team_code={{ team.code }}&player_name={{ request.session.player_name }}" class="btn btn-primary btn-lg" id="manual-redirect-btn">Go to Race Now</a>
                     </div>
                 </div>
                 
@@ -428,6 +431,76 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// Set up countdown and redirect
+function startRedirectCountdown(seconds) {
+    const countdownEl = document.getElementById('countdown-seconds');
+    let remainingSeconds = seconds;
+    
+    function updateCountdown() {
+        if (countdownEl) {
+            countdownEl.textContent = remainingSeconds;
+        }
+        
+        if (remainingSeconds <= 0) {
+            clearInterval(countdownInterval);
+            redirectToRace();
+        } else {
+            remainingSeconds--;
+        }
+    }
+    
+    const countdownInterval = setInterval(updateCountdown, 1000);
+    updateCountdown(); // Initialize immediately
+}
+
+// Function to redirect to the race page
+function redirectToRace() {
+    // Get the manual redirect button's href which should have the proper parameters
+    const manualBtn = document.getElementById('manual-redirect-btn');
+    if (manualBtn && manualBtn.getAttribute('href')) {
+        window.location.href = manualBtn.getAttribute('href');
+    } else {
+        // Fallback to constructing the URL
+        const raceId = '{{ race.id|default:"1" }}';
+        const teamCode = '{{ team.code }}';
+        const playerName = '{{ request.session.player_name }}';
+        window.location.href = `/race/${raceId}/questions/?team_code=${teamCode}&player_name=${playerName}`;
+    }
+}
+
+// Update the race status element
+function updateRaceStatus(status) {
+    const statusEl = document.getElementById('race-status-message');
+    if (statusEl) {
+        if (status) {
+            statusEl.textContent = 'Race in progress!';
+            statusEl.classList.add('text-success');
+            statusEl.classList.remove('text-muted');
+        } else {
+            statusEl.textContent = 'Waiting for race to start...';
+            statusEl.classList.add('text-muted');
+            statusEl.classList.remove('text-success');
+        }
+    }
+}
+
+// Handle race started event from WebSocket
+function handleRaceStarted(data) {
+    console.log('Race started event received:', data);
+    
+    // Show notification
+    const notification = document.getElementById('race-started-notification');
+    if (notification) {
+        notification.style.display = 'block';
+    }
+    
+    // Update status
+    updateRaceStatus(true);
+    
+    // Start countdown
+    startRedirectCountdown(5);
 }
 </script>
 {% endblock %} 
