@@ -14,6 +14,20 @@
         <p>Total Questions: {% for zone in zones %}{% with zone_questions=questions_by_zone|get_item:zone.id %}{{ zone_questions|length }}{% endwith %}{% endfor %}</p>
         <button id="test-answer-btn" class="btn btn-warning">Test Answer Submission</button>
         <div id="test-result" class="mt-2"></div>
+        <hr>
+        <div>
+            <p><strong>Quick Answer Buttons:</strong></p>
+            <button id="submit-hula-blues" class="btn btn-sm btn-success">Submit "Hula Blues"</button>
+            <button id="submit-hi-li-li-e" class="btn btn-sm btn-success">Submit "Hi'ilawe"</button>
+            <button id="submit-duke" class="btn btn-sm btn-success">Submit "Duke Kahanamoku"</button>
+            <hr>
+            <p><strong>Auto-Fill Form:</strong></p>
+            <div class="d-flex">
+                <button id="fill-hula-blues" class="btn btn-sm btn-info mr-2">Fill "Hula Blues"</button>
+                <button id="fill-hi-li-li-e" class="btn btn-sm btn-info mr-2">Fill "Hi'ilawe"</button>
+                <button id="fill-duke" class="btn btn-sm btn-info">Fill "Duke Kahanamoku"</button>
+            </div>
+        </div>
     </div>
     
     <div class="race-header">
@@ -85,8 +99,8 @@
                 </div>
                 
                 <div class="navigation-buttons">
-                    <button id="prev-question" class="btn btn-secondary" disabled><i class="fas fa-arrow-left"></i> Previous</button>
-                    <button id="next-question" class="btn btn-primary" disabled>Next <i class="fas fa-arrow-right"></i></button>
+                    <button id="prev-question" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Previous</button>
+                    <button id="next-question" class="btn btn-primary">Next <i class="fas fa-arrow-right"></i></button>
                 </div>
             </div>
         {% endif %}
@@ -777,6 +791,122 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+    
+    // Quick answer buttons
+    function setupQuickAnswerButton(buttonId, answer) {
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.addEventListener('click', function() {
+                const testResult = document.getElementById('test-result');
+                testResult.innerHTML = `Submitting "${answer}"...`;
+                
+                // Get the first visible question's ID
+                const visibleQuestion = document.querySelector('.question-card[style*="display: block"]') || 
+                                        document.querySelector('.question-card:not([style*="display: none"])') ||
+                                        document.querySelector('.question-card');
+                
+                if (!visibleQuestion) {
+                    testResult.innerHTML = 'Error: No visible question found!';
+                    return;
+                }
+                
+                const questionId = visibleQuestion.dataset.questionId;
+                console.log(`Submitting "${answer}" for question ${questionId}`);
+                
+                // Find and update the attempts counter
+                const attemptsEl = visibleQuestion.querySelector('.attempts-count');
+                let attempts = 1;
+                if (attemptsEl) {
+                    attempts = parseInt(attemptsEl.textContent) || 0;
+                    attempts++;
+                    attemptsEl.textContent = attempts;
+                }
+                
+                // Submit the answer
+                const checkAnswerUrl = window.location.origin + "/check-answer/";
+                const payload = {
+                    question_id: questionId,
+                    answer: answer,
+                    team_code: '{{ team.code }}',
+                    attempt_number: attempts
+                };
+                
+                fetch(checkAnswerUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Quick answer response:', data);
+                    testResult.innerHTML = `Response for "${answer}": ${JSON.stringify(data)}`;
+                    
+                    // Show the result in the answer feedback area as well
+                    const feedbackEl = visibleQuestion.querySelector('.answer-feedback');
+                    if (feedbackEl) {
+                        feedbackEl.style.display = 'block';
+                        
+                        if (data.correct) {
+                            feedbackEl.textContent = `Correct answer! You earned ${data.points} points.`;
+                            feedbackEl.className = 'answer-feedback correct';
+                            
+                            // Update total score
+                            teamScore += data.points;
+                            document.getElementById('team-score').textContent = teamScore;
+                        } else {
+                            feedbackEl.textContent = `Incorrect answer. Try again.`;
+                            feedbackEl.className = 'answer-feedback incorrect';
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Quick answer error:', error);
+                    testResult.innerHTML = `Error submitting "${answer}": ${error.message}`;
+                });
+            });
+        }
+    }
+    
+    // Set up quick answer buttons
+    setupQuickAnswerButton('submit-hula-blues', 'Hula Blues');
+    setupQuickAnswerButton('submit-hi-li-li-e', 'Hi\'ilawe');
+    setupQuickAnswerButton('submit-duke', 'Duke Kahanamoku');
+    
+    // Add auto-fill functionality
+    function setupAutoFill(buttonId, answer) {
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.addEventListener('click', function() {
+                // Find the visible question
+                const visibleQuestion = document.querySelector('.question-card[style*="display: block"]') || 
+                                        document.querySelector('.question-card:not([style*="display: none"])') ||
+                                        document.querySelector('.question-card');
+                
+                if (!visibleQuestion) {
+                    console.error('No visible question found for auto-fill');
+                    return;
+                }
+                
+                // Find the input and fill it
+                const input = visibleQuestion.querySelector('.answer-input');
+                if (input) {
+                    input.value = answer;
+                    input.focus();
+                    console.log(`Filled "${answer}" into input`);
+                } else {
+                    console.error('No answer input found in visible question');
+                }
+            });
+        }
+    }
+    
+    // Set up auto-fill buttons
+    setupAutoFill('fill-hula-blues', 'Hula Blues');
+    setupAutoFill('fill-hi-li-li-e', 'Hi\'ilawe');
+    setupAutoFill('fill-duke', 'Duke Kahanamoku');
 });
 
 // Helper function to get cookies (for CSRF token)
