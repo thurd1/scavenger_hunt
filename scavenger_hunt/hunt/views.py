@@ -1418,7 +1418,14 @@ def race_questions(request, race_id):
                 questions_by_zone[zone.id] = []
             
             for question in questions:
-                questions_by_zone[question.zone.id].append(question)
+                if question.zone.id in questions_by_zone:
+                    questions_by_zone[question.zone.id].append(question)
+                else:
+                    # In case zone wasn't in our initial list
+                    questions_by_zone[question.zone.id] = [question]
+            
+            # Total questions count for progress tracking
+            total_questions = questions.count()
             
             context = {
                 'race': race,
@@ -1426,85 +1433,25 @@ def race_questions(request, race_id):
                 'team_member': team_member,
                 'zones': zones,
                 'questions_by_zone': questions_by_zone,
+                'total_questions': total_questions,
             }
             
             return render(request, 'hunt/race_questions.html', context)
             
         except Team.DoesNotExist:
-            messages.error(request, f"Team with code {team_code} not found.")
-            return redirect('join_game_session')
+            # Instead of redirecting, show error in the template
+            return render(request, 'hunt/race_questions.html', {
+                'race': race,
+                'error': f"Team with code {team_code} not found.",
+                'show_join_form': True
+            })
     
-    # If not using URL parameters, fall back to session-based check
-    if not player_name:
-        print("No player name in session or URL parameters")
-        if team_code:
-            # If team_code provided but no player_name, redirect to join with team code
-            return redirect(f'/join-existing-team/?team_code={team_code}')
-        else:
-            messages.error(request, "Please set your player name first.")
-            return redirect('join_game_session')
-    
-    try:
-        # First try to get team from session (team_id)
-        team_id = request.session.get('team_id')
-        if team_id:
-            team = Team.objects.get(id=team_id)
-            
-            # Check if the team is part of a lobby with this race
-            team_in_race = team.participating_lobbies.filter(race=race).exists()
-            
-            if not team_in_race:
-                # Team is not part of this race
-                messages.warning(request, "Your team is not participating in this race.")
-                # Continue anyway to show questions
-            
-            try:
-                team_member = TeamMember.objects.get(team=team, role=player_name)
-                print(f"Found team member {player_name} in team {team.name}")
-            except TeamMember.DoesNotExist:
-                # Create a team member if they don't exist yet - removed name field
-                team_member = TeamMember.objects.create(team=team, role=player_name)
-                print(f"Created new team member {player_name} for team {team.name}")
-        else:
-            # Fallback: try to find any team this player is part of
-            team_member = TeamMember.objects.filter(role=player_name).first()
-            
-            if not team_member:
-                print(f"No team found for player {player_name}")
-                messages.error(request, "You are not part of any team. Please join a team first.")
-                return redirect('join_team')
-            
-            team = team_member.team
-            print(f"Found team {team.name} for player {player_name}")
-    except Team.DoesNotExist:
-        messages.error(request, "Team not found.")
-        return redirect('join_team')
-    except Exception as e:
-        print(f"Error finding team: {e}")
-        messages.error(request, f"Error finding your team: {str(e)}")
-        return redirect('join_team')
-    
-    # Get zones and questions for this race
-    zones = Zone.objects.filter(race=race).order_by('created_at')
-    questions = Question.objects.filter(zone__race=race).select_related('zone').order_by('zone__created_at')
-    
-    # Group questions by zone
-    questions_by_zone = {}
-    for zone in zones:
-        questions_by_zone[zone.id] = []
-    
-    for question in questions:
-        questions_by_zone[question.zone.id].append(question)
-    
-    context = {
-        'race': race,
-        'team': team,
-        'team_member': team_member,
-        'zones': zones,
-        'questions_by_zone': questions_by_zone,
-    }
-    
-    return render(request, 'hunt/race_questions.html', context)
+    # If they get here, they need to enter team code and player name
+    return render(request, 'hunt/race_questions.html', {
+        'race': race if race else None,
+        'show_join_form': True,
+        'race_id': race_id
+    })
 
 def check_race_status(request, race_id):
     """API endpoint to check if a race has started"""
