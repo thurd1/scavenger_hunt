@@ -4,7 +4,47 @@
 {% block title %}Team {{ team.name }}{% endblock %}
 
 {% block head_extras %}
-<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Connect to team WebSocket
+    const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws';
+    const teamSocket = new WebSocket(
+        `${wsScheme}//${window.location.host}/ws/team/{{ team.id }}/`
+    );
+
+    teamSocket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        console.log('Team socket received:', data);
+        
+        if (data.type === 'race_started') {
+            // Show the race started notification
+            document.getElementById('race-started').style.display = 'block';
+            
+            // Start countdown
+            let countdown = 5;
+            const countdownElement = document.getElementById('countdown');
+            
+            const timer = setInterval(function() {
+                countdown--;
+                countdownElement.textContent = countdown;
+                
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    window.location.href = '/race/current';
+                }
+            }, 1000);
+        }
+    };
+
+    teamSocket.onopen = function() {
+        console.log('Team WebSocket connected');
+    };
+
+    teamSocket.onerror = function(error) {
+        console.error('Team WebSocket error:', error);
+    };
+});
+</script>
 {% endblock %}
 
 {% block welcome_text %}
@@ -30,7 +70,6 @@
                     </div>
                     <p>You are being redirected to the race questions page...</p>
                     <p>Redirecting in <span id="countdown">5</span> seconds</p>
-                    <a href="/race/current" class="btn btn-primary">Go to Race Now</a>
                 </div>
                 
         <div class="members-section">
