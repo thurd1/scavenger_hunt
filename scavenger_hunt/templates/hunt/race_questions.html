@@ -252,234 +252,234 @@
 </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Simple way to handle the conditional logic without template tags in JS
-        const questionContainer = document.getElementById('question-container');
-        const joinForm = document.querySelector('.join-race-form');
+document.addEventListener('DOMContentLoaded', function() {
+    // Simple way to handle the conditional logic without template tags in JS
+    const questionContainer = document.getElementById('question-container');
+    const joinForm = document.querySelector('.join-race-form');
+    
+    if (questionContainer) {
+        // We're in questions display mode
+        // Keep track of current question index
+        let currentQuestionIndex = 0;
         
-        if (questionContainer) {
-            // We're in questions display mode
-            // Keep track of current question index
-            let currentQuestionIndex = 0;
+        // Collect all questions
+        const questions = document.querySelectorAll('.question-card');
+        const totalQuestions = questions.length;
+        
+        // Hide all questions initially except the first one
+        for (let i = 1; i < questions.length; i++) {
+            questions[i].style.display = 'none';
+        }
+        
+        // Update the question counter
+        const updateQuestionCounter = function() {
+            const prevButton = document.getElementById('prev-question');
+            const nextButton = document.getElementById('next-question');
             
-            // Collect all questions
-            const questions = document.querySelectorAll('.question-card');
-            const totalQuestions = questions.length;
-            
-            // Hide all questions initially except the first one
-            for (let i = 1; i < questions.length; i++) {
-                questions[i].style.display = 'none';
+            // Disable/enable previous button
+            if (currentQuestionIndex === 0) {
+                prevButton.disabled = true;
+            } else {
+                prevButton.disabled = false;
             }
             
-            // Update the question counter
-            const updateQuestionCounter = function() {
-                const prevButton = document.getElementById('prev-question');
-                const nextButton = document.getElementById('next-question');
-                
-                // Disable/enable previous button
-                if (currentQuestionIndex === 0) {
-                    prevButton.disabled = true;
-                } else {
-                    prevButton.disabled = false;
-                }
-                
-                // Disable/enable next button
-                if (currentQuestionIndex === totalQuestions - 1) {
-                    nextButton.disabled = true;
-                } else {
-                    nextButton.disabled = false;
-                }
+            // Disable/enable next button
+            if (currentQuestionIndex === totalQuestions - 1) {
+                nextButton.disabled = true;
+            } else {
+                nextButton.disabled = false;
+            }
+        };
+        
+        // Initialize question counter
+        updateQuestionCounter();
+        
+        // Next button event listener
+        document.getElementById('next-question').addEventListener('click', function() {
+            if (currentQuestionIndex < totalQuestions - 1) {
+                questions[currentQuestionIndex].style.display = 'none';
+                currentQuestionIndex++;
+                questions[currentQuestionIndex].style.display = 'block';
+                updateQuestionCounter();
+            }
+        });
+        
+        // Previous button event listener
+        document.getElementById('prev-question').addEventListener('click', function() {
+            if (currentQuestionIndex > 0) {
+                questions[currentQuestionIndex].style.display = 'none';
+                currentQuestionIndex--;
+                questions[currentQuestionIndex].style.display = 'block';
+                updateQuestionCounter();
+            }
+        });
+        
+        // Track attempts and points for each question
+        const questionData = {};
+        
+        // Initialize question data
+        document.querySelectorAll('.question-card').forEach(question => {
+            const questionId = question.id.split('-')[1];
+            questionData[questionId] = {
+                attempts: 0,
+                points: 0,
+                maxAttempts: 3
             };
+        });
+        
+        // Submit answer function
+        const submitAnswer = function(questionId, answer) {
+            // Get the team code from the page
+            const teamCode = '{{ team.code }}';
             
-            // Initialize question counter
-            updateQuestionCounter();
+            // Check if max attempts reached
+            if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
+                showPhotoUpload(questionId);
+                return;
+            }
             
-            // Next button event listener
-            document.getElementById('next-question').addEventListener('click', function() {
-                if (currentQuestionIndex < totalQuestions - 1) {
-                    questions[currentQuestionIndex].style.display = 'none';
-                    currentQuestionIndex++;
-                    questions[currentQuestionIndex].style.display = 'block';
-                    updateQuestionCounter();
-                }
-            });
+            // Increment attempts
+            questionData[questionId].attempts++;
+            document.getElementById(`attempts-${questionId}`).textContent = questionData[questionId].attempts;
             
-            // Previous button event listener
-            document.getElementById('prev-question').addEventListener('click', function() {
-                if (currentQuestionIndex > 0) {
-                    questions[currentQuestionIndex].style.display = 'none';
-                    currentQuestionIndex--;
-                    questions[currentQuestionIndex].style.display = 'block';
-                    updateQuestionCounter();
-                }
-            });
-            
-            // Track attempts and points for each question
-            const questionData = {};
-            
-            // Initialize question data
-            document.querySelectorAll('.question-card').forEach(question => {
-                const questionId = question.id.split('-')[1];
-                questionData[questionId] = {
-                    attempts: 0,
-                    points: 0,
-                    maxAttempts: 3
-                };
-            });
-            
-            // Submit answer function
-            const submitAnswer = function(questionId, answer) {
-                // Get the team code from the page
-                const teamCode = '{{ team.code }}';
-                
-                // Check if max attempts reached
-                if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
-                    showPhotoUpload(questionId);
-                    return;
-                }
-                
-                // Increment attempts
-                questionData[questionId].attempts++;
-                document.getElementById(`attempts-${questionId}`).textContent = questionData[questionId].attempts;
-                
-                // Make API call to check answer
-                fetch('/check-answer/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({
-                        question_id: questionId,
-                        answer: answer,
-                        team_code: teamCode,
-                        attempt_number: questionData[questionId].attempts
-                    })
+            // Make API call to check answer
+            fetch('/check-answer/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    question_id: questionId,
+                    answer: answer,
+                    team_code: teamCode,
+                    attempt_number: questionData[questionId].attempts
                 })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Answer check response:', data);
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Answer check response:', data);
+                
+                const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                feedbackElement.style.display = 'block';
+                
+                if (data.correct) {
+                    feedbackElement.className = 'feedback correct';
+                    feedbackElement.textContent = `Correct! You earned ${data.points} points.`;
                     
-                    const feedbackElement = document.getElementById(`feedback-${questionId}`);
-                    feedbackElement.style.display = 'block';
+                    // Update points
+                    questionData[questionId].points = data.points;
                     
-                    if (data.correct) {
-                        feedbackElement.className = 'feedback correct';
-                        feedbackElement.textContent = `Correct! You earned ${data.points} points.`;
-                        
-                        // Update points
-                        questionData[questionId].points = data.points;
-                        
-                        // Update total score
-                        updateTotalScore();
-                        
-                        // Disable further submissions for this question
-                        const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
-                        submitButton.disabled = true;
-                        
-                        // Automatically move to next question after a delay
-                        setTimeout(() => {
-                            if (currentQuestionIndex < totalQuestions - 1) {
-                                document.getElementById('next-question').click();
-                            }
-                        }, 2000);
-                    } else {
-                        feedbackElement.className = 'feedback incorrect';
-                        feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
-                        
-                        // If max attempts reached, show photo upload
-                        if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
-                            showPhotoUpload(questionId);
+                    // Update total score
+                    updateTotalScore();
+                    
+                    // Disable further submissions for this question
+                    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+                    submitButton.disabled = true;
+                    
+                    // Automatically move to next question after a delay
+                    setTimeout(() => {
+                        if (currentQuestionIndex < totalQuestions - 1) {
+                            document.getElementById('next-question').click();
                         }
-                    }
-                })
-                .catch(error => {
-                    console.error('Error checking answer:', error);
-                    alert('Error checking answer. Please try again.');
-                });
-            };
-            
-            // Show photo upload form
-            const showPhotoUpload = function(questionId) {
-                const photoUploadElement = document.getElementById(`photo-upload-${questionId}`);
-                photoUploadElement.style.display = 'block';
-                
-                // Disable answer submission
-                const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
-                submitButton.disabled = true;
-            };
-            
-            // Update total score
-            const updateTotalScore = function() {
-                let totalScore = 0;
-                for (const questionId in questionData) {
-                    totalScore += questionData[questionId].points;
-                }
-                document.getElementById('total-score').textContent = totalScore;
-            };
-            
-            // Add event listeners to submit buttons
-            document.querySelectorAll('.submit-answer').forEach(button => {
-                button.addEventListener('click', function() {
-                    const questionId = this.getAttribute('data-question-id');
-                    const answerInput = document.getElementById(`answer-${questionId}`);
-                    submitAnswer(questionId, answerInput.value);
-                });
-            });
-            
-            // Add event listeners to upload photo buttons
-            document.querySelectorAll('.upload-photo').forEach(button => {
-                button.addEventListener('click', function() {
-                    const questionId = this.getAttribute('data-question-id');
-                    // Photo upload functionality would go here
-                    alert('Photo upload not implemented in this demo.');
-                });
-            });
-            
-            // Submit test answer
-            document.getElementById('submit-test-answer').addEventListener('click', function() {
-                const testAnswer = document.getElementById('test-answer').value;
-                if (testAnswer) {
-                    // Use the current question ID
-                    const currentQuestion = questions[currentQuestionIndex];
-                    const questionId = currentQuestion.id.split('-')[1];
-                    submitAnswer(questionId, testAnswer);
+                    }, 2000);
                 } else {
-                    alert('Please enter a test answer.');
-                }
-            });
-            
-            // Quick answer submission
-            window.submitQuickAnswer = function(answer) {
-                const currentQuestion = questions[currentQuestionIndex];
-                const questionId = currentQuestion.id.split('-')[1];
-                submitAnswer(questionId, answer);
-            };
-            
-            // Fill answer field
-            window.fillAnswerField = function(answer) {
-                const currentQuestion = questions[currentQuestionIndex];
-                const questionId = currentQuestion.id.split('-')[1];
-                const answerInput = document.getElementById(`answer-${questionId}`);
-                answerInput.value = answer;
-            };
-        }
-        
-        // Helper function to get cookies for CSRF token
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
+                    feedbackElement.className = 'feedback incorrect';
+                    feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
+                    
+                    // If max attempts reached, show photo upload
+                    if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
+                        showPhotoUpload(questionId);
                     }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking answer:', error);
+                alert('Error checking answer. Please try again.');
+            });
+        };
+        
+        // Show photo upload form
+        const showPhotoUpload = function(questionId) {
+            const photoUploadElement = document.getElementById(`photo-upload-${questionId}`);
+            photoUploadElement.style.display = 'block';
+            
+            // Disable answer submission
+            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+            submitButton.disabled = true;
+        };
+        
+        // Update total score
+        const updateTotalScore = function() {
+            let totalScore = 0;
+            for (const questionId in questionData) {
+                totalScore += questionData[questionId].points;
+            }
+            document.getElementById('total-score').textContent = totalScore;
+        };
+        
+        // Add event listeners to submit buttons
+        document.querySelectorAll('.submit-answer').forEach(button => {
+            button.addEventListener('click', function() {
+                const questionId = this.getAttribute('data-question-id');
+                const answerInput = document.getElementById(`answer-${questionId}`);
+                submitAnswer(questionId, answerInput.value);
+            });
+        });
+        
+        // Add event listeners to upload photo buttons
+        document.querySelectorAll('.upload-photo').forEach(button => {
+            button.addEventListener('click', function() {
+                const questionId = this.getAttribute('data-question-id');
+                // Photo upload functionality would go here
+                alert('Photo upload not implemented in this demo.');
+            });
+        });
+        
+        // Submit test answer
+        document.getElementById('submit-test-answer').addEventListener('click', function() {
+            const testAnswer = document.getElementById('test-answer').value;
+            if (testAnswer) {
+                // Use the current question ID
+                const currentQuestion = questions[currentQuestionIndex];
+                const questionId = currentQuestion.id.split('-')[1];
+                submitAnswer(questionId, testAnswer);
+            } else {
+                alert('Please enter a test answer.');
+            }
+        });
+        
+        // Quick answer submission
+        window.submitQuickAnswer = function(answer) {
+            const currentQuestion = questions[currentQuestionIndex];
+            const questionId = currentQuestion.id.split('-')[1];
+            submitAnswer(questionId, answer);
+        };
+        
+        // Fill answer field
+        window.fillAnswerField = function(answer) {
+            const currentQuestion = questions[currentQuestionIndex];
+            const questionId = currentQuestion.id.split('-')[1];
+            const answerInput = document.getElementById(`answer-${questionId}`);
+            answerInput.value = answer;
+        };
+    }
+    
+    // Helper function to get cookies for CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
                 }
             }
-            return cookieValue;
         }
-    });
-    </script>
-    {% endblock %} 
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %} 
