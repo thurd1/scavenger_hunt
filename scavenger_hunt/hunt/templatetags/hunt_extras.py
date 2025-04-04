@@ -20,10 +20,37 @@ def filter_by(items, field_value):
     
     if value is None:
         # Return a dictionary of items indexed by the specified field
-        return {getattr(item, field_name, item.get(field_name, '')): item for item in items}
+        result = {}
+        for item in items:
+            try:
+                # Try to get the attribute directly (for model instances)
+                key_value = getattr(item, field_name)
+            except (AttributeError, TypeError):
+                try:
+                    # Try dictionary access for dict-like objects
+                    key_value = item[field_name] if field_name in item else ''
+                except (TypeError, KeyError):
+                    # If all fails, use empty string as key
+                    key_value = ''
+            result[key_value] = item
+        return result
     
     # Filter items where the specified field equals the value
-    return [item for item in items if getattr(item, field_name, item.get(field_name, '')) == value]
+    filtered_items = []
+    for item in items:
+        try:
+            # Try to get the attribute directly (for model instances)
+            item_value = getattr(item, field_name)
+            if item_value == value:
+                filtered_items.append(item)
+        except (AttributeError, TypeError):
+            try:
+                # Try dictionary access for dict-like objects
+                if field_name in item and item[field_name] == value:
+                    filtered_items.append(item)
+            except (TypeError, KeyError):
+                pass
+    return filtered_items
 
 @register.filter
 def get(items, key):
