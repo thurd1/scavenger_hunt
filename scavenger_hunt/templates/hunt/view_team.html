@@ -6,8 +6,8 @@
 {% block head_extras %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Connect to team WebSocket
-    const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws';
+    // Connect to team WebSocket with correct URL format
+    const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const teamSocket = new WebSocket(
         `${wsScheme}//${window.location.host}/ws/team/{{ team.id }}/`
     );
