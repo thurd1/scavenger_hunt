@@ -54,7 +54,7 @@
                 <p style="color: white; font-size: 1.2rem; margin-bottom: 20px;">The race has begun! You will be redirected to the questions page.</p>
                 <div class="spinner" style="margin: 20px auto; border: 5px solid rgba(144, 200, 60, 0.3); border-radius: 50%; border-top: 5px solid #90C83C; width: 60px; height: 60px; animation: spin 1s linear infinite;"></div>
                 <p id="race-countdown" style="color: white; font-size: 1.1rem; margin: 20px 0;">Redirecting in 5 seconds...</p>
-                <a id="race-manual-redirect" href="/race/{{ race.id|default:race_id }}/questions/" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;" onclick="goToRaceNow(event)">
+                <a id="race-manual-redirect" href="/race/{{ race.id|default:race_id }}/questions/?team_id={{ team.id }}&player_name={{ request.session.player_name|urlencode }}" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;" onclick="goToRaceNow(event)">
                     <i class="fas fa-play"></i> Go to Race Now
                 </a>
             </div>
@@ -196,101 +196,53 @@
 </style>
 
 <script>
-// Add direct redirect function
+document.addEventListener('DOMContentLoaded', function() {
+    const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const teamSocket = new WebSocket(
+        `${wsScheme}//${window.location.host}/ws/team/{{ team.id }}/`
+    );
+
+    teamSocket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        console.log('Team socket received:', data);
+        
+        if (data.type === 'race_started') {
+            handleRaceStart();
+        }
+    };
+});
+
 function goToRaceNow(event) {
     if (event) {
         event.preventDefault();
     }
     const raceId = '{{ race.id|default:race_id }}';
-    // Try to navigate directly
-    window.location.href = `/race/${raceId}/questions/`;
+    const teamId = '{{ team.id }}';
+    const playerName = document.getElementById('sessionPlayerName').value || '';
+    
+    // Include team_id and player_name as query parameters
+    window.location.href = `/race/${raceId}/questions/?team_id=${teamId}&player_name=${encodeURIComponent(playerName)}`;
 }
 
-// Initialize the team and race functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const teamId = '{{ team.id }}';
-    const raceId = '{{ race.id|default:race_id }}';
-    const raceNotification = document.getElementById('race-started-notification');
-    const raceCountdown = document.getElementById('race-countdown');
+function handleRaceStart() {
+    console.log('Race started event detected!');
     
-    // Function to handle race start
-    function handleRaceStart() {
-        console.log('Race started event detected!');
-        
-        // Show the notification
-        raceNotification.style.display = 'block';
-        
-        // Set up countdown for redirect
-        let countdown = 5;
-        const countdownTimer = setInterval(function() {
-            countdown--;
-            raceCountdown.textContent = `Redirecting in ${countdown} seconds...`;
-            
-            if (countdown <= 0) {
-                clearInterval(countdownTimer);
-                // Try different redirection methods
-                try {
-                    // Method 1: Direct assignment
-                    window.location.href = `/race/${raceId}/questions/`;
-                    
-                    // Method 2 (after a brief delay if method 1 fails)
-                    setTimeout(function() {
-                        try {
-                            window.location.replace(`/race/${raceId}/questions/`);
-                        } catch (e) {
-                            console.error('Error with redirect method 2:', e);
-                        }
-                    }, 200);
-                } catch (e) {
-                    console.error('Error redirecting:', e);
-                }
-            }
-        }, 1000);
-    }
+    // Show the notification
+    document.getElementById('race-started-notification').style.display = 'block';
     
-    // Connect to WebSocket for race updates
-    if (raceId) {
-        // WebSocket for race start notification
-        const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const raceSocket = new WebSocket(
-            `${wsScheme}//${window.location.host}/ws/race/${raceId}/`
-        );
+    // Set up countdown for redirect
+    let countdown = 5;
+    const countdownElement = document.getElementById('race-countdown');
+    
+    const countdownTimer = setInterval(function() {
+        countdown--;
+        countdownElement.textContent = `Redirecting in ${countdown} seconds...`;
         
-        raceSocket.onopen = function() {
-            console.log('Race WebSocket connected');
-        };
-        
-        raceSocket.onmessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
-                console.log('Race message received:', data);
-                
-                if (data.type === 'race_started') {
-                    handleRaceStart();
-                }
-            } catch (e) {
-                console.error('Error handling message:', e);
-            }
-        };
-        
-        raceSocket.onerror = function(error) {
-            console.error('WebSocket error:', error);
-        };
-        
-        // Setup polling as backup
-        setInterval(function() {
-            fetch(`/race/${raceId}/status/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.started || data.hunt_started || data.race_started) {
-                        handleRaceStart();
-                    }
-                })
-                .catch(error => {
-                    console.log('Poll error (expected if endpoint not configured):', error);
-                });
-        }, 3000);
-    }
-});
+        if (countdown <= 0) {
+            clearInterval(countdownTimer);
+            goToRaceNow(); // Use the same function for consistency
+        }
+    }, 1000);
+}
 </script>
 {% endblock %} 
