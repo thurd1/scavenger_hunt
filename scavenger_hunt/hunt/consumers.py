@@ -168,6 +168,13 @@ class TeamConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error creating team member: {e}")
 
+    # Add this method to handle race start events
+    async def race_started(self, event):
+        """Handle race started event"""
+        await self.send(text_data=json.dumps({
+            'type': 'race_started'
+        }))
+
 
 class AvailableTeamsConsumer(AsyncWebsocketConsumer):
     async def connect(self):
