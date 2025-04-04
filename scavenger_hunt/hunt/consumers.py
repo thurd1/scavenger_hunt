@@ -455,7 +455,7 @@ class RaceConsumer(AsyncWebsocketConsumer):
     async def race_started(self, event):
         """Event handler for when a race starts"""
         # Construct redirect URL
-        redirect_url = f"/race/{self.race_id}/questions/"
+        redirect_url = f"/race/{self.race_id}/questions/?team_id={{ team.id }}"
         
         # Send message to WebSocket
         await self.send(text_data=json.dumps({
