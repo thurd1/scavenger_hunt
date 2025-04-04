@@ -23,42 +23,17 @@
                     <h4 class="mb-0">Code: <span id="team-code">{{ team.code }}</span></h4>
                 </div>
                 
-                <!-- Debugging section -->
-                <div id="debug-section" class="mb-4 p-3 border rounded bg-dark text-light">
-                    <h4>WebSocket Debugging</h4>
-                    <div class="d-flex mb-2">
-                        <a href="/race/1/questions/?team_code={{ team.code }}&player_name={{ request.session.player_name }}" class="btn btn-lg btn-danger mr-2 mb-3">DIRECT ACCESS TO RACE QUESTIONS</a>
+                <!-- When race starts, show only this section -->
+                <div id="race-started" style="display: none;">
+                    <h2>Race Started!</h2>
+                    <div class="spinner-border text-success" role="status">
+                        <span class="visually-hidden">Loading...</span>
                     </div>
-                    <div class="d-flex mb-2">
-                        <button id="test-websocket" class="btn btn-sm btn-warning mr-2">Test WebSocket</button>
-                        <button id="test-check-answer" class="btn btn-sm btn-info mr-2">Test Answer API</button>
-                    </div>
-                    <div id="debug-log" class="small" style="max-height: 150px; overflow-y: auto; font-family: monospace;">
-                        Logs will appear here...
-                    </div>
+                    <p>You are being redirected to the race questions page...</p>
+                    <p>Redirecting in <span id="countdown">5</span> seconds</p>
+                    <a href="/race/current" class="btn btn-primary">Go to Race Now</a>
                 </div>
                 
-                <!-- Race started notification overlay -->
-                <div id="race-started-notification" class="race-started-notification">
-                    <div class="notification-content">
-                        <h2>Race Started!</h2>
-                        <p>You are being redirected to the race questions page...</p>
-                        <div class="countdown" id="redirect-countdown">Redirecting in <span id="countdown-seconds">5</span> seconds</div>
-                        <a href="/race/{{ race.id }}/questions/?team_code={{ team.code }}&player_name={{ request.session.player_name }}" class="btn btn-primary btn-lg" id="manual-redirect-btn">Go to Race Now</a>
-                    </div>
-                </div>
-                
-                <!-- Debug info - only visible during development -->
-                <div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa; text-align: left;">
-                    <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
-                    <p class="mb-1">Lobby: {{ lobby.name|default:"None" }}</p>
-                    <p class="mb-1">Lobby Code: {{ lobby_code|default:"None" }}</p>
-                    <p class="mb-1">Race ID: {{ race.id|default:"None" }}</p>
-                    <p class="mb-0">Members count: {{ members|length }}</p>
-                </div>
-            </div>
-        </div>
-
         <div class="members-section">
             <h2 class="section-title">Team Members</h2>
             <div class="members-grid" id="members-container">
