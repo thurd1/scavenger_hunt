@@ -35,7 +35,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (countdown <= 0) {
                     clearInterval(timer);
-                    window.location.href = '/race/{{ race.id|default:race_id }}/questions/';
+                    // Use the correct URL pattern for race_questions
+                    window.location.href = "{% url 'race_questions' race_id=race.id|default:race_id %}";
                 }
             }, 1000);
         }
@@ -52,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function goToRaceNow(event) {
     event.preventDefault();
-    window.location.href = '/race/{{ race.id|default:race_id }}/questions/';
+    window.location.href = "{% url 'race_questions' race_id=race.id|default:race_id %}";
 }
 </script>
 {% endblock %}
@@ -79,7 +80,7 @@ function goToRaceNow(event) {
                         <p style="color: white; font-size: 1.2rem; margin-bottom: 20px;">The race has begun! You will be redirected to the questions page.</p>
                         <div class="spinner" style="margin: 20px auto; border: 5px solid rgba(144, 200, 60, 0.3); border-radius: 50%; border-top: 5px solid #90C83C; width: 60px; height: 60px; animation: spin 1s linear infinite;"></div>
                         <p id="race-countdown" style="color: white; font-size: 1.1rem; margin: 20px 0;">Redirecting in 5 seconds...</p>
-                        <a id="race-manual-redirect" href="/race/{{ race.id|default:race_id }}/questions/" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;" onclick="goToRaceNow(event)">
+                        <a id="race-manual-redirect" href="{% url 'race_questions' race_id=race.id|default:race_id %}" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;" onclick="goToRaceNow(event)">
                             <i class="fas fa-play"></i> Go to Race Now
                         </a>
                     </div>
