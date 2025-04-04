@@ -4,6 +4,38 @@
 
 {% block title %}Race Questions - {{ race.name|default:"Join Race" }}{% endblock %}
 
+{% block head_extras %}
+<script>
+// Check sessionStorage for team info when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // If we're showing the join form, check if we should be showing questions instead
+    {% if show_join_form %}
+    // Look for team info in URL params first
+    const urlParams = new URLSearchParams(window.location.search);
+    const teamParam = urlParams.get('team_code');
+    
+    if (teamParam) {
+        console.log('Team code found in URL params:', teamParam);
+        // The form will handle this automatically
+    } else {
+        // Check localStorage as backup
+        const storedTeamCode = localStorage.getItem('team_code');
+        const storedPlayerName = localStorage.getItem('player_name');
+        
+        if (storedTeamCode && storedPlayerName) {
+            console.log('Found stored team info:', storedTeamCode, storedPlayerName);
+            // Auto-fill the form
+            document.getElementById('team_code').value = storedTeamCode;
+            document.getElementById('player_name').value = storedPlayerName;
+            // Submit the form automatically
+            document.querySelector('.join-race-form').submit();
+        }
+    }
+    {% endif %}
+});
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4">
     <div class="dashboard-box p-4">

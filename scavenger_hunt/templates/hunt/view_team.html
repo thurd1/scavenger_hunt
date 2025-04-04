@@ -217,11 +217,27 @@ function goToRaceNow(event) {
         event.preventDefault();
     }
     const raceId = '{{ race.id|default:race_id }}';
-    const teamId = '{{ team.id }}';
-    const playerName = document.getElementById('sessionPlayerName').value || '';
+    const teamCode = '{{ team.code }}';
+    const playerName = '{{ request.session.player_name }}';
     
-    // Include team_id and player_name as query parameters
-    window.location.href = `/race/${raceId}/questions/?team_id=${teamId}&player_name=${encodeURIComponent(playerName)}`;
+    // Store in localStorage for persistence across redirects
+    localStorage.setItem('team_code', teamCode);
+    localStorage.setItem('player_name', playerName);
+    
+    console.log(`Race started. Redirecting to race ${raceId} with team code ${teamCode}`);
+    
+    // Try multiple redirection methods
+    try {
+        // Method 1: With query params
+        window.location.href = `/race/${raceId}/questions/?team_code=${teamCode}&player_name=${encodeURIComponent(playerName)}`;
+        
+        // Method 2 as fallback
+        setTimeout(() => {
+            window.location.replace(`/race/${raceId}/questions/`);
+        }, 200);
+    } catch (e) {
+        console.error('Redirect failed:', e);
+    }
 }
 
 function handleRaceStart() {
