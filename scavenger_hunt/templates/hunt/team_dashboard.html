@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="dashboard-content">
+        <div class="team-info">
+            <h1>Team Dashboard</h1>
+            <div class="team-details">
+                <h2>Team: {{ team.name }}</h2>
+            </div>
+
+            <div class="members-section">
+                <h3>Team Members</h3>
+                <div id="membersList" class="members-list">
+                </div>
+            </div>
+        </div>
+
+        <div class="game-status">
+            <h3>Game Status</h3>
+            <p>Waiting for game to start...</p>
+        </div>
+
+        <div class="navigation-buttons">
+            <a href="{% url 'join_game_session' %}" class="btn change-team-btn">
+                <i class="fas fa-home"></i> Back to Home
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard-content {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 30px;
+    margin: 20px auto;
+    max-width: 800px;
+}
+
+.team-info h1 {
+    color: #90C83C;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.team-details {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.team-details h2 {
+    color: #ffffff;
+    margin-bottom: 10px;
+}
+
+.members-section {
+    margin: 30px 0;
+}
+
+.members-section h3 {
+    color: #90C83C;
+    margin-bottom: 15px;
+}
+
+.members-list {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.member-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    margin-bottom: 8px;
+    background: rgba(144, 200, 60, 0.1);
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.member-item:last-child {
+    margin-bottom: 0;
+}
+
+.member-item:hover {
+    background: rgba(144, 200, 60, 0.2);
+}
+
+.member-item i {
+    color: #90C83C;
+    margin-right: 10px;
+}
+
+.member-item span {
+    color: #ffffff;
+}
+
+.navigation-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: transform 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+}
+
+.change-team-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+</style>
+
+<script>
+    const teamId = {{ team.id }};
+    let socket;
+
+    function connectWebSocket() {
+        const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        socket = new WebSocket(
+            `${wsScheme}://${window.location.host}/ws/team/${teamId}/`
+        );
+
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if (data.type === 'team_update') {
+                updateMembersList(data.members);
+            }
+        };
+
+        socket.onclose = function(e) {
+            console.log('Socket closed, attempting to reconnect...');
+            setTimeout(connectWebSocket, 1000);
+        };
+    }
+
+    function updateMembersList(members) {
+        const membersList = document.getElementById('membersList');
+        if (members && members.length > 0) {
+            membersList.innerHTML = members.map(member => `
+                <div class="member-item">
+                    <i class="fas fa-user"></i>
+                    <span>${member.role}</span>
+                </div>
+            `).join('');
+        } else {
+            membersList.innerHTML = '<p class="no-members">No members in this team yet</p>';
+        }
+    }
+
+    // Initial members load
+    const initialMembers = {{ members_json|safe }};
+    updateMembersList(initialMembers);
+
+    // Connect WebSocket
+    document.addEventListener('DOMContentLoaded', connectWebSocket);
+</script>
+{% endblock %} 

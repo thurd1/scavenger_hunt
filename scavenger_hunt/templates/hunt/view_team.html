@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Team: {{ team.name }}{% endblock %}
+
+{% block head_extras %}
+<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
+{% endblock %}
+
+{% block welcome_text %}
+    <p style="color: #90C83C">Team Information</p>
+{% endblock %}
+
+{% block body_attributes %}data-race-id="{{ race_id }}"{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="dashboard-box p-4">
+        <div class="lobby-header">
+            <h1>{{ team.name }}</h1>
+            
+            <!-- Debug info - only visible during development -->
+            <div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa; text-align: left;">
+                <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
+                <p class="mb-1">Lobby: {{ lobby.name|default:"None" }}</p>
+                <p class="mb-1">Lobby Code: {{ lobby_code|default:"None" }}</p>
+                <p class="mb-1">Race ID: {{ race.id|default:"None" }}</p>
+                <p class="mb-0">Members count: {{ members|length }}</p>
+            </div>
+        </div>
+
+        <div class="members-section">
+            <h2 class="section-title">Team Members</h2>
+            <div class="members-grid" id="members-container">
+                {% if members %}
+                    {% for member in members %}
+                    <div class="member-card" data-member="{{ member.role }}">
+                        <div class="member-header">
+                            <h3><i class="fas fa-user"></i> {{ member.role }}</h3>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-members-message">
+                        <p>No members in this team yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <input type="hidden" id="sessionPlayerName" value="{{ request.session.player_name }}">
+        
+        <!-- Race status notification area -->
+        <div id="race-status-area" class="race-status-area mt-4 p-3 rounded" style="display: none;">
+            <h5 class="text-center" id="race-status-title">Race Status</h5>
+            <p id="race-status-message" class="text-center mb-0"></p>
+        </div>
+        
+        <!-- Add a prominent race started notification that will appear when race starts -->
+        <div id="race-started-notification" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(33, 37, 41, 0.95); border: 3px solid #90C83C; border-radius: 15px; padding: 30px; max-width: 90%; width: 500px; text-align: center;">
+                <h2 style="color: #90C83C; margin-bottom: 20px;">Race Started!</h2>
+                <p style="color: white; font-size: 1.2rem; margin-bottom: 20px;">The race has begun! You will be redirected to the questions page.</p>
+                <div class="spinner" style="margin: 20px auto; border: 5px solid rgba(144, 200, 60, 0.3); border-radius: 50%; border-top: 5px solid #90C83C; width: 60px; height: 60px; animation: spin 1s linear infinite;"></div>
+                <p id="race-countdown" style="color: white; font-size: 1.1rem; margin: 20px 0;">Redirecting in 5 seconds...</p>
+                <a id="race-manual-redirect" href="/race/{{ race.id|default:race_id }}/questions/" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;" onclick="goToRaceNow(event)">
+                    <i class="fas fa-play"></i> Go to Race Now
+                </a>
+            </div>
+        </div>
+        
+        <!-- Race access section -->
+        {% if race.id or race_id %}
+        <div class="actions-section">
+            <div class="action-buttons">
+                {% if race.id %}
+                <a href="{% url 'race_questions' race.id %}" class="btn btn-success">
+                    <i class="fas fa-play"></i> Access Race Questions
+                </a>
+                {% elif race_id %}
+                <a href="{% url 'race_questions' race_id %}" class="btn btn-success">
+                    <i class="fas fa-play"></i> Access Race Questions
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="back-button-container">
+            <a href="{% url 'join_team' %}" class="btn btn-success">
+                <i class="fas fa-arrow-left"></i> Back to Teams
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard-box {
+    background-color: rgba(33, 37, 41, 0.9);
+    border-radius: 15px;
+    border: 1px solid rgba(144, 200, 60, 0.2);
+}
+
+.lobby-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.lobby-header h1 {
+    color: #90C83C;
+    margin: 0 0 15px 0;
+}
+
+.members-section {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.section-title {
+    color: #90C83C;
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.members-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 10px;
+}
+
+.member-card {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.member-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(144, 200, 60, 0.2);
+}
+
+.member-header {
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    padding-bottom: 10px;
+}
+
+.member-header h3 {
+    color: #90C83C;
+    margin: 0 0 5px 0;
+    font-size: 1.2rem;
+}
+
+.no-members-message {
+    text-align: center;
+    color: #999;
+    padding: 2rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    grid-column: 1 / -1;
+}
+
+.race-status-area {
+    background-color: rgba(33, 37, 41, 0.7);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    max-width: 800px;
+    margin: 1rem auto;
+    border-radius: 12px;
+}
+
+.race-status-area.active {
+    background-color: rgba(144, 200, 60, 0.2);
+    animation: pulse 2s infinite;
+}
+
+.actions-section {
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.back-button-container {
+    text-align: center;
+    padding: 20px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(144, 200, 60, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0); }
+}
+</style>
+
+<script>
+// Add direct redirect function
+function goToRaceNow(event) {
+    if (event) {
+        event.preventDefault();
+    }
+    const raceId = '{{ race.id|default:race_id }}';
+    // Try to navigate directly
+    window.location.href = `/race/${raceId}/questions/`;
+}
+
+// Initialize the team and race functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const teamId = '{{ team.id }}';
+    const raceId = '{{ race.id|default:race_id }}';
+    const raceNotification = document.getElementById('race-started-notification');
+    const raceCountdown = document.getElementById('race-countdown');
+    
+    // Function to handle race start
+    function handleRaceStart() {
+        console.log('Race started event detected!');
+        
+        // Show the notification
+        raceNotification.style.display = 'block';
+        
+        // Set up countdown for redirect
+        let countdown = 5;
+        const countdownTimer = setInterval(function() {
+            countdown--;
+            raceCountdown.textContent = `Redirecting in ${countdown} seconds...`;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownTimer);
+                // Try different redirection methods
+                try {
+                    // Method 1: Direct assignment
+                    window.location.href = `/race/${raceId}/questions/`;
+                    
+                    // Method 2 (after a brief delay if method 1 fails)
+                    setTimeout(function() {
+                        try {
+                            window.location.replace(`/race/${raceId}/questions/`);
+                        } catch (e) {
+                            console.error('Error with redirect method 2:', e);
+                        }
+                    }, 200);
+                } catch (e) {
+                    console.error('Error redirecting:', e);
+                }
+            }
+        }, 1000);
+    }
+    
+    // Connect to WebSocket for race updates
+    if (raceId) {
+        // WebSocket for race start notification
+        const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const raceSocket = new WebSocket(
+            `${wsScheme}//${window.location.host}/ws/race/${raceId}/`
+        );
+        
+        raceSocket.onopen = function() {
+            console.log('Race WebSocket connected');
+        };
+        
+        raceSocket.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Race message received:', data);
+                
+                if (data.type === 'race_started') {
+                    handleRaceStart();
+                }
+            } catch (e) {
+                console.error('Error handling message:', e);
+            }
+        };
+        
+        raceSocket.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+        
+        // Setup polling as backup
+        setInterval(function() {
+            fetch(`/race/${raceId}/status/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.started || data.hunt_started || data.race_started) {
+                        handleRaceStart();
+                    }
+                })
+                .catch(error => {
+                    console.log('Poll error (expected if endpoint not configured):', error);
+                });
+        }, 3000);
+        
+        // Manual check: Add event listeners to all race buttons
+        document.querySelectorAll('.btn-success').forEach(button => {
+            if (button.textContent.includes('Race') || button.textContent.includes('Questions')) {
+                const originalHref = button.getAttribute('href');
+                button.setAttribute('href', `/race/${raceId}/questions/`);
+                console.log(`Updated button href from ${originalHref} to /race/${raceId}/questions/`);
+            }
+        });
+    }
+    
+    // Force check race status immediately for testing
+    setTimeout(function() {
+        const testButton = document.createElement('button');
+        testButton.style.position = 'fixed';
+        testButton.style.bottom = '10px';
+        testButton.style.right = '10px';
+        testButton.style.zIndex = '1000';
+        testButton.style.padding = '5px';
+        testButton.style.opacity = '0.5';
+        testButton.textContent = 'Test Race Start';
+        testButton.addEventListener('click', function() {
+            handleRaceStart();
+        });
+        document.body.appendChild(testButton);
+    }, 2000);
+});
+</script>
+{% endblock %} 
