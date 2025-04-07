@@ -25,6 +25,7 @@ from django.db import models
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
 import time
+import uuid
 
 logger = logging.getLogger(__name__)
 

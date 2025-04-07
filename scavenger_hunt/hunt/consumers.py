@@ -305,11 +305,15 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         await self.accept()
         logger.info(f"WebSocket connection accepted for lobby {self.lobby_id}")
         
+        # Get initial lobby state
+        lobby = await self.get_lobby_data()
+        
         # Send connection confirmation message to client
         await self.send(text_data=json.dumps({
             'type': 'connection_established',
             'message': f'Connected to lobby {self.lobby_id} WebSocket',
-            'lobby_id': self.lobby_id
+            'lobby_id': self.lobby_id,
+            'lobby': lobby
         }))
 
     async def disconnect(self, close_code):
@@ -322,16 +326,57 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         logger.info(f"Channel {self.channel_name} removed from group {self.lobby_group_name}")
 
     async def receive(self, text_data):
-        # We don't expect to receive messages from clients in this case
-        # This is mainly for broadcasting from server to clients
+        # Handle messages from clients
         try:
             data = json.loads(text_data)
             logger.info(f"Received message in lobby {self.lobby_id}: {data}")
+            
+            if data.get('action') == 'get_teams':
+                # Client requesting fresh team data
+                lobby = await self.get_lobby_data()
+                await self.send(text_data=json.dumps({
+                    'type': 'lobby_data',
+                    'lobby': lobby
+                }))
+                
         except json.JSONDecodeError:
             logger.error(f"Invalid JSON received in lobby {self.lobby_id}")
         except Exception as e:
             logger.error(f"Error processing message in lobby {self.lobby_id}: {str(e)}")
 
+    @database_sync_to_async
+    def get_lobby_data(self):
+        """Get full lobby data including teams for initial state"""
+        try:
+            lobby = Lobby.objects.prefetch_related('teams', 'teams__members').get(id=self.lobby_id)
+            
+            # Format for JSON
+            teams_data = []
+            for team in lobby.teams.all():
+                teams_data.append({
+                    'id': team.id,
+                    'name': team.name,
+                    'code': team.code,
+                    'members_count': team.members.count(),
+                    'members': list(team.members.values('id', 'role'))
+                })
+                
+            return {
+                'id': lobby.id,
+                'name': lobby.name,
+                'code': lobby.code,
+                'is_active': lobby.is_active,
+                'hunt_started': lobby.hunt_started,
+                'teams': teams_data,
+                'teams_count': len(teams_data)
+            }
+        except Lobby.DoesNotExist:
+            logger.error(f"Lobby {self.lobby_id} does not exist")
+            return None
+        except Exception as e:
+            logger.error(f"Error getting lobby data: {str(e)}")
+            return None
+    
     async def team_joined(self, event):
         logger.info(f"Broadcasting team_joined event in lobby {self.lobby_id}: {event}")
         
@@ -373,6 +418,33 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error sending team_member_joined event: {str(e)}")
 
+    async def team_member_left(self, event):
+        logger.info(f"Broadcasting team_member_left event in lobby {self.lobby_id}")
+        
+        # Send message to WebSocket with member data
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'team_member_left',
+                'member_id': event['member_id'],
+                'team_id': event['team_id']
+            }))
+            logger.info(f"Successfully sent team_member_left event to client")
+        except Exception as e:
+            logger.error(f"Error sending team_member_left event: {str(e)}")
+
+    async def lobby_updated(self, event):
+        logger.info(f"Broadcasting lobby_updated event")
+        
+        # Send message to WebSocket with updated lobby data
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'lobby_updated',
+                'lobby': event['lobby']
+            }))
+            logger.info(f"Successfully sent lobby_updated event to client")
+        except Exception as e:
+            logger.error(f"Error sending lobby_updated event: {str(e)}")
+    
     async def race_status_changed(self, event):
         logger.info(f"Broadcasting race_status_changed event in lobby {self.lobby_id}: {event}")
         
@@ -386,6 +458,25 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             logger.info(f"Successfully sent race_status_changed event to client")
         except Exception as e:
             logger.error(f"Error sending race_status_changed event: {str(e)}")
+
+    async def race_started(self, event):
+        logger.info(f"Broadcasting race_started event in lobby {self.lobby_id}")
+        
+        # Send message to WebSocket with redirect URL
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'race_started',
+                'redirect_url': event['redirect_url']
+            }))
+            # Send it again after a delay to ensure delivery
+            await asyncio.sleep(0.5)
+            await self.send(text_data=json.dumps({
+                'type': 'race_started',
+                'redirect_url': event['redirect_url']
+            }))
+            logger.info(f"Successfully sent race_started event to client")
+        except Exception as e:
+            logger.error(f"Error sending race_started event: {str(e)}")
 
 class RaceConsumer(AsyncWebsocketConsumer):
     """
