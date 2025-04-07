@@ -385,10 +385,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Save current question index to server
                 saveCurrentQuestionIndex(currentQuestionIndex);
                 
-                // Hide navigation buttons for new question until it's answered correctly
+                // IMPORTANT: Hide navigation buttons for new question until it's answered correctly or photo uploaded
                 const questionId = questions[currentQuestionIndex].id.split('-')[1];
                 if (questionData[questionId] && !questionData[questionId].answered && !questionData[questionId].photoUploaded) {
                     document.getElementById('navigation-buttons').style.display = 'none';
+                    console.log('Moving to next question, hiding navigation buttons');
+                } else {
+                    console.log('Moving to next question that is already answered or has photo, showing navigation buttons');
                 }
             }
         });
@@ -493,6 +496,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     submitButton.disabled = false;
                     submitButton.textContent = "Submit Answer";
                 }
+                
+                // Hide navigation buttons until photo is uploaded
+                document.getElementById('navigation-buttons').style.display = 'none';
                 return;
             }
             
@@ -565,15 +571,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         submitButton.disabled = true;
                     }
                     
-                    // Show navigation buttons
+                    // Show navigation buttons - now it's safe to proceed
                     document.getElementById('navigation-buttons').style.display = 'block';
-                    
-                    // Automatically move to next question after a delay
-                    setTimeout(() => {
-                        if (currentQuestionIndex < totalQuestions - 1) {
-                            document.getElementById('next-question').click();
-                        }
-                    }, 2000);
+                    console.log('Correct answer, showing navigation buttons');
                 } else {
                     feedbackElement.className = 'feedback incorrect';
                     feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
@@ -582,6 +582,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (submitButton) {
                         submitButton.disabled = false;
                     }
+                    
+                    // IMPORTANT: Ensure navigation buttons are hidden for incorrect answers
+                    document.getElementById('navigation-buttons').style.display = 'none';
+                    console.log('Incorrect answer, hiding navigation buttons');
                     
                     // If max attempts reached, show photo upload
                     if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
@@ -647,9 +651,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitButton.disabled = true;
             }
             
-            // Do NOT show navigation buttons until photo is uploaded
-            // Instead, navigation buttons will be shown after photo upload is successful
+            // IMPORTANT: Explicitly hide navigation buttons until photo is uploaded
             document.getElementById('navigation-buttons').style.display = 'none';
+            console.log('Max attempts reached, showing photo upload and hiding navigation buttons');
         };
         
         // Add event listeners to upload photo buttons
@@ -731,21 +735,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Mark photo as uploaded
                 questionData[questionId].photoUploaded = true;
                 
-                // Only NOW show navigation buttons - after successful photo upload
+                // Show navigation buttons after successful photo upload
+                console.log('Photo uploaded successfully, showing navigation buttons');
                 document.getElementById('navigation-buttons').style.display = 'block';
                 
-                // Force display of navigation buttons - add a direct console log for debugging
-                console.log('Photo uploaded successfully, showing navigation buttons');
+                // Force visibility through direct style manipulation
                 const navButtons = document.getElementById('navigation-buttons');
                 navButtons.style.display = 'block';
-                
-                // Check that it's visible
-                setTimeout(() => {
-                    console.log('Navigation buttons display status:', navButtons.style.display);
-                    if (navButtons.style.display !== 'block') {
-                        navButtons.style.display = 'block';
-                    }
-                }, 500);
                 
                 // Disable upload button
                 if (uploadButton) {
@@ -760,6 +756,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     uploadButton.disabled = false;
                     uploadButton.textContent = "Upload Photo";
                 }
+                
+                // Make sure navigation buttons remain hidden on error
+                document.getElementById('navigation-buttons').style.display = 'none';
             }
         })
         .catch(error => {
@@ -771,6 +770,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 uploadButton.disabled = false;
                 uploadButton.textContent = "Upload Photo";
             }
+            
+            // Make sure navigation buttons remain hidden on error
+            document.getElementById('navigation-buttons').style.display = 'none';
         });
     }
 });
