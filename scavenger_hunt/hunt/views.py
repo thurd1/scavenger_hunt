@@ -1190,47 +1190,19 @@ def check_answer(request):
                             team_race_progress.total_points += points
                             team_race_progress.save()
                     
-                    # Update team progress (for overall leaderboard)
+                    # Update team progress for this specific question
                     team_progress, created = TeamProgress.objects.get_or_create(
                         team=team,
-                        defaults={'total_score': 0}
+                        question=question,
+                        defaults={'completed': is_correct}
                     )
-                    team_progress.total_score = team_race_progress.total_points
-                    team_progress.save()
                     
-                    # Also update WebSocket for real-time leaderboard updates
-                    try:
-                        # Get all team progress records with related team and race info
-                        teams_data = []
-                        for tp in TeamRaceProgress.objects.select_related('team', 'race'):
-                            team = tp.team
-                            race = tp.race
-                            if team:
-                                # Get the lobby for this team that's associated with the race
-                                lobby = Lobby.objects.filter(teams=team, race=race).first()
-                                lobby_id = lobby.id if lobby else None
-                                lobby_name = race.name if race else 'Unknown Race'
-                                
-                                teams_data.append({
-                                    'id': team.id,
-                                    'name': team.name,
-                                    'score': tp.total_points,
-                                    'lobby_id': lobby_id,
-                                    'lobby_name': lobby_name
-                                })
+                    # If the answer is correct, mark this question as completed
+                    if is_correct and not team_progress.completed:
+                        team_progress.completed = True
+                        team_progress.completion_time = timezone.now()
+                        team_progress.save()
                         
-                        # Send update to channel layer
-                        channel_layer = get_channel_layer()
-                        async_to_sync(channel_layer.group_send)(
-                            "leaderboard",
-                            {
-                                "type": "leaderboard_update",
-                                "teams": teams_data
-                            }
-                        )
-                    except Exception as e:
-                        # Log exception but don't interrupt the flow
-                        logger.error(f"Error sending WebSocket update: {str(e)}")
                 except Exception as e:
                     print(f"Error updating team race progress: {e}")
             else:

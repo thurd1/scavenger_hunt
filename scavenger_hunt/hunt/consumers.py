@@ -538,12 +538,16 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
         teams_data = []
         
         try:
-            # Get all active lobbies
-            lobbies = Lobby.objects.filter(status__in=['open', 'active', 'completed'])
+            # Get all active lobbies - FIXED: Use is_active instead of status
+            lobbies = Lobby.objects.filter(is_active=True)
             
             for lobby in lobbies:
-                # Get teams in this lobby
-                teams = Team.objects.filter(lobby=lobby)
+                # Skip lobbies without a race
+                if not lobby.race:
+                    continue
+                    
+                # Get teams in this lobby - FIXED: Use participating_lobbies relation
+                teams = Team.objects.filter(participating_lobbies=lobby)
                 
                 for team in teams:
                     try:

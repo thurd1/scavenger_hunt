@@ -258,8 +258,8 @@ def team_score_changed(sender, instance, created, **kwargs):
         # This is more reliable than just updating a single team's score
         teams_data = []
         
-        # Get all active lobbies
-        lobbies = Lobby.objects.filter(status__in=['open', 'active', 'completed'])
+        # Get all active lobbies - FIXED: Use is_active instead of status
+        lobbies = Lobby.objects.filter(is_active=True)
         
         for lobby in lobbies:
             # Skip lobbies without a race
