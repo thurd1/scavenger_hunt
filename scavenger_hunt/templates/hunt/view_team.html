@@ -286,6 +286,40 @@
             startCountdownAndRedirect(raceId);
         }
         
+        // Setup auto-refresh every second if race hasn't started
+        if (!hasRaceStarted) {
+            console.log("Setting up auto-refresh for team view page");
+            // Set up automatic refresh every 1 second
+            setInterval(function() {
+                // Fetch the current page again to check for updates
+                fetch(window.location.href)
+                    .then(response => response.text())
+                    .then(html => {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        
+                        // Check if race has started in the new content
+                        const raceStartedElement = doc.querySelector('.race-status-area.active');
+                        if (raceStartedElement) {
+                            console.log("Race has started! Refreshing page...");
+                            window.location.reload();
+                        }
+                        
+                        // Update team members section
+                        const currentMembersGrid = document.querySelector('.members-grid');
+                        const newMembersGrid = doc.querySelector('.members-grid');
+                        if (currentMembersGrid && newMembersGrid && 
+                            currentMembersGrid.innerHTML !== newMembersGrid.innerHTML) {
+                            currentMembersGrid.innerHTML = newMembersGrid.innerHTML;
+                            console.log("Updated team members");
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error during auto-refresh:', error);
+                    });
+            }, 1000); // Refresh every 1 second
+        }
+        
         // Connect to WebSocket for real-time race updates
         if (raceId) {
             try {

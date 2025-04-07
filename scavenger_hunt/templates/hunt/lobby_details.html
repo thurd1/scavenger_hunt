@@ -414,10 +414,63 @@
         }
     }
     
-    // Initialize WebSocket when the DOM is loaded
+    // Function to refresh the team list
+    function refreshTeamList() {
+        fetch(window.location.href)
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Extract the teams grid from the fetched document
+                const newTeamsContent = doc.querySelector('.teams-grid');
+                const currentTeamsContent = document.querySelector('.teams-grid');
+                
+                // Extract the team count from the info card
+                const newInfoCard = doc.querySelector('.info-card');
+                const currentInfoCard = document.querySelector('.info-card');
+                
+                // Update the teams grid if it exists and has changed
+                if (newTeamsContent && currentTeamsContent && 
+                    newTeamsContent.innerHTML !== currentTeamsContent.innerHTML) {
+                    currentTeamsContent.innerHTML = newTeamsContent.innerHTML;
+                    console.log("Updated teams list");
+                }
+                
+                // Update the info card if it exists and has changed
+                if (newInfoCard && currentInfoCard && 
+                    newInfoCard.innerHTML !== currentInfoCard.innerHTML) {
+                    currentInfoCard.innerHTML = newInfoCard.innerHTML;
+                    console.log("Updated lobby info");
+                }
+                
+                // Check if there are no teams and update the message
+                if (!newTeamsContent) {
+                    const noTeamsElement = doc.querySelector('.no-teams');
+                    const currentContainer = document.querySelector('.teams-grid, .no-teams');
+                    const dashboardBox = document.querySelector('.dashboard-box');
+                    
+                    if (noTeamsElement && currentContainer && 
+                        noTeamsElement.innerHTML !== currentContainer.innerHTML) {
+                        // Replace teams grid with no teams message
+                        currentContainer.outerHTML = noTeamsElement.outerHTML;
+                        console.log("Updated to show no teams message");
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing team list:', error);
+            });
+    }
+    
+    // Initialize WebSocket and auto-refresh when the DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
         // Set the lobby ID for the WebSocket connection
         window.lobbyId = '{{ lobby.id }}';
+        
+        // Set up automatic refresh every 1 second
+        console.log("Setting up auto-refresh for lobby details page");
+        setInterval(refreshTeamList, 1000);
     });
 </script>
 {% endblock %}
