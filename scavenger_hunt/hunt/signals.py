@@ -144,6 +144,7 @@ def team_lobby_association_changed(sender, instance, action, reverse, model, pk_
             
             for team_id in team_ids:
                 try:
+                    # Explicitly get the Team object to use its methods
                     team = Team.objects.get(id=team_id)
                     
                     # Format the team data
@@ -167,6 +168,8 @@ def team_lobby_association_changed(sender, instance, action, reverse, model, pk_
                     )
                 except Team.DoesNotExist:
                     print(f"SIGNAL ERROR: Team with ID {team_id} not found")
+                except Exception as e:
+                    print(f"SIGNAL ERROR in team_joined: {str(e)}")
             
     elif action == 'post_remove':
         channel_layer = get_channel_layer()
