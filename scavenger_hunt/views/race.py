@@ -187,11 +187,36 @@ def check_answer(request):
                 best_index = i
         
         # Accept if similarity is high enough
-        if best_ratio >= 0.9:  # 90% similarity threshold
+        if best_ratio >= 0.8:  # Lowered from 0.9 to 0.8 for better matching
             is_correct = True
             match_type = f"fuzzy-{best_ratio:.2f}"
             matched_answer = original_correct_answers[best_index]
             print(f"MATCH: Fuzzy match found with answer option {best_index+1}, similarity: {best_ratio:.2f}")
+    
+    # 7. Contained-in match (for cases where the answer is part of a longer correct answer)
+    if not is_correct:
+        for i, correct in enumerate(correct_answers):
+            # Check if the provided answer is completely contained in the correct answer
+            # (useful for partial answers or abbreviations)
+            if len(provided_normalized) >= 3 and provided_normalized in correct:
+                # Check that it's at least 50% the length of the correct answer or at least 5 chars
+                if len(provided_normalized) >= max(5, len(correct) * 0.5):
+                    is_correct = True
+                    match_type = "contained-in"
+                    matched_answer = original_correct_answers[i]
+                    print(f"MATCH: Contained-in match found with answer option {i+1}")
+                    break
+            
+            # Check if the correct answer is completely contained in the provided answer
+            # (useful when the user gives more detail than needed)
+            elif len(correct) >= 3 and correct in provided_normalized:
+                # Check that it's at least 70% the length of the provided answer or at least 5 chars
+                if len(correct) >= max(5, len(provided_normalized) * 0.7):
+                    is_correct = True
+                    match_type = "contains"
+                    matched_answer = original_correct_answers[i]
+                    print(f"MATCH: Contains match found with answer option {i+1}")
+                    break
     
     # Log final result
     if is_correct:

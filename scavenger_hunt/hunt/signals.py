@@ -4,7 +4,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import json
 
-from .models import Team, TeamMember, Lobby, Race, RaceProgress, Question, Zone
+from .models import Team, TeamMember, Lobby, Race, TeamProgress, Question, Zone
 
 @receiver(post_save, sender=Team)
 def team_created(sender, instance, created, **kwargs):

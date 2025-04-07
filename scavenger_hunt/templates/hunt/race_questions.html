@@ -403,6 +403,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        // Add event listeners for form submissions
+        document.querySelectorAll('.answer-form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const questionId = this.id.split('-')[2];
+                const answerInput = document.getElementById(`answer-${questionId}`);
+                if (answerInput && answerInput.value.trim()) {
+                    submitAnswer(questionId, answerInput.value);
+                }
+            });
+        });
+
         // Add event listeners to submit buttons
         document.querySelectorAll('.submit-answer').forEach(button => {
             button.addEventListener('click', function() {
@@ -435,18 +447,40 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`Submitting answer for question ${questionId}: "${answer}"`);
             console.log(`Team code: ${teamCode}`);
             
+            // Disable the submit button during processing to prevent double submission
+            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = "Checking...";
+            }
+            
             // Check if this question was already answered correctly
             if (questionData[questionId] && questionData[questionId].answered) {
                 const feedbackElement = document.getElementById(`feedback-${questionId}`);
                 feedbackElement.className = 'feedback correct';
                 feedbackElement.style.display = 'block';
                 feedbackElement.textContent = `You've already correctly answered this question!`;
+                
+                // Re-enable the submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
+                
+                // Show navigation buttons
+                document.getElementById('navigation-buttons').style.display = 'block';
                 return;
             }
             
             // Check if max attempts reached
             if (questionData[questionId] && questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
                 showPhotoUpload(questionId);
+                
+                // Re-enable the submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
                 return;
             }
             
@@ -478,6 +512,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const feedbackElement = document.getElementById(`feedback-${questionId}`);
                 feedbackElement.style.display = 'block';
                 
+                // Re-enable the submit button if needed
+                if (submitButton) {
+                    submitButton.textContent = "Submit Answer";
+                }
+                
                 if (data.already_answered) {
                     // Question was already answered correctly before
                     feedbackElement.className = 'feedback correct';
@@ -488,7 +527,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     questionData[questionId].points = data.points;
                     
                     // Disable further submissions for this question
-                    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
                     if (submitButton) {
                         submitButton.disabled = true;
                     }
@@ -511,7 +549,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateTotalScore();
                     
                     // Disable further submissions for this question
-                    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
                     if (submitButton) {
                         submitButton.disabled = true;
                     }
@@ -529,6 +566,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     feedbackElement.className = 'feedback incorrect';
                     feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
                     
+                    // Re-enable the submit button for next attempt
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
+                    
                     // If max attempts reached, show photo upload
                     if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
                         showPhotoUpload(questionId);
@@ -538,6 +580,12 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Error checking answer:', error);
                 alert('Error checking answer. Please try again.');
+                
+                // Re-enable the submit button on error
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
             });
         }
         
@@ -583,7 +631,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Disable answer submission
             const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
-            submitButton.disabled = true;
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            
+            // Show navigation buttons when photo upload is shown
+            document.getElementById('navigation-buttons').style.display = 'block';
         };
         
         // Add event listeners to upload photo buttons

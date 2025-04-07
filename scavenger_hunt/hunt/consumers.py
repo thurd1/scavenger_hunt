@@ -285,84 +285,107 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
 
 class LobbyConsumer(AsyncWebsocketConsumer):
     """
-    WebSocket consumer for lobby updates.
-    Handles real-time updates when teams join/leave and when race status changes.
+    WebSocket consumer for lobbies
+    Handles real-time updates related to a specific lobby
     """
     async def connect(self):
         self.lobby_id = self.scope['url_route']['kwargs']['lobby_id']
         self.lobby_group_name = f'lobby_{self.lobby_id}'
         
-        # Join the lobby group
+        # Additional detailed logging for WebSocket connections
+        logger.info(f"WebSocket connecting for lobby {self.lobby_id}. Path: {self.scope['path']}")
+        logger.info(f"Adding channel {self.channel_name} to group {self.lobby_group_name}")
+        
+        # Join lobby group
         await self.channel_layer.group_add(
             self.lobby_group_name,
             self.channel_name
         )
         
-        # Accept the connection
         await self.accept()
+        logger.info(f"WebSocket connection accepted for lobby {self.lobby_id}")
         
-        # Log for debugging
-        print(f"WebSocket CONNECTED: Lobby {self.lobby_id}")
-        
-        # Send a confirmation message
+        # Send connection confirmation message to client
         await self.send(text_data=json.dumps({
             'type': 'connection_established',
-            'message': f'Connected to lobby {self.lobby_id}'
+            'message': f'Connected to lobby {self.lobby_id} WebSocket',
+            'lobby_id': self.lobby_id
         }))
 
     async def disconnect(self, close_code):
         # Leave the lobby group
+        logger.info(f"WebSocket disconnecting from lobby {self.lobby_id} with code: {close_code}")
         await self.channel_layer.group_discard(
             self.lobby_group_name,
             self.channel_name
         )
-        print(f"WebSocket DISCONNECTED: Lobby {self.lobby_id}")
+        logger.info(f"Channel {self.channel_name} removed from group {self.lobby_group_name}")
 
     async def receive(self, text_data):
-        # We don't expect to receive messages from clients
+        # We don't expect to receive messages from clients in this case
         # This is mainly for broadcasting from server to clients
-        pass
+        try:
+            data = json.loads(text_data)
+            logger.info(f"Received message in lobby {self.lobby_id}: {data}")
+        except json.JSONDecodeError:
+            logger.error(f"Invalid JSON received in lobby {self.lobby_id}")
+        except Exception as e:
+            logger.error(f"Error processing message in lobby {self.lobby_id}: {str(e)}")
 
     async def team_joined(self, event):
-        """
-        Broadcast to clients when a team joins the lobby
-        """
-        print(f"BROADCASTING team_joined event in lobby {self.lobby_id}")
-        await self.send(text_data=json.dumps({
-            'type': 'team_joined',
-            'team': event['team']
-        }))
+        logger.info(f"Broadcasting team_joined event in lobby {self.lobby_id}: {event}")
+        
+        # Send message to WebSocket with team data
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'team_joined',
+                'team': event['team']
+            }))
+            logger.info(f"Successfully sent team_joined event to client")
+        except Exception as e:
+            logger.error(f"Error sending team_joined event: {str(e)}")
 
     async def team_left(self, event):
-        """
-        Broadcast to clients when a team leaves the lobby
-        """
-        await self.send(text_data=json.dumps({
-            'type': 'team_left',
-            'team_id': event['team_id']
-        }))
+        logger.info(f"Broadcasting team_left event in lobby {self.lobby_id}: {event}")
+        
+        # Send message to WebSocket with team id
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'team_left',
+                'team_id': event['team_id']
+            }))
+            logger.info(f"Successfully sent team_left event to client")
+        except Exception as e:
+            logger.error(f"Error sending team_left event: {str(e)}")
 
     async def team_member_joined(self, event):
-        """
-        Broadcast to clients when a new member joins a team
-        """
-        await self.send(text_data=json.dumps({
-            'type': 'team_member_joined',
-            'member': event['member'],
-            'team_id': event['team_id'],
-            'team_name': event['team_name']
-        }))
+        logger.info(f"Broadcasting team_member_joined event in lobby {self.lobby_id}: {event}")
+        
+        # Send message to WebSocket with member data
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'team_member_joined',
+                'member': event['member'],
+                'team_id': event['team_id'],
+                'team_name': event['team_name']
+            }))
+            logger.info(f"Successfully sent team_member_joined event to client")
+        except Exception as e:
+            logger.error(f"Error sending team_member_joined event: {str(e)}")
 
     async def race_status_changed(self, event):
-        """
-        Broadcast to clients when race status changes
-        """
-        print(f"BROADCASTING race_status_changed event in lobby {self.lobby_id} - status: {event['status']}")
-        await self.send(text_data=json.dumps({
-            'type': 'race_status_changed',
-            'status': event['status'],
-            'race_id': event.get('race_id')
-        }))
+        logger.info(f"Broadcasting race_status_changed event in lobby {self.lobby_id}: {event}")
+        
+        # Send message to WebSocket with status data
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'race_status_changed',
+                'status': event['status'],
+                'race_id': event['race_id']
+            }))
+            logger.info(f"Successfully sent race_status_changed event to client")
+        except Exception as e:
+            logger.error(f"Error sending race_status_changed event: {str(e)}")
 
 class RaceConsumer(AsyncWebsocketConsumer):
     """
