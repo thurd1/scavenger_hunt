@@ -59,14 +59,14 @@
                                                         <h3 class="question-title">Question {{ forloop.counter }}</h3>
                                                         <div class="question-text">{{ question.text }}</div>
                                                         
-                                                        <form id="answer-form-{{ forloop.counter0 }}" onsubmit="submitAnswer({{ forloop.counter0 }}); return false;" class="answer-form mt-4">
+                                                        <form id="answer-form-{{ forloop.counter0 }}" class="answer-form mt-4" onsubmit="event.preventDefault(); const questionId='{{ forloop.counter0 }}'; const answer=document.getElementById('answer-{{ forloop.counter0 }}').value; if(answer) submitAnswer(questionId, answer); return false;">
                                                             <div class="form-group">
                                                                 <label for="answer-{{ forloop.counter0 }}">Your Answer:</label>
                                                                 <input type="text" id="answer-{{ forloop.counter0 }}" name="answer" class="form-control" required>
                                                             </div>
                                                             
                                                             <div class="mt-3">
-                                                                <button type="submit" class="btn btn-success">Submit Answer</button>
+                                                                <button type="submit" class="btn btn-success submit-answer" data-question-id="{{ forloop.counter0 }}">Submit Answer</button>
                                                             </div>
                                                             
                                                             <div class="answer-feedback mt-3" id="feedback-{{ forloop.counter0 }}" style="display: none;"></div>
@@ -389,7 +389,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 const questionId = this.id.split('-')[2];
                 const answerInput = document.getElementById(`answer-${questionId}`);
-                submitAnswer(questionId, answerInput.value);
+                if (answerInput && answerInput.value) {
+                    submitAnswer(questionId, answerInput.value);
+                }
             });
         });
 
@@ -398,7 +400,9 @@ document.addEventListener('DOMContentLoaded', function() {
             button.addEventListener('click', function() {
                 const questionId = this.getAttribute('data-question-id');
                 const answerInput = document.getElementById(`answer-${questionId}`);
-                submitAnswer(questionId, answerInput.value);
+                if (answerInput && answerInput.value) {
+                    submitAnswer(questionId, answerInput.value);
+                }
             });
         });
         
@@ -461,7 +465,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Disable further submissions for this question
                     const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
-                    submitButton.disabled = true;
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
                     
                     // Show navigation buttons
                     document.getElementById('navigation-buttons').style.display = 'block';
@@ -482,7 +488,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Disable further submissions for this question
                     const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
-                    submitButton.disabled = true;
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
                     
                     // Show navigation buttons
                     document.getElementById('navigation-buttons').style.display = 'block';
