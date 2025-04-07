@@ -3,8 +3,9 @@ from django.dispatch import receiver
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import json
+import logging
 
-from .models import Team, TeamMember, Lobby, Race, TeamProgress, Question, Zone
+from .models import Team, TeamMember, Lobby, Race, TeamProgress, Question, Zone, TeamRaceProgress
 
 @receiver(post_save, sender=Team)
 def team_created(sender, instance, created, **kwargs):
@@ -234,3 +235,80 @@ def team_lobby_association_changed(sender, instance, action, reverse, model, pk_
                         print(f"ERROR in team_left (reverse direction): {str(e)}")
     except Exception as e:
         print(f"CRITICAL ERROR in team_lobby_association_changed: {str(e)}") 
+
+@receiver(post_save, sender=TeamRaceProgress)
+def team_score_changed(sender, instance, created, **kwargs):
+    """
+    Signal handler to notify connected clients when a team's score changes
+    """
+    try:
+        team = instance.team
+        race = instance.race
+        
+        if not team or not race:
+            logging.warning(f"TeamRaceProgress missing team or race: team_id={getattr(team, 'id', None)}, race_id={getattr(race, 'id', None)}")
+            return
+            
+        logging.info(f"SIGNAL: Team {team.name} score updated to {instance.total_points} in race {race.name}")
+        
+        # Send update to the leaderboard
+        channel_layer = get_channel_layer()
+        
+        # Get all teams to refresh the entire leaderboard
+        # This is more reliable than just updating a single team's score
+        teams_data = []
+        
+        # Get all active lobbies
+        lobbies = Lobby.objects.filter(status__in=['open', 'active', 'completed'])
+        
+        for lobby in lobbies:
+            # Skip lobbies without a race
+            if not lobby.race:
+                continue
+                
+            # Get teams in this lobby
+            lobby_teams = Team.objects.filter(participating_lobbies=lobby)
+            
+            for team_obj in lobby_teams:
+                try:
+                    # Get team's progress in the race
+                    progress = TeamRaceProgress.objects.get(team=team_obj, race=lobby.race)
+                    total_points = progress.total_points
+                except TeamRaceProgress.DoesNotExist:
+                    # If no progress exists, score is 0
+                    total_points = 0
+                
+                teams_data.append({
+                    'id': team_obj.id,
+                    'name': team_obj.name,
+                    'score': total_points,
+                    'lobby_id': str(lobby.id),
+                    'lobby_name': lobby.race.name if lobby.race else 'Unknown Race'
+                })
+        
+        # Sort by score
+        teams_data.sort(key=lambda x: x['score'], reverse=True)
+        
+        # Send update to leaderboard group
+        async_to_sync(channel_layer.group_send)(
+            'leaderboard',
+            {
+                'type': 'leaderboard_update',
+                'teams': teams_data
+            }
+        )
+        
+        # Also send to the race-specific group if it exists
+        async_to_sync(channel_layer.group_send)(
+            f'race_{race.id}',
+            {
+                'type': 'team_score_update',
+                'team_id': team.id,
+                'team_name': team.name,
+                'score': instance.total_points
+            }
+        )
+        
+        logging.info(f"SIGNAL: Sent leaderboard update with {len(teams_data)} teams")
+    except Exception as e:
+        logging.error(f"ERROR in team_score_changed signal: {str(e)}", exc_info=True) 

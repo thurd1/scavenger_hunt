@@ -433,85 +433,139 @@ class RaceConsumer(AsyncWebsocketConsumer):
         }))
 
 class LeaderboardConsumer(AsyncWebsocketConsumer):
+    """
+    Consumer for the leaderboard page.
+    Handles real-time updates for team scores across all lobbies.
+    """
+    
     async def connect(self):
-        # Join the leaderboard group
+        """
+        Connect to the leaderboard group and send initial data.
+        """
+        self.group_name = "leaderboard"
+        
+        # Log connection
+        logging.info(f"Leaderboard WebSocket connecting: {self.channel_name}")
+        
+        # Join leaderboard group
         await self.channel_layer.group_add(
-            "leaderboard",
+            self.group_name,
             self.channel_name
         )
+        
         await self.accept()
+        logging.info(f"Leaderboard WebSocket connection accepted: {self.channel_name}")
         
         # Send initial leaderboard data
         await self.send_initial_leaderboard_data()
-
+        
     async def disconnect(self, close_code):
-        # Leave the leaderboard group
+        """
+        Leave the leaderboard group.
+        """
+        logging.info(f"Leaderboard WebSocket disconnecting: {self.channel_name}, code: {close_code}")
+        
+        # Leave leaderboard group
         await self.channel_layer.group_discard(
-            "leaderboard",
+            self.group_name,
             self.channel_name
         )
-
-    # Receive message from WebSocket (not used but needed for completeness)
-    async def receive(self, text_data):
-        # If the client sends a request for data, refresh the leaderboard
-        if text_data:
-            try:
-                data = json.loads(text_data)
-                if data.get('action') == 'get_data':
-                    await self.send_initial_leaderboard_data()
-            except json.JSONDecodeError:
-                pass
-
-    # Receive message from the leaderboard group
-    async def leaderboard_update(self, event):
-        teams = event['teams']
-        
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps({
-            'type': 'leaderboard_update',
-            'teams': teams
-        }))
     
-    # Send initial leaderboard data
+    async def receive(self, text_data):
+        """
+        Receive message from WebSocket.
+        """
+        try:
+            text_data_json = json.loads(text_data)
+            action = text_data_json.get('action', '')
+            
+            logging.info(f"Leaderboard received message: {action}")
+            
+            if action == 'get_data':
+                # Refresh leaderboard data
+                await self.send_initial_leaderboard_data()
+                
+        except json.JSONDecodeError:
+            logging.error(f"Invalid JSON received in LeaderboardConsumer: {text_data}")
+        except Exception as e:
+            logging.error(f"Error processing message in LeaderboardConsumer: {str(e)}")
+    
+    async def leaderboard_update(self, event):
+        """
+        Receive update from leaderboard group and send to WebSocket.
+        """
+        try:
+            teams = event.get('teams', [])
+            
+            # Send message to WebSocket
+            await self.send(text_data=json.dumps({
+                'type': 'leaderboard_update',
+                'teams': teams
+            }))
+            
+            logging.info(f"Leaderboard update sent to client: {len(teams)} teams")
+        except Exception as e:
+            logging.error(f"Error sending leaderboard update: {str(e)}")
+    
     async def send_initial_leaderboard_data(self):
-        teams_data = await self.get_teams_data()
-        
-        await self.send(text_data=json.dumps({
-            'type': 'leaderboard_update',
-            'teams': teams_data
-        }))
-        
-    @database_sync_to_async
-    def get_teams_data(self):
-        from .models import TeamRaceProgress, Team, Lobby, Race
-        
+        """
+        Send initial leaderboard data to the client.
+        """
+        try:
+            # Get leaderboard data
+            teams = await database_sync_to_async(self.get_leaderboard_data)()
+            
+            # Send to WebSocket
+            await self.send(text_data=json.dumps({
+                'type': 'leaderboard_update',
+                'teams': teams
+            }))
+            
+            logging.info(f"Initial leaderboard data sent: {len(teams)} teams")
+        except Exception as e:
+            logging.error(f"Error sending initial leaderboard data: {str(e)}")
+            # Send error message
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'Failed to load leaderboard data'
+            }))
+    
+    def get_leaderboard_data(self):
+        """
+        Get all team data for the leaderboard.
+        """
+        # Get all teams with their score from all lobbies
         teams_data = []
         
-        # Get all teams that are in lobbies with races
-        teams = Team.objects.prefetch_related('participating_lobbies').all()
-        
-        for team in teams:
-            # Get the lobby for this team
-            lobby = team.participating_lobbies.first()
+        try:
+            # Get all active lobbies
+            lobbies = Lobby.objects.filter(status__in=['open', 'active', 'completed'])
             
-            if lobby and lobby.race:
-                # Look for existing race progress
-                try:
-                    progress = TeamRaceProgress.objects.get(team=team, race=lobby.race)
-                    total_points = progress.total_points
-                except TeamRaceProgress.DoesNotExist:
-                    # If no progress exists, score is 0
-                    total_points = 0
+            for lobby in lobbies:
+                # Get teams in this lobby
+                teams = Team.objects.filter(lobby=lobby)
                 
-                teams_data.append({
-                    'id': team.id,
-                    'name': team.name,
-                    'score': total_points,
-                    'lobby_id': str(lobby.id),
-                    'lobby_name': lobby.race.name if lobby.race else 'Unknown Race'
-                })
-        
-        # Sort by score
-        teams_data.sort(key=lambda x: x['score'], reverse=True)
-        
-        return teams_data 
+                for team in teams:
+                    try:
+                        # Get team's progress in the race
+                        progress = TeamRaceProgress.objects.get(team=team, race=lobby.race)
+                        total_points = progress.total_points
+                    except TeamRaceProgress.DoesNotExist:
+                        # If no progress exists, score is 0
+                        total_points = 0
+                    
+                    teams_data.append({
+                        'id': team.id,
+                        'name': team.name,
+                        'score': total_points,
+                        'lobby_id': str(lobby.id),
+                        'lobby_name': lobby.race.name if lobby.race else 'Unknown Race'
+                    })
+            
+            # Sort by score
+            teams_data.sort(key=lambda x: x['score'], reverse=True)
+            
+            return teams_data
+        except Exception as e:
+            logging.error(f"Error getting leaderboard data: {str(e)}")
+            return [] 

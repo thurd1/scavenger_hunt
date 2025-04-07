@@ -1,317 +1,148 @@
 {% extends "base.html" %}
 
+{% load static %}
+
 {% block title %}Leaderboard{% endblock %}
 
 {% block welcome_text %}
     <p>Leaderboard</p>
 {% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'hunt/css/dashboard.css' %}">
+<style>
+    .dashboard-box {
+        max-width: 900px;
+        margin: 20px auto;
+        padding: 20px;
+        background-color: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .lobby-selector {
+        margin-bottom: 20px;
+    }
+    
+    .table-responsive {
+        overflow-x: auto;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        border-color: #007bff;
+    }
+    
+    .btn-primary:hover {
+        background-color: #0069d9;
+        border-color: #0062cc;
+    }
+    
+    .websocket-status {
+        margin-bottom: 15px;
+        font-size: 14px;
+        padding: 5px 10px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    
+    .websocket-status.connected {
+        color: #28a745;
+    }
+    
+    .websocket-status.disconnected, .websocket-status.error {
+        color: #dc3545;
+    }
+    
+    .websocket-status.reconnecting {
+        color: #ffc107;
+    }
+    
+    .team-row.updated {
+        animation: highlight 3s;
+    }
+    
+    .team-row.new-team {
+        animation: fadeIn 3s;
+    }
+    
+    .score-increased {
+        color: #28a745;
+        font-weight: bold;
+    }
+    
+    @keyframes highlight {
+        0% { background-color: rgba(255, 243, 148, 0.8); }
+        100% { background-color: transparent; }
+    }
+    
+    @keyframes fadeIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-    <div class="container py-4">
-        <div class="dashboard-box p-4">
-            <h2 style="color: #90C83C; text-align: center; margin-bottom: 3rem;">Leaderboard</h2>
-            
-            <!-- Lobby Selector -->
-            <div class="lobby-selector mb-5">
-                <label for="lobby-select" class="mb-3" style="color: #90C83C; display: block; font-size: 1.2rem;">Select Race:</label>
-                <select id="lobby-select" class="form-control custom-select">
-                    <option value="all" selected>All Races</option>
+    <div class="container">
+        <div class="dashboard-box">
+            <div class="lobby-selector">
+                <label for="lobby-select">Show teams for:</label>
+                <select id="lobby-select" class="form-control">
+                    <option value="all">All Races</option>
                     {% for lobby in lobbies %}
-                        <option value="{{ lobby.id }}">{{ lobby.race.name }} (Code: {{ lobby.code }})</option>
+                    <option value="{{ lobby.id }}">{{ lobby.race.name }}</option>
                     {% endfor %}
                 </select>
             </div>
             
-            <div id="leaderboard-container" class="table-responsive mb-5">
-                <table class="w-100">
+            <div class="table-responsive">
+                <table class="table table-striped">
                     <thead>
                         <tr>
-                            <th>Team Name</th>
+                            <th>Team</th>
                             <th>Score</th>
                             <th>Race</th>
                         </tr>
                     </thead>
                     <tbody id="leaderboard-body">
-                        {% for team in teams %}
-                        <tr class="team-row" data-team-id="{{ team.id }}" data-lobby-id="{{ team.lobby_id }}">
-                            <td class="team-name">{{ team.name }}</td>
-                            <td class="team-score">{{ team.score }}</td>
-                            <td class="team-lobby">{{ team.lobby_name }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="3" class="text-center">No teams available</td>
-                        </tr>
-                        {% endfor %}
+                        {% if teams %}
+                            {% for team in teams %}
+                            <tr class="team-row" data-team-id="{{ team.id }}" data-lobby-id="{{ team.lobby_id }}">
+                                <td class="team-name">{{ team.name }}</td>
+                                <td class="team-score">{{ team.score }}</td>
+                                <td class="team-lobby">{{ team.lobby_name }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center">No teams available</td>
+                            </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
-            
-            <div class="text-center mt-5">
-                <a href="{% url 'leader_dashboard' %}" class="btn btn-success btn-lg">Back to Dashboard</a>
-            </div>
         </div>
     </div>
+{% endblock %}
 
-    <style>
-    .dashboard-box {
-        background-color: rgba(33, 37, 41, 0.9);
-        border-radius: 15px;
-        border: 1px solid rgba(144, 200, 60, 0.2);
-        padding: 2.5rem !important;
-    }
-    
-    .lobby-selector {
-        max-width: 500px;
-        margin: 0 auto 2.5rem auto;
-        padding: 1.5rem;
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 8px;
-    }
-    
-    .custom-select {
-        background-color: rgba(33, 37, 41, 0.8);
-        color: white;
-        border: 1px solid rgba(144, 200, 60, 0.3);
-        padding: 12px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 1.1rem;
-    }
-    
-    .custom-select:focus {
-        border-color: #90C83C;
-        outline: none;
-        box-shadow: 0 0 0 0.2rem rgba(144, 200, 60, 0.25);
-    }
-    
-    .table-responsive {
-        overflow-x: auto;
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 8px;
-        padding: 1.5rem;
-        margin-bottom: 2.5rem;
-    }
-    
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    
-    th, td {
-        padding: 1.2rem;
-        text-align: left;
-        border-bottom: 1px solid rgba(144, 200, 60, 0.2);
-    }
-    
-    th {
-        color: #90C83C;
-        font-weight: bold;
-        white-space: nowrap;
-        font-size: 1.2rem;
-    }
-    
-    td {
-        color: white;
-        font-size: 1.1rem;
-    }
-    
-    tr:last-child td {
-        border-bottom: none;
-    }
-    
-    tr:hover {
-        background: rgba(144, 200, 60, 0.1);
-    }
-    
-    .text-center {
-        text-align: center;
-    }
-    
-    .btn-success {
-        background-color: #90C83C;
-        border-color: #90C83C;
-        padding: 0.8rem 2rem;
-        font-size: 1.1rem;
-        margin-top: 1.5rem;
-    }
-    
-    .btn-success:hover {
-        background-color: #7ab32f;
-        border-color: #7ab32f;
-    }
-    
-    .team-row.updated {
-        animation: highlight 2s ease-in-out;
-    }
-    
-    @keyframes highlight {
-        0% { background-color: rgba(144, 200, 60, 0.4); }
-        100% { background-color: transparent; }
-    }
-
-    /* Override any button styles to ensure they're all green */
-    .btn, .btn-primary, button[type="submit"] {
-        background: linear-gradient(135deg, #90C83C, #7AAF2F) !important;
-        color: white !important;
-        border-color: #7AAF2F !important;
-    }
-
-    .btn:hover, .btn-primary:hover, button[type="submit"]:hover {
-        background: linear-gradient(135deg, #7AAF2F, #618825) !important;
-        color: white !important;
-        border-color: #618825 !important;
-    }
-    </style>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Leaderboard page loaded, connecting to WebSocket...');
+{% block extra_js %}
+<script src="{% static 'hunt/js/leaderboard-websocket.js' %}"></script>
+<script>
+    // Handle lobby selection filtering
+    document.getElementById('lobby-select').addEventListener('change', function() {
+        const selectedLobbyId = this.value;
+        const teamRows = document.querySelectorAll('.team-row');
+        
+        teamRows.forEach(row => {
+            const lobbyId = row.dataset.lobbyId;
             
-            // Connect to WebSocket for real-time updates
-            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-            const socket = new WebSocket(
-                protocol + window.location.host + '/ws/leaderboard/'
-            );
-
-            // Handle WebSocket events
-            socket.onopen = function(e) {
-                console.log('WebSocket connection established');
-                // Request initial data
-                socket.send(JSON.stringify({
-                    action: 'get_data'
-                }));
-            };
-
-            socket.onmessage = function(e) {
-                console.log('Received WebSocket message:', e.data);
-                const data = JSON.parse(e.data);
-                
-                if (data.type === 'leaderboard_update') {
-                    console.log('Leaderboard update received:', data.teams);
-                    updateLeaderboard(data.teams);
-                }
-            };
-
-            socket.onclose = function(e) {
-                console.error('WebSocket closed unexpectedly', e);
-                // Try to reconnect after a delay
-                setTimeout(function() {
-                    console.log('Attempting to reconnect WebSocket...');
-                    window.location.reload();
-                }, 5000);
-            };
-
-            socket.onerror = function(e) {
-                console.error('WebSocket error occurred:', e);
-            };
-            
-            // Handle lobby selector changes
-            const lobbySelector = document.getElementById('lobby-select');
-            lobbySelector.addEventListener('change', function() {
-                const selectedLobbyId = this.value;
-                filterLeaderboardByLobby(selectedLobbyId);
-            });
-
-            // Function to filter leaderboard by lobby
-            function filterLeaderboardByLobby(lobbyId) {
-                const rows = document.querySelectorAll('.team-row');
-                
-                if (lobbyId === 'all') {
-                    // Show all teams
-                    rows.forEach(row => {
-                        row.style.display = '';
-                    });
-                } else {
-                    // Show only teams in the selected lobby
-                    rows.forEach(row => {
-                        const teamLobbyId = row.getAttribute('data-lobby-id');
-                        if (teamLobbyId === lobbyId) {
-                            row.style.display = '';
-                        } else {
-                            row.style.display = 'none';
-                        }
-                    });
-                }
-            }
-
-            // Function to update the leaderboard
-            function updateLeaderboard(teams) {
-                const leaderboardBody = document.getElementById('leaderboard-body');
-                const selectedLobbyId = document.getElementById('lobby-select').value;
-                
-                if (!teams || teams.length === 0) {
-                    leaderboardBody.innerHTML = '<tr><td colspan="3" class="text-center">No teams available</td></tr>';
-                    return;
-                }
-                
-                // Sort teams by score (highest first)
-                teams.sort((a, b) => b.score - a.score);
-                
-                // Clear the table
-                leaderboardBody.innerHTML = '';
-                
-                // Add each team to the table
-                teams.forEach(team => {
-                    // Create new row for this team
-                    const row = document.createElement('tr');
-                    row.className = 'team-row';
-                    row.dataset.teamId = team.id;
-                    row.dataset.lobbyId = team.lobby_id || '';
-                    
-                    const nameCell = document.createElement('td');
-                    nameCell.className = 'team-name';
-                    nameCell.textContent = team.name;
-                    
-                    const scoreCell = document.createElement('td');
-                    scoreCell.className = 'team-score';
-                    scoreCell.textContent = team.score;
-                    
-                    const lobbyCell = document.createElement('td');
-                    lobbyCell.className = 'team-lobby';
-                    lobbyCell.textContent = team.lobby_name || 'Unknown';
-                    
-                    row.appendChild(nameCell);
-                    row.appendChild(scoreCell);
-                    row.appendChild(lobbyCell);
-                    
-                    // Apply animation for visual highlight
-                    row.classList.add('updated');
-                    
-                    // Apply filter based on current selection
-                    if (selectedLobbyId !== 'all' && team.lobby_id !== selectedLobbyId) {
-                        row.style.display = 'none';
-                    }
-                    
-                    leaderboardBody.appendChild(row);
-                    
-                    // Remove the highlight class after animation completes
-                    setTimeout(() => {
-                        row.classList.remove('updated');
-                    }, 2000);
-                });
-            }
-
-            // If WebSocket fails, try to fetch data via API
-            setTimeout(function() {
-                if (socket.readyState !== 1) {
-                    fetchLeaderboardData();
-                }
-            }, 2000);
-
-            // Fallback to fetch API if WebSocket is not working
-            function fetchLeaderboardData() {
-                fetch('/api/leaderboard-data/')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            updateLeaderboard(data.teams);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching leaderboard data:', error);
-                    });
+            if (selectedLobbyId === 'all' || lobbyId === selectedLobbyId) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
             }
         });
-    </script>
+    });
+</script>
 {% endblock %}
