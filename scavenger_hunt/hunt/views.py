@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 from django.db import models
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,66 @@ def start_race(request, lobby_id):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@require_POST
+def notify_race_started(request, lobby_id):
+    """
+    Extra endpoint to manually trigger race started notifications
+    in case the WebSocket notifications from the original start_race call fail
+    """
+    try:
+        lobby = get_object_or_404(Lobby, id=lobby_id)
+        
+        # Check if the race has actually started
+        if not lobby.hunt_started:
+            return JsonResponse({'success': False, 'error': 'Race has not been started yet'})
+        
+        # Get the race
+        race = lobby.race
+        if not race:
+            return JsonResponse({'success': False, 'error': 'No race assigned to this lobby'})
+        
+        # Build the redirect URL for participants
+        redirect_url = reverse('race_questions', kwargs={'race_id': race.id})
+        
+        # Get channel layer and send notifications again
+        channel_layer = get_channel_layer()
+        
+        # Try multiple times to ensure delivery
+        for _ in range(3):
+            try:
+                # Send to lobby channel
+                async_to_sync(channel_layer.group_send)(
+                    f'lobby_{lobby_id}',
+                    {
+                        'type': 'race_started',
+                        'redirect_url': redirect_url
+                    }
+                )
+                
+                # Also send to race channel
+                async_to_sync(channel_layer.group_send)(
+                    f'race_{race.id}',
+                    {
+                        'type': 'race_started',
+                        'redirect_url': redirect_url
+                    }
+                )
+                
+                # Small delay between attempts
+                time.sleep(0.5)
+            except Exception as e:
+                logger.error(f"Error in notification attempt: {e}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Notifications sent successfully',
+            'redirect_url': redirect_url
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in notify_race_started: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
 
 class LobbyDetailsView(DetailView):
     model = Lobby

@@ -9,7 +9,7 @@ from asgiref.sync import sync_to_async
 from django.utils import timezone
 import asyncio
 from datetime import datetime
-from django.db.models import Sum
+from django.db.models import Sum, Count
 
 logger = logging.getLogger(__name__)
 
@@ -423,14 +423,40 @@ class RaceConsumer(AsyncWebsocketConsumer):
 
     async def race_started(self, event):
         """
-        Broadcast to clients when race starts
+        Handles when a race is started and sends the redirect URL to clients
+        This is called when a 'race_started' event is received through the group.
         """
-        print(f"BROADCASTING race_started event for race {self.race_id}")
-        await self.send(text_data=json.dumps({
-            'type': 'race_started',
-            'race_id': self.race_id,
-            'redirect_url': event.get('redirect_url', f'/race/{self.race_id}/questions/')
-        }))
+        try:
+            race_id = event.get('race_id', self.race_id)
+            redirect_url = event.get('redirect_url', f'/race/{race_id}/questions/')
+            message = event.get('message', 'Race has started! Redirecting to questions page.')
+            
+            # Log the event for debugging
+            logger.info(f"RaceConsumer: Sending race_started event to client for race {race_id}")
+            
+            # Send the event to the WebSocket client
+            await self.send(text_data=json.dumps({
+                'type': 'race_started',
+                'race_id': race_id,
+                'redirect_url': redirect_url,
+                'message': message
+            }))
+            
+            # Send it a second time after a brief delay to ensure delivery
+            await asyncio.sleep(1)
+            
+            # Log the second attempt
+            logger.info(f"RaceConsumer: Sending second race_started event to client for race {race_id}")
+            
+            # Send again
+            await self.send(text_data=json.dumps({
+                'type': 'race_started',
+                'race_id': race_id,
+                'redirect_url': redirect_url,
+                'message': message
+            }))
+        except Exception as e:
+            logger.error(f"Error in RaceConsumer.race_started: {str(e)}")
 
 class LeaderboardConsumer(AsyncWebsocketConsumer):
     """

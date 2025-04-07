@@ -490,6 +490,20 @@ function startRace(lobbyId) {
             // Store the redirect URL for fallback
             const redirectUrl = data.redirect_url;
             
+            // First, try to broadcast the race started event manually
+            try {
+                // Try to manually notify clients via a second API call
+                fetch(`/lobby/${lobbyId}/notify-race-started/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    }
+                }).catch(e => console.log('Notification API call optional, continuing...'));
+            } catch (e) {
+                console.log('Notification API error, continuing with fallback...');
+            }
+            
             // Set a fallback timeout to redirect everyone to the race 
             // in case the WebSocket notification fails
             setTimeout(() => {
@@ -497,7 +511,7 @@ function startRace(lobbyId) {
                 if (confirm('Race has started successfully! Would you like to go to the race page as well?')) {
                     window.location.href = redirectUrl;
                 }
-            }, 2000);
+            }, 1000);
             
             // Remove notification after 3 seconds
             setTimeout(() => {

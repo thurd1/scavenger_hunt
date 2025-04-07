@@ -372,8 +372,45 @@
                         window.location.href = redirectUrl || `/race/${raceId}/questions/`;
                     }
                 }, 1000);
+            } else {
+                // If we can't find the countdown elements, just redirect immediately as a fallback
+                console.log("Countdown elements not found, redirecting immediately to:", redirectUrl || `/race/${raceId}/questions/`);
+                window.location.href = redirectUrl || `/race/${raceId}/questions/`;
             }
         }
     });
+    
+    // Additional aggressive backup redirection
+    window.onload = function() {
+        // Get race info directly from page attributes
+        const bodyEl = document.body;
+        const raceId = bodyEl.getAttribute('data-race-id');
+        
+        if (raceId) {
+            // Check if race has already started right away
+            fetch(`/race/${raceId}/status/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.race_started) {
+                        console.log('Initial race status check: Race has started, redirecting...');
+                        window.location.href = data.redirect_url || `/race/${raceId}/questions/`;
+                    }
+                })
+                .catch(error => console.error('Error checking initial race status:', error));
+            
+            // Secondary backup check every 3 seconds
+            setInterval(function() {
+                fetch(`/race/${raceId}/status/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.race_started) {
+                            console.log('Backup race status check: Race has started, redirecting...');
+                            window.location.href = data.redirect_url || `/race/${raceId}/questions/`;
+                        }
+                    })
+                    .catch(error => console.error('Error in backup race status check:', error));
+            }, 3000);
+        }
+    };
 </script>
 {% endblock %} 

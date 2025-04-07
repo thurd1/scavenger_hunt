@@ -419,10 +419,61 @@
         // Set the lobby ID for the WebSocket connection
         window.lobbyId = '{{ lobby.id }}';
         
-        // Set up automatic refresh every 2 seconds for real-time team updates
-        setInterval(function() {
-            location.reload();
-        }, 2000);
+        // Add a visual indicator for real-time updates
+        const statusIndicator = document.createElement('div');
+        statusIndicator.style.position = 'fixed';
+        statusIndicator.style.bottom = '10px';
+        statusIndicator.style.right = '10px';
+        statusIndicator.style.padding = '8px 12px';
+        statusIndicator.style.background = 'rgba(144, 200, 60, 0.2)';
+        statusIndicator.style.color = '#90C83C';
+        statusIndicator.style.borderRadius = '4px';
+        statusIndicator.style.fontSize = '12px';
+        statusIndicator.style.zIndex = '9999';
+        statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#90C83C;border-radius:50%;margin-right:5px;"></span> Auto-refreshing...';
+        document.body.appendChild(statusIndicator);
+        
+        // Set up automatic refresh with fetch instead of full page reload
+        function refreshTeamData() {
+            fetch(window.location.href)
+                .then(response => response.text())
+                .then(html => {
+                    // Create a temporary DOM element to parse the HTML
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Get the teams grid from the fetched HTML
+                    const newTeamsSection = doc.querySelector('.teams-grid') || doc.querySelector('.no-teams');
+                    const currentTeamsSection = document.querySelector('.teams-grid') || document.querySelector('.no-teams');
+                    
+                    // Update only if there's a difference
+                    if (newTeamsSection && currentTeamsSection) {
+                        if (newTeamsSection.innerHTML !== currentTeamsSection.innerHTML) {
+                            currentTeamsSection.innerHTML = newTeamsSection.innerHTML;
+                            statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#90C83C;border-radius:50%;margin-right:5px;"></span> Teams updated!';
+                            
+                            // Reset the indicator after 1 second
+                            setTimeout(() => {
+                                statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#90C83C;border-radius:50%;margin-right:5px;"></span> Auto-refreshing...';
+                            }, 1000);
+                        }
+                    } else {
+                        // If structure is different, do a full reload
+                        location.reload();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing team data:', error);
+                    // If there's an error, fallback to full page reload
+                    location.reload();
+                });
+        }
+        
+        // Initial refresh after 1 second
+        setTimeout(refreshTeamData, 1000);
+        
+        // Then refresh every 2 seconds
+        setInterval(refreshTeamData, 2000);
     });
 </script>
 {% endblock %}
