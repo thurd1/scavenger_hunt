@@ -464,7 +464,7 @@ class RaceConsumer(AsyncWebsocketConsumer):
 class LeaderboardConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         # Join leaderboard group
-        await async_to_sync(self.channel_layer.group_add)(
+        await self.channel_layer.group_add(
             "leaderboard",
             self.channel_name
         )
@@ -477,7 +477,7 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         # Leave leaderboard group
-        await async_to_sync(self.channel_layer.group_discard)(
+        await self.channel_layer.group_discard(
             "leaderboard",
             self.channel_name
         )
@@ -496,6 +496,19 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
     
     async def send_leaderboard_data(self):
         # Get all teams with their scores
+        teams_data = await self.get_teams_data()
+        
+        # Send to WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'leaderboard_update',
+            'teams': teams_data
+        }))
+        
+    @database_sync_to_async
+    def get_teams_data(self):
+        from .models import Team, TeamRaceProgress
+        from django.db.models import Sum
+        
         teams_data = []
         teams = Team.objects.all()
         
@@ -509,9 +522,5 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
                 'name': team.name,
                 'score': total_score
             })
-        
-        # Send to WebSocket
-        await self.send(text_data=json.dumps({
-            'type': 'leaderboard_update',
-            'teams': teams_data
-        })) 
+            
+        return teams_data 

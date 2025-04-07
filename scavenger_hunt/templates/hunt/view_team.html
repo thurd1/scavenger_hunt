@@ -14,83 +14,36 @@
 {% block body_attributes %}data-race-id="{{ race_id }}"{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-    <div class="dashboard-box p-4">
-        <div class="lobby-header">
-            <h1>{{ team.name }}</h1>
-            
-            <!-- Debug info - only visible during development -->
-            <div class="debug-info bg-dark p-2 mb-4 rounded" style="font-size: 0.8rem; color: #aaa; text-align: left;">
-                <p class="mb-1"><strong>Debug:</strong> Team ID: {{ team.id }}</p>
-                <p class="mb-1">Lobby: {{ lobby.name|default:"None" }}</p>
-                <p class="mb-1">Lobby Code: {{ lobby_code|default:"None" }}</p>
-                <p class="mb-1">Race ID: {{ race.id|default:"None" }}</p>
-                <p class="mb-0">Members count: {{ members|length }}</p>
-            </div>
-        </div>
+<div class="container">
+    <div class="dashboard-box">
+        <h2 style="color: #90C83C">Team Information</h2>
+        
+        <h1>{{ team.name }}</h1>
 
-        <div class="members-section">
-            <h2 class="section-title">Team Members</h2>
-            <div class="members-grid" id="members-container">
-                {% if members %}
-                    {% for member in members %}
-                    <div class="member-card" data-member="{{ member.role }}">
-                        <div class="member-header">
-                            <h3><i class="fas fa-user"></i> {{ member.role }}</h3>
+        {% if team.participating_lobbies.first %}
+            <div class="card bg-dark mb-4">
+                <div class="card-body">
+                    <h3>Race Status</h3>
+                    {% if team.participating_lobbies.first.hunt_started %}
+                        <div class="alert alert-success">
+                            <h4>Race Started!</h4>
+                            <p>The race has begun! You will be redirected to the questions page.</p>
+                            <p>Redirecting in <span id="countdown">5</span> seconds...</p>
+                            <p>
+                                <a href="{% url 'race_questions' race_id=team.participating_lobbies.first.race.id %}" class="btn btn-success btn-lg">Go to Race Now</a>
+                            </p>
                         </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="no-members-message">
-                        <p>No members in this team yet.</p>
-                    </div>
-                {% endif %}
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <h4>Race Not Started</h4>
+                            <p>Please wait for the leader to start the race.</p>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-        </div>
-        
-        <input type="hidden" id="sessionPlayerName" value="{{ request.session.player_name }}">
-        
-        <!-- Race status notification area -->
-        <div id="race-status-area" class="race-status-area mt-4 p-3 rounded" style="display: none;">
-            <h5 class="text-center" id="race-status-title">Race Status</h5>
-            <p id="race-status-message" class="text-center mb-0"></p>
-        </div>
-        
-        <!-- Add a prominent race started notification that will appear when race starts -->
-        <div id="race-started-notification" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(33, 37, 41, 0.95); border: 3px solid #90C83C; border-radius: 15px; padding: 30px; max-width: 90%; width: 500px; text-align: center;">
-                <h2 style="color: #90C83C; margin-bottom: 20px;">Race Started!</h2>
-                <p style="color: white; font-size: 1.2rem; margin-bottom: 20px;">The race has begun! You will be redirected to the questions page.</p>
-                <div class="spinner" style="margin: 20px auto; border: 5px solid rgba(144, 200, 60, 0.3); border-radius: 50%; border-top: 5px solid #90C83C; width: 60px; height: 60px; animation: spin 1s linear infinite;"></div>
-                <p id="race-countdown" style="color: white; font-size: 1.1rem; margin: 20px 0;">Redirecting in 5 seconds...</p>
-                <a id="race-manual-redirect" href="/race/{{ race.id|default:race_id }}/questions/" class="btn btn-success btn-lg" style="width: 80%; margin-top: 15px; font-size: 1.2rem;" onclick="goToRaceNow(event)">
-                    <i class="fas fa-play"></i> Go to Race Now
-                </a>
-            </div>
-        </div>
-        
-        <!-- Race access section -->
-        {% if race.id or race_id %}
-        <div class="actions-section">
-            <div class="action-buttons">
-                {% if race.id %}
-                <a href="{% url 'race_questions' race.id %}" class="btn btn-success">
-                    <i class="fas fa-play"></i> Access Race Questions
-                </a>
-                {% elif race_id %}
-                <a href="{% url 'race_questions' race_id %}" class="btn btn-success">
-                    <i class="fas fa-play"></i> Access Race Questions
-                </a>
-                {% endif %}
-            </div>
-        </div>
         {% endif %}
 
-        <div class="back-button-container">
-            <a href="{% url 'join_team' %}" class="btn btn-success">
-                <i class="fas fa-arrow-left"></i> Back to Teams
-            </a>
-        </div>
+        <a href="{% url 'team_list' %}" class="btn btn-primary">Back to Teams</a>
     </div>
 </div>
 

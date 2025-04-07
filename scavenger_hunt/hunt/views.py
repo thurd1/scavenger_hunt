@@ -1537,6 +1537,7 @@ def upload_photo_api(request):
         team_answer.save()
         
         # Also update/create team progress
+        from .models import TeamProgress
         team_progress, created = TeamProgress.objects.get_or_create(
             team=team,
             question=question,

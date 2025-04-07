@@ -7,9 +7,10 @@
 {% endblock %}
 
 {% block content %}
-    <div class="container">
-        <div class="dashboard-box">
-            <h2 style="color: #90C83C" class="mb-4">Leaderboard</h2>
+    <div class="container py-4">
+        <div class="dashboard-box p-4">
+            <h2 style="color: #90C83C; text-align: center; margin-bottom: 2rem;">Leaderboard</h2>
+            
             <div id="leaderboard-container" class="table-responsive mb-4">
                 <table class="w-100">
                     <thead>
@@ -32,52 +33,77 @@
                     </tbody>
                 </table>
             </div>
-            <div class="button-group">
-                <a href="{% url 'leader_dashboard' %}" class="btn w-100">Back to Dashboard</a>
+            
+            <div class="text-center">
+                <a href="{% url 'leader_dashboard' %}" class="btn btn-success btn-lg">Back to Dashboard</a>
             </div>
         </div>
     </div>
 
     <style>
+    .dashboard-box {
+        background-color: rgba(33, 37, 41, 0.9);
+        border-radius: 15px;
+        border: 1px solid rgba(144, 200, 60, 0.2);
+    }
+    
     .table-responsive {
         overflow-x: auto;
         background: rgba(0, 0, 0, 0.3);
         border-radius: 8px;
         padding: 1rem;
+        margin-bottom: 2rem;
     }
+    
     table {
         width: 100%;
         border-collapse: collapse;
     }
+    
     th, td {
         padding: 1rem;
         text-align: left;
         border-bottom: 1px solid rgba(144, 200, 60, 0.2);
     }
+    
     th {
         color: #90C83C;
         font-weight: bold;
         white-space: nowrap;
+        font-size: 1.2rem;
     }
+    
     td {
         color: white;
+        font-size: 1.1rem;
     }
+    
     tr:last-child td {
         border-bottom: none;
     }
+    
     tr:hover {
         background: rgba(144, 200, 60, 0.1);
     }
+    
     .text-center {
         text-align: center;
     }
-    .button-group {
-        display: grid;
-        gap: 1rem;
+    
+    .btn-success {
+        background-color: #90C83C;
+        border-color: #90C83C;
     }
+    
+    .btn-success:hover {
+        background-color: #7ab32f;
+        border-color: #7ab32f;
+    }
+    
     .team-row.updated {
         animation: highlight 2s ease-in-out;
     }
+    
     @keyframes highlight {
         0% { background-color: rgba(144, 200, 60, 0.4); }
         100% { background-color: transparent; }

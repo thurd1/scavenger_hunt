@@ -26,7 +26,7 @@
                                     <label for="player_name">Your Name:</label>
                                     <input type="text" id="player_name" name="player_name" class="form-control" required placeholder="Enter your name">
                                 </div>
-                                <button type="submit" class="btn btn-primary btn-lg">Join Race</button>
+                                <button type="submit" class="btn btn-success btn-lg">Join Race</button>
                             </form>
                         </div>
                         
@@ -49,37 +49,37 @@
                             {% for zone_id, questions in questions_by_zone.items %}
                                 {% with zone=zones|filter_by:'id'|get:zone_id %}
                                     <div class="zone mb-5" id="zone-{{ zone.id }}">
-                                        <h2 class="zone-title">Zone: {{ zone.id }} - {{ zone.name }}</h2>
+                                        <h2 class="zone-title">Zone: {{ zone.name }}</h2>
                                         
                                         {% for question in questions %}
                                             <div class="question-card mb-4" id="question-{{ question.id }}">
                                                 <h3 class="question-title">Question {{ forloop.counter }}</h3>
-                                                <div class="question-text mb-3">{{ question.text }}</div>
+                                                <div class="question-text mb-4">{{ question.text }}</div>
                                                 
                                                 <div class="answer-form">
-                                                    <form id="answer-form-{{ question.id }}" class="mb-3">
-                                                        <div class="form-group">
+                                                    <form id="answer-form-{{ question.id }}" class="mb-4">
+                                                        <div class="form-group mb-3">
                                                             <label for="answer-{{ question.id }}">Your Answer:</label>
                                                             <input type="text" id="answer-{{ question.id }}" class="form-control" placeholder="Enter your answer">
                                                         </div>
-                                                        <div class="attempts-info mb-2">
+                                                        <div class="attempts-info mb-3">
                                                             Attempts: <span id="attempts-{{ question.id }}">0</span>/3
                                                         </div>
-                                                        <div class="points-info mb-2">
+                                                        <div class="points-info mb-3">
                                                             Points: <span id="points-{{ question.id }}">3</span> for first try, 2 for second, 1 for third
                                                         </div>
-                                                        <button type="button" class="btn btn-success submit-answer" data-question-id="{{ question.id }}">Submit Answer</button>
+                                                        <button type="button" class="btn btn-success btn-lg submit-answer" data-question-id="{{ question.id }}">Submit Answer</button>
                                                     </form>
                                                     
-                                                    <div id="feedback-{{ question.id }}" class="feedback mt-2 mb-3" style="display: none;"></div>
+                                                    <div id="feedback-{{ question.id }}" class="feedback mt-3 mb-4" style="display: none;"></div>
                                                     
                                                     <div id="photo-upload-{{ question.id }}" class="photo-upload" style="display: none;">
                                                         <p>You've used all 3 attempts. Please upload a photo instead:</p>
-                                                        <form id="photo-form-{{ question.id }}" class="mb-3" enctype="multipart/form-data">
-                                                            <div class="form-group">
+                                                        <form id="photo-form-{{ question.id }}" class="mb-4" enctype="multipart/form-data">
+                                                            <div class="form-group mb-3">
                                                                 <input type="file" id="photo-{{ question.id }}" name="photo" class="form-control-file">
                                                             </div>
-                                                            <button type="button" class="btn btn-success upload-photo" data-question-id="{{ question.id }}">Upload Photo</button>
+                                                            <button type="button" class="btn btn-success btn-lg upload-photo" data-question-id="{{ question.id }}">Upload Photo</button>
                                                         </form>
                                                     </div>
                                                 </div>
@@ -90,9 +90,8 @@
                             {% endfor %}
                             
                             <!-- Navigation buttons -->
-                            <div class="navigation-buttons d-flex justify-content-between mt-4" style="display: none;" id="navigation-buttons">
-                                <button id="prev-question" class="btn btn-success">Previous</button>
-                                <button id="next-question" class="btn btn-success">Next</button>
+                            <div class="navigation-buttons d-flex justify-content-center mt-5" style="display: none;" id="navigation-buttons">
+                                <button id="next-question" class="btn btn-success btn-lg">Next Question</button>
                             </div>
                         </div>
                     </div>
@@ -149,12 +148,17 @@
     border: 1px solid rgba(144, 200, 60, 0.3);
     border-radius: 10px;
     padding: 20px;
-    margin-bottom: 20px;
+    margin-bottom: 30px;
 }
 
 .question-title {
     color: #ffffff;
     margin-bottom: 15px;
+}
+
+.question-text {
+    font-size: 1.2rem;
+    line-height: 1.5;
 }
 
 .attempts-info, .points-info {
@@ -163,7 +167,7 @@
 }
 
 .feedback {
-    padding: 10px;
+    padding: 15px;
     border-radius: 5px;
 }
 
@@ -187,15 +191,25 @@
     background: rgba(144, 200, 60, 0.1);
     border: 1px solid rgba(144, 200, 60, 0.3);
     border-radius: 10px;
-    padding: 15px;
+    padding: 20px;
     text-align: center;
     margin-bottom: 30px;
 }
 
 .stats h3 {
-    margin: 5px 0;
+    margin: 10px 0;
     font-size: 1.2rem;
     color: #90C83C;
+}
+
+.btn-success {
+    background-color: #90C83C;
+    border-color: #90C83C;
+}
+
+.btn-success:hover {
+    background-color: #7ab32f;
+    border-color: #7ab32f;
 }
 </style>
 
@@ -221,15 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update the question counter
         const updateQuestionCounter = function() {
-            const prevButton = document.getElementById('prev-question');
             const nextButton = document.getElementById('next-question');
-            
-            // Disable/enable previous button
-            if (currentQuestionIndex === 0) {
-                prevButton.disabled = true;
-            } else {
-                prevButton.disabled = false;
-            }
             
             // Disable/enable next button
             if (currentQuestionIndex === totalQuestions - 1) {
@@ -247,16 +253,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (currentQuestionIndex < totalQuestions - 1) {
                 questions[currentQuestionIndex].style.display = 'none';
                 currentQuestionIndex++;
-                questions[currentQuestionIndex].style.display = 'block';
-                updateQuestionCounter();
-            }
-        });
-        
-        // Previous button event listener
-        document.getElementById('prev-question').addEventListener('click', function() {
-            if (currentQuestionIndex > 0) {
-                questions[currentQuestionIndex].style.display = 'none';
-                currentQuestionIndex--;
                 questions[currentQuestionIndex].style.display = 'block';
                 updateQuestionCounter();
             }
