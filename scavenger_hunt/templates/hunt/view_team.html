@@ -3,227 +3,383 @@
 
 {% block title %}Team: {{ team.name }}{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/team.css' %}">
+{% block head_extras %}
+<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 {% endblock %}
 
+{% block welcome_text %}
+    <p style="color: #90C83C">Team Information</p>
+{% endblock %}
+
+{% block body_attributes %}data-race-id="{{ race_id }}"{% endblock %}
+
 {% block content %}
-<div class="container team-view py-4">
-    <div class="row mb-4">
-        <div class="col">
-            <h1 class="team-name display-4">{{ team.name }}</h1>
-            <p class="team-code lead">Team Code: <strong>{{ team.code }}</strong></p>
-            {% if joined_team %}
-            <div class="alert alert-success">
-                You've joined this team as <strong>{{ request.session.team_role }}</strong>!
-            </div>
-            {% endif %}
-        </div>
-    </div>
+<div class="container">
+    <div class="dashboard-box">
+        <h2 style="color: #90C83C">Team Information</h2>
+        
+        <h1>{{ team.name }}</h1>
 
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title mb-0">Team Members</h3>
-                </div>
+        {% if team.participating_lobbies.first %}
+            <div class="card bg-dark mb-4">
                 <div class="card-body">
-                    <ul class="list-group" id="team-members-list">
-                        {% for member in team.members.all %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ member.role }}
-                            {% if member.id == request.session.team_member_id %}
-                            <span class="badge bg-primary">You</span>
-                            {% endif %}
-                        </li>
-                        {% empty %}
-                        <li class="list-group-item">No members have joined this team yet.</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
-
-            {% if lobby %}
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title mb-0">Lobby: {{ lobby.name }}</h3>
-                </div>
-                <div class="card-body">
-                    <p>Waiting for the hunt to start...</p>
-                    <div id="lobby-status" class="alert alert-info">
-                        {% if lobby.hunt_started %}
-                        <p>The hunt has started!</p>
-                        {% else %}
-                        <p>Waiting for the organizer to start the hunt...</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-        </div>
-
-        <div class="col-md-4">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title mb-0">Team Actions</h3>
-                </div>
-                <div class="card-body">
-                    {% if not joined_team %}
-                    <h4>Join This Team</h4>
-                    <form method="post" action="{% url 'join_team' team.id %}">
-                        {% csrf_token %}
-                        <div class="mb-3">
-                            <label for="role" class="form-label">Your Role in the Team</label>
-                            <input type="text" class="form-control" id="role" name="role" required
-                                placeholder="Navigator, Driver, etc.">
-                            <div class="form-text">What's your job on this team?</div>
+                    <h3>Race Status</h3>
+                    {% if team.participating_lobbies.first.hunt_started %}
+                        <div class="race-status-area active" id="race-started-notification">
+                            <div class="race-started-content">
+                                <h2 class="race-title">Race Started!</h2>
+                                <p class="race-description">The race has begun! You will be redirected to the questions page.</p>
+                                <div class="countdown-container">
+                                    <div class="countdown-circle">
+                                        <div class="countdown-spinner"></div>
+                                        <span id="countdown" class="countdown-number">5</span>
+                                    </div>
+                                </div>
+                                <p id="race-countdown">Redirecting in 5 seconds...</p>
+                                <p class="mt-4">
+                                    <a href="{% url 'race_questions' race_id=team.participating_lobbies.first.race.id %}" class="btn btn-success btn-lg">Go to Race Now</a>
+                                </p>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">Join Team</button>
-                    </form>
                     {% else %}
-                    <div class="d-grid gap-2">
-                        {% if lobby and lobby.hunt_started and lobby.race %}
-                        <a href="{% url 'race_questions' lobby.race.id %}" class="btn btn-success">Go to Hunt</a>
-                        {% endif %}
-                        <a href="{% url 'leave_team' team.id %}" class="btn btn-danger">Leave Team</a>
-                    </div>
+                        <div class="alert alert-warning">
+                            <h4>Race Not Started</h4>
+                            <p>Please wait for the leader to start the race.</p>
+                        </div>
                     {% endif %}
                 </div>
             </div>
+        {% endif %}
 
-            {% if is_race_active and race %}
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3 class="card-title mb-0">Race Information</h3>
-                </div>
-                <div class="card-body">
-                    <p>Race Name: {{ race.name }}</p>
-                    <p>Date: {{ race.date }}</p>
-                    <p>Total Questions: {{ race.questions.count }}</p>
-                    <div class="d-grid">
-                        <a href="{% url 'race_questions' race.id %}" class="btn btn-primary">Go to Questions</a>
+        <div class="members-section mt-4">
+            <h3 class="section-title">Team Members</h3>
+            
+            <div class="members-grid">
+                {% for member in members %}
+                    <div class="member-card">
+                        <div class="member-header">
+                            <h3>{{ member.role }}</h3>
+                            {% if member.id == request.session.team_member_id %}
+                            <span class="badge bg-primary">You</span>
+                            {% endif %}
+                        </div>
                     </div>
-                </div>
+                {% empty %}
+                    <div class="no-members-message">
+                        <p>No members have joined this team yet.</p>
+                    </div>
+                {% endfor %}
             </div>
-            {% endif %}
         </div>
+
+        <div class="actions-section mt-4">
+            <h3 class="section-title">Team Actions</h3>
+            
+            <div class="action-buttons">
+                {% if not joined_team %}
+                    <form method="post" action="{% url 'join_team' team.id %}" class="team-action-form">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="role" class="form-label">Your Role in the Team</label>
+                            <input type="text" class="form-control" id="role" name="role" required 
+                                   placeholder="Navigator, Driver, etc.">
+                            <div class="form-text">What's your job on this team?</div>
+                        </div>
+                        <button type="submit" class="btn btn-success">Join Team</button>
+                    </form>
+                {% else %}
+                    {% if lobby and lobby.hunt_started and lobby.race %}
+                        <a href="{% url 'race_questions' lobby.race.id %}" class="btn btn-success">Go to Hunt</a>
+                    {% endif %}
+                    <a href="{% url 'leave_team' team.id %}" class="btn btn-danger">Leave Team</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <a href="{% url 'join_team' %}" class="btn btn-primary">Back to Teams</a>
     </div>
 </div>
 
-<!-- Race Started Notification Modal -->
-<div class="modal fade" id="raceStartedModal" tabindex="-1" aria-labelledby="raceStartedModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title" id="raceStartedModalLabel">Race Started!</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>The race has started! You will be redirected to the questions page in <span id="redirect-countdown">5</span> seconds.</p>
-                <div class="progress">
-                    <div id="redirect-progress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <a href="#" id="go-to-race-now-btn" class="btn btn-primary">Go to Race Now</a>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+<style>
+.dashboard-box {
+    background-color: rgba(33, 37, 41, 0.9);
+    border-radius: 15px;
+    border: 1px solid rgba(144, 200, 60, 0.2);
+    padding: 2rem;
+}
 
-{% block extra_js %}
+.members-section {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.section-title {
+    color: #90C83C;
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.members-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 10px;
+}
+
+.member-card {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.member-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(144, 200, 60, 0.2);
+}
+
+.member-header {
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+    padding-bottom: 10px;
+}
+
+.member-header h3 {
+    color: #90C83C;
+    margin: 0 0 5px 0;
+    font-size: 1.2rem;
+}
+
+.no-members-message {
+    text-align: center;
+    color: #999;
+    padding: 2rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    grid-column: 1 / -1;
+}
+
+.race-status-area {
+    background-color: rgba(33, 37, 41, 0.7);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    max-width: 800px;
+    margin: 1rem auto;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    display: block !important;
+}
+
+.race-status-area.active {
+    background-color: rgba(40, 167, 69, 0.2);
+    animation: pulse 2s infinite;
+    border: 2px solid rgba(144, 200, 60, 0.6);
+}
+
+.race-title {
+    color: #90C83C;
+    margin-bottom: 1.5rem;
+    font-size: 2rem;
+    text-shadow: 0 0 10px rgba(144, 200, 60, 0.5);
+}
+
+.race-description {
+    color: white;
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+}
+
+.countdown-container {
+    display: flex;
+    justify-content: center;
+    margin: 1.5rem 0;
+}
+
+.countdown-circle {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(144, 200, 60, 0.3);
+}
+
+.countdown-spinner {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 4px solid rgba(144, 200, 60, 0.2);
+    border-top-color: #90C83C;
+    animation: spin 1s linear infinite;
+}
+
+.countdown-number {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #90C83C;
+    z-index: 1;
+}
+
+#race-countdown {
+    font-size: 1.2rem;
+    color: #ddd;
+    margin-top: 1rem;
+}
+
+.actions-section {
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.team-action-form {
+    max-width: 500px;
+    margin: 0 auto;
+    background: rgba(33, 37, 41, 0.8);
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid rgba(144, 200, 60, 0.3);
+}
+
+.back-button-container {
+    text-align: center;
+    padding: 20px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.4); }
+    70% { box-shadow: 0 0 0 15px rgba(144, 200, 60, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0); }
+}
+</style>
+
 <script>
+    // Initialize the team view functionality
     document.addEventListener('DOMContentLoaded', function() {
-        // Regular JavaScript without Django template variables in JavaScript
-        const hasLobby = {% if lobby %}true{% else %}false{% endif %};
-        const hasRace = {% if race %}true{% else %}false{% endif %};
-        const lobbyStarted = {% if lobby and lobby.hunt_started %}true{% else %}false{% endif %};
-        const raceId = {% if race %}{{ race.id }}{% else %}null{% endif %};
-        const lobbyRaceId = {% if lobby and lobby.race %}{{ lobby.race.id }}{% else %}null{% endif %};
+        // Get race information from the page
+        const hasRaceStarted = {% if team.participating_lobbies.first.hunt_started %}true{% else %}false{% endif %};
+        const raceId = {% if team.participating_lobbies.first.race.id %}{{ team.participating_lobbies.first.race.id }}{% else %}null{% endif %};
         
-        // Show race started notification if needed
-        if (hasLobby && lobbyStarted && lobbyRaceId) {
-            const redirectUrl = `/race/${lobbyRaceId}/questions/`;
-            showRaceStartedNotification(redirectUrl);
+        // Start automatic countdown if race has started
+        if (hasRaceStarted && raceId) {
+            console.log("Race already started, showing notification");
+            // Show race started notification
+            startCountdownAndRedirect(raceId);
         }
         
-        // Connect to WebSocket if we have a race
-        if (hasRace && raceId) {
-            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-            const wsUrl = `${protocol}${window.location.host}/ws/race/${raceId}/`;
-            
+        // Connect to WebSocket for real-time race updates
+        if (raceId) {
             try {
-                const socket = new WebSocket(wsUrl);
+                const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const raceSocket = new WebSocket(
+                    `${wsScheme}//${window.location.host}/ws/race/${raceId}/`
+                );
                 
-                socket.onopen = function(e) {
-                    console.log('WebSocket connection established');
-                };
-                
-                socket.onmessage = function(e) {
+                raceSocket.onmessage = function(e) {
                     const data = JSON.parse(e.data);
-                    console.log('WebSocket message received:', data);
+                    console.log('Received WebSocket message:', data);
                     
+                    // Handle race started event
                     if (data.type === 'race_started') {
-                        const url = data.redirect_url || `/race/${raceId}/questions/`;
-                        showRaceStartedNotification(url);
+                        console.log('Race started! Showing notification...');
+                        startCountdownAndRedirect(raceId, data.redirect_url);
                     }
                 };
                 
-                socket.onerror = function(e) {
-                    console.error('WebSocket error:', e);
+                raceSocket.onclose = function(e) {
+                    console.log('Race WebSocket closed');
                 };
                 
-                socket.onclose = function(e) {
-                    console.log('WebSocket connection closed');
+                raceSocket.onerror = function(e) {
+                    console.error('Race WebSocket error:', e);
                 };
-            } catch (err) {
-                console.error('Failed to connect to WebSocket:', err);
+                
+            } catch (e) {
+                console.error('Error setting up WebSocket:', e);
+            }
+        }
+        
+        // Function to show race started notification and redirect
+        function startCountdownAndRedirect(raceId, redirectUrl) {
+            // Show race started notification
+            const notification = document.getElementById('race-started-notification');
+            if (notification) {
+                notification.style.display = 'block';
+                notification.classList.add('active');
+                
+                // Make sure the spinner is visible
+                const spinner = document.querySelector('.countdown-spinner');
+                if (spinner) {
+                    spinner.style.display = 'block';
+                }
+            }
+            
+            // Start countdown
+            let countdownEl = document.getElementById('countdown');
+            let countdownMsgEl = document.getElementById('race-countdown');
+            
+            if (countdownEl && countdownMsgEl) {
+                let seconds = 5;
+                
+                // Update countdown every second
+                let countdownInterval = setInterval(function() {
+                    seconds--;
+                    countdownEl.textContent = seconds;
+                    countdownMsgEl.textContent = `Redirecting in ${seconds} seconds...`;
+                    
+                    // When countdown reaches 0, redirect
+                    if (seconds <= 0) {
+                        clearInterval(countdownInterval);
+                        console.log("Countdown complete, redirecting to:", redirectUrl || `/race/${raceId}/questions/`);
+                        // Direct redirect without sessionStorage
+                        window.location.href = redirectUrl || `/race/${raceId}/questions/`;
+                    }
+                }, 1000);
             }
         }
     });
-    
-    function showRaceStartedNotification(redirectUrl) {
-        // Update the button URL
-        const goToRaceButton = document.getElementById('go-to-race-now-btn');
-        if (goToRaceButton) {
-            goToRaceButton.href = redirectUrl;
-        }
-        
-        // Show the modal
-        const modalElement = document.getElementById('raceStartedModal');
-        if (modalElement) {
-            const modal = new bootstrap.Modal(modalElement);
-            modal.show();
-            
-            // Start countdown
-            let seconds = 5;
-            const countdownElement = document.getElementById('redirect-countdown');
-            const progressBar = document.getElementById('redirect-progress');
-            
-            const interval = setInterval(function() {
-                seconds--;
-                
-                if (countdownElement) {
-                    countdownElement.textContent = seconds;
-                }
-                
-                if (progressBar) {
-                    progressBar.style.width = (seconds / 5 * 100) + '%';
-                }
-                
-                if (seconds <= 0) {
-                    clearInterval(interval);
-                    window.location.href = redirectUrl;
-                }
-            }, 1000);
-            
-            // Clear interval if modal is closed
-            modalElement.addEventListener('hidden.bs.modal', function() {
-                clearInterval(interval);
-            });
-        }
-    }
 </script>
 {% endblock %} 
