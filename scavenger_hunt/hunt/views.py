@@ -615,6 +615,8 @@ def delete_lobby(request, lobby_id):
 @require_POST
 def delete_team(request, team_id):
     try:
+        from django.db import connection
+        
         # Get team details first for messaging
         team = get_object_or_404(Team, id=team_id)
         team_name = team.name
@@ -625,16 +627,34 @@ def delete_team(request, team_id):
         
         # Manual deletion using raw SQL to avoid cascade issues with non-existent tables
         with connection.cursor() as cursor:
-            # Delete team members first
-            cursor.execute("DELETE FROM hunt_teammember WHERE team_id = %s", [team_id])
-            
-            # Remove team from lobbies (M2M relationship)
+            # First, remove team from any lobbies (M2M relationship)
             cursor.execute("DELETE FROM hunt_lobby_teams WHERE team_id = %s", [team_id])
             
-            # Delete TeamRaceProgress if exists (check if table exists first)
+            # Get tables in the database
             tables = connection.introspection.table_names()
+            
+            # Delete related objects in the correct order
+            if 'hunt_teamanswer' in tables:
+                cursor.execute("DELETE FROM hunt_teamanswer WHERE team_id = %s", [team_id])
+            
+            if 'hunt_teamprogress' in tables:
+                cursor.execute("DELETE FROM hunt_teamprogress WHERE team_id = %s", [team_id])
+                
             if 'hunt_teamraceprogress' in tables:
                 cursor.execute("DELETE FROM hunt_teamraceprogress WHERE team_id = %s", [team_id])
+            
+            # Delete any other potential related tables
+            for table in tables:
+                if table.startswith('hunt_') and table != 'hunt_team' and table != 'hunt_teammember' and 'team' in table.lower():
+                    try:
+                        sql = f"DELETE FROM {table} WHERE team_id = %s"
+                        cursor.execute(sql, [team_id])
+                        logger.info(f"Deleted related data from {table} for team {team_id}")
+                    except Exception as e:
+                        logger.error(f"Error deleting from {table}: {str(e)}")
+            
+            # Delete team members last (before the team itself)
+            cursor.execute("DELETE FROM hunt_teammember WHERE team_id = %s", [team_id])
             
             # Finally delete the team
             cursor.execute("DELETE FROM hunt_team WHERE id = %s", [team_id])

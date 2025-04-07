@@ -8,10 +8,10 @@
     {% block head_extras %}{% endblock %}
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Roboto', sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #003A5B;
+            background-color: #f0f2f5;
             color: gray;
             text-align: center;
             min-height: 100vh;
@@ -278,6 +278,14 @@
         </div>
     </div>
 
-    {% block scripts %}{% endblock %}
+    {% block scripts %}
+    <script src="{% static 'hunt/js/jquery-3.6.0.min.js' %}"></script>
+    <script src="{% static 'hunt/js/bootstrap.min.js' %}"></script>
+    <!-- Common site-wide JavaScript -->
+    <script src="{% static 'hunt/js/common.js' %}"></script>
+    {% endblock %}
+
+    {% block additional_styles %}
+    {% endblock %}
 </body>
 </html>

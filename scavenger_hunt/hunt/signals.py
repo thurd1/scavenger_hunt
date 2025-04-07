@@ -262,7 +262,7 @@ def team_score_changed(sender, instance, created, **kwargs):
         # This is more reliable than just updating a single team's score
         teams_data = []
         
-        # Get all active lobbies - FIXED: Use is_active instead of status
+        # Get all active lobbies - Use is_active instead of status
         lobbies = Lobby.objects.filter(is_active=True)
         
         for lobby in lobbies:
@@ -351,17 +351,35 @@ def cleanup_after_lobby_deletion(sender, instance, **kwargs):
             
         # Use raw SQL to avoid cascade issues with non-existent tables
         with connection.cursor() as cursor:
+            # Get tables in the database
+            tables = connection.introspection.table_names()
+            
             for team_id in team_ids:
                 try:
                     logger.info(f"Deleting orphaned team {team_id} with raw SQL")
                     
-                    # Delete team members first
-                    cursor.execute("DELETE FROM hunt_teammember WHERE team_id = %s", [team_id])
+                    # Delete related objects in the correct order
+                    if 'hunt_teamanswer' in tables:
+                        cursor.execute("DELETE FROM hunt_teamanswer WHERE team_id = %s", [team_id])
                     
-                    # Check if TeamRaceProgress table exists
-                    tables = connection.introspection.table_names()
+                    if 'hunt_teamprogress' in tables:
+                        cursor.execute("DELETE FROM hunt_teamprogress WHERE team_id = %s", [team_id])
+                        
                     if 'hunt_teamraceprogress' in tables:
                         cursor.execute("DELETE FROM hunt_teamraceprogress WHERE team_id = %s", [team_id])
+                    
+                    # Delete any other potential related tables
+                    for table in tables:
+                        if table.startswith('hunt_') and table != 'hunt_team' and table != 'hunt_teammember' and 'team' in table.lower():
+                            try:
+                                sql = f"DELETE FROM {table} WHERE team_id = %s"
+                                cursor.execute(sql, [team_id])
+                                logger.info(f"Deleted related data from {table} for team {team_id}")
+                            except Exception as e:
+                                logger.error(f"Error deleting from {table}: {str(e)}")
+                    
+                    # Delete team members last (before the team itself)
+                    cursor.execute("DELETE FROM hunt_teammember WHERE team_id = %s", [team_id])
                     
                     # Finally delete the team
                     cursor.execute("DELETE FROM hunt_team WHERE id = %s", [team_id])
