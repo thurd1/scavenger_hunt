@@ -52,6 +52,7 @@
     background-color: rgba(33, 37, 41, 0.9);
     border-radius: 15px;
     border: 1px solid rgba(144, 200, 60, 0.2);
+    padding: 2rem;
 }
 
 .lobby-header {
@@ -189,126 +190,64 @@
 </style>
 
 <script>
-// Add direct redirect function
-function goToRaceNow(event) {
-    if (event) {
-        event.preventDefault();
-    }
-    const raceId = '{{ race.id|default:race_id }}';
-    // Try to navigate directly
-    window.location.href = `/race/${raceId}/questions/`;
-}
-
-// Initialize the team and race functionality
+// Initialize the team view functionality
 document.addEventListener('DOMContentLoaded', function() {
-    const teamId = '{{ team.id }}';
-    const raceId = '{{ race.id|default:race_id }}';
-    const raceNotification = document.getElementById('race-started-notification');
-    const raceCountdown = document.getElementById('race-countdown');
+    // Start automatic countdown if race has started
+    const hasRaceStarted = {% if team.participating_lobbies.first.hunt_started %}true{% else %}false{% endif %};
+    const raceId = {% if team.participating_lobbies.first.race.id %}{{ team.participating_lobbies.first.race.id }}{% else %}{% if race_id %}{{ race_id }}{% else %}0{% endif %}{% endif %};
     
-    // Function to handle race start
-    function handleRaceStart() {
-        console.log('Race started event detected!');
-        
-        // Show the notification
-        raceNotification.style.display = 'block';
-        
-        // Set up countdown for redirect
-        let countdown = 5;
-        const countdownTimer = setInterval(function() {
-            countdown--;
-            raceCountdown.textContent = `Redirecting in ${countdown} seconds...`;
+    if (hasRaceStarted && raceId) {
+        // Start countdown
+        let countdownEl = document.getElementById('countdown');
+        if (countdownEl) {
+            let seconds = 5;
             
-            if (countdown <= 0) {
-                clearInterval(countdownTimer);
-                // Try different redirection methods
-                try {
-                    // Method 1: Direct assignment
-                    window.location.href = `/race/${raceId}/questions/`;
-                    
-                    // Method 2 (after a brief delay if method 1 fails)
-                    setTimeout(function() {
-                        try {
-                            window.location.replace(`/race/${raceId}/questions/`);
-                        } catch (e) {
-                            console.error('Error with redirect method 2:', e);
-                        }
-                    }, 200);
-                } catch (e) {
-                    console.error('Error redirecting:', e);
-                }
-            }
-        }, 1000);
-    }
-    
-    // Connect to WebSocket for race updates
-    if (raceId) {
-        // WebSocket for race start notification
-        const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const raceSocket = new WebSocket(
-            `${wsScheme}//${window.location.host}/ws/race/${raceId}/`
-        );
-        
-        raceSocket.onopen = function() {
-            console.log('Race WebSocket connected');
-        };
-        
-        raceSocket.onmessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
-                console.log('Race message received:', data);
+            // Update countdown every second
+            let countdownInterval = setInterval(function() {
+                seconds--;
+                countdownEl.textContent = seconds;
                 
-                if (data.type === 'race_started') {
-                    handleRaceStart();
+                // When countdown reaches 0, redirect
+                if (seconds <= 0) {
+                    clearInterval(countdownInterval);
+                    window.location.href = `/race/${raceId}/questions/`;
                 }
-            } catch (e) {
-                console.error('Error handling message:', e);
-            }
-        };
-        
-        raceSocket.onerror = function(error) {
-            console.error('WebSocket error:', error);
-        };
-        
-        // Setup polling as backup
-        setInterval(function() {
-            fetch(`/race/${raceId}/status/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.started || data.hunt_started || data.race_started) {
-                        handleRaceStart();
-                    }
-                })
-                .catch(error => {
-                    console.log('Poll error (expected if endpoint not configured):', error);
-                });
-        }, 3000);
-        
-        // Manual check: Add event listeners to all race buttons
-        document.querySelectorAll('.btn-success').forEach(button => {
-            if (button.textContent.includes('Race') || button.textContent.includes('Questions')) {
-                const originalHref = button.getAttribute('href');
-                button.setAttribute('href', `/race/${raceId}/questions/`);
-                console.log(`Updated button href from ${originalHref} to /race/${raceId}/questions/`);
-            }
-        });
+            }, 1000);
+        }
     }
     
-    // Force check race status immediately for testing
-    setTimeout(function() {
-        const testButton = document.createElement('button');
-        testButton.style.position = 'fixed';
-        testButton.style.bottom = '10px';
-        testButton.style.right = '10px';
-        testButton.style.zIndex = '1000';
-        testButton.style.padding = '5px';
-        testButton.style.opacity = '0.5';
-        testButton.textContent = 'Test Race Start';
-        testButton.addEventListener('click', function() {
-            handleRaceStart();
-        });
-        document.body.appendChild(testButton);
-    }, 2000);
+    // Connect to WebSocket for real-time race updates
+    if (raceId) {
+        try {
+            const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const raceSocket = new WebSocket(
+                `${wsScheme}//${window.location.host}/ws/race/${raceId}/`
+            );
+            
+            raceSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                console.log('Received WebSocket message:', data);
+                
+                // Handle race started event
+                if (data.type === 'race_started') {
+                    console.log('Race started! Redirecting...');
+                    // Redirect to race questions
+                    window.location.href = data.redirect_url || `/race/${raceId}/questions/`;
+                }
+            };
+            
+            raceSocket.onclose = function(e) {
+                console.log('Race WebSocket closed');
+            };
+            
+            raceSocket.onerror = function(e) {
+                console.error('Race WebSocket error:', e);
+            };
+            
+        } catch (e) {
+            console.error('Error setting up WebSocket:', e);
+        }
+    }
 });
 </script>
 {% endblock %} 

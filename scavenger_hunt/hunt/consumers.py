@@ -469,6 +469,9 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
+        
+        # Send initial leaderboard data
+        await self.send_initial_leaderboard_data()
 
     async def disconnect(self, close_code):
         # Leave the leaderboard group
@@ -479,7 +482,14 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
 
     # Receive message from WebSocket (not used but needed for completeness)
     async def receive(self, text_data):
-        pass
+        # If the client sends a request for data, refresh the leaderboard
+        if text_data:
+            try:
+                data = json.loads(text_data)
+                if data.get('action') == 'get_data':
+                    await self.send_initial_leaderboard_data()
+            except json.JSONDecodeError:
+                pass
 
     # Receive message from the leaderboard group
     async def leaderboard_update(self, event):
@@ -491,11 +501,10 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
             'teams': teams
         }))
     
-    async def send_leaderboard_data(self):
-        # Get all teams with their scores
+    # Send initial leaderboard data
+    async def send_initial_leaderboard_data(self):
         teams_data = await self.get_teams_data()
         
-        # Send to WebSocket
         await self.send(text_data=json.dumps({
             'type': 'leaderboard_update',
             'teams': teams_data
@@ -503,21 +512,32 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
         
     @database_sync_to_async
     def get_teams_data(self):
-        from .models import Team, TeamRaceProgress
-        from django.db.models import Sum
+        from .models import TeamRaceProgress, Team, Lobby
         
         teams_data = []
-        teams = Team.objects.all()
         
-        for team in teams:
-            # Get total score from TeamRaceProgress
-            total_score = TeamRaceProgress.objects.filter(team=team).aggregate(Sum('total_points'))['total_points__sum'] or 0
+        # Get teams with race progress
+        team_race_progresses = TeamRaceProgress.objects.select_related('team', 'race').all()
+        
+        for progress in team_race_progresses:
+            team = progress.team
+            race = progress.race
             
-            # Get team data
-            teams_data.append({
-                'id': team.id,
-                'name': team.name,
-                'score': total_score
-            })
-            
+            if team and race:
+                # Find the lobby for this team and race
+                lobby = Lobby.objects.filter(teams=team, race=race).first()
+                lobby_id = lobby.id if lobby else None
+                lobby_name = race.name if race else 'Unknown Race'
+                
+                teams_data.append({
+                    'id': team.id,
+                    'name': team.name,
+                    'score': progress.total_points,
+                    'lobby_id': lobby_id,
+                    'lobby_name': lobby_name
+                })
+        
+        # Sort by score
+        teams_data.sort(key=lambda x: x['score'], reverse=True)
+        
         return teams_data 

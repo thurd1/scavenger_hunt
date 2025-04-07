@@ -177,6 +177,10 @@
             // Handle WebSocket events
             socket.onopen = function(e) {
                 console.log('WebSocket connection established');
+                // Request initial data
+                socket.send(JSON.stringify({
+                    action: 'get_data'
+                }));
             };
 
             socket.onmessage = function(e) {
@@ -191,6 +195,11 @@
 
             socket.onclose = function(e) {
                 console.error('WebSocket closed unexpectedly', e);
+                // Try to reconnect after a delay
+                setTimeout(function() {
+                    console.log('Attempting to reconnect WebSocket...');
+                    window.location.reload();
+                }, 5000);
             };
 
             socket.onerror = function(e) {
@@ -239,86 +248,70 @@
                 // Sort teams by score (highest first)
                 teams.sort((a, b) => b.score - a.score);
                 
-                // Keep track of existing team rows
-                const existingTeams = {};
-                document.querySelectorAll('.team-row').forEach(row => {
-                    existingTeams[row.dataset.teamId] = row;
-                });
-                
                 // Clear the table
                 leaderboardBody.innerHTML = '';
                 
                 // Add each team to the table
                 teams.forEach(team => {
-                    let row;
+                    // Create new row for this team
+                    const row = document.createElement('tr');
+                    row.className = 'team-row';
+                    row.dataset.teamId = team.id;
+                    row.dataset.lobbyId = team.lobby_id || '';
                     
-                    // Check if we already have this team in the table
-                    if (existingTeams[team.id]) {
-                        row = existingTeams[team.id];
-                        
-                        // Update score if changed
-                        const scoreCell = row.querySelector('.team-score');
-                        const currentScore = parseInt(scoreCell.textContent);
-                        
-                        if (currentScore !== team.score) {
-                            scoreCell.textContent = team.score;
-                            row.classList.add('updated');
-                            
-                            // Remove the highlight class after animation completes
-                            setTimeout(() => {
-                                row.classList.remove('updated');
-                            }, 2000);
-                        }
-                    } else {
-                        // Create new row for this team
-                        row = document.createElement('tr');
-                        row.className = 'team-row';
-                        row.dataset.teamId = team.id;
-                        row.dataset.lobbyId = team.lobby_id || '';
-                        
-                        const nameCell = document.createElement('td');
-                        nameCell.className = 'team-name';
-                        nameCell.textContent = team.name;
-                        
-                        const scoreCell = document.createElement('td');
-                        scoreCell.className = 'team-score';
-                        scoreCell.textContent = team.score;
-                        
-                        const lobbyCell = document.createElement('td');
-                        lobbyCell.className = 'team-lobby';
-                        lobbyCell.textContent = team.lobby_name || 'Unknown';
-                        
-                        row.appendChild(nameCell);
-                        row.appendChild(scoreCell);
-                        row.appendChild(lobbyCell);
-                        row.classList.add('updated');
-                        
-                        // Apply filter based on current selection
-                        if (selectedLobbyId !== 'all' && team.lobby_id !== selectedLobbyId) {
-                            row.style.display = 'none';
-                        }
-                        
-                        // Remove the highlight class after animation completes
-                        setTimeout(() => {
-                            row.classList.remove('updated');
-                        }, 2000);
+                    const nameCell = document.createElement('td');
+                    nameCell.className = 'team-name';
+                    nameCell.textContent = team.name;
+                    
+                    const scoreCell = document.createElement('td');
+                    scoreCell.className = 'team-score';
+                    scoreCell.textContent = team.score;
+                    
+                    const lobbyCell = document.createElement('td');
+                    lobbyCell.className = 'team-lobby';
+                    lobbyCell.textContent = team.lobby_name || 'Unknown';
+                    
+                    row.appendChild(nameCell);
+                    row.appendChild(scoreCell);
+                    row.appendChild(lobbyCell);
+                    
+                    // Apply animation for visual highlight
+                    row.classList.add('updated');
+                    
+                    // Apply filter based on current selection
+                    if (selectedLobbyId !== 'all' && team.lobby_id !== selectedLobbyId) {
+                        row.style.display = 'none';
                     }
                     
                     leaderboardBody.appendChild(row);
+                    
+                    // Remove the highlight class after animation completes
+                    setTimeout(() => {
+                        row.classList.remove('updated');
+                    }, 2000);
                 });
             }
 
-            // Fetch initial leaderboard data
-            fetch('/api/leaderboard-data/')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        updateLeaderboard(data.teams);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching leaderboard data:', error);
-                });
+            // If WebSocket fails, try to fetch data via API
+            setTimeout(function() {
+                if (socket.readyState !== 1) {
+                    fetchLeaderboardData();
+                }
+            }, 2000);
+
+            // Fallback to fetch API if WebSocket is not working
+            function fetchLeaderboardData() {
+                fetch('/api/leaderboard-data/')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateLeaderboard(data.teams);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching leaderboard data:', error);
+                    });
+            }
         });
     </script>
 {% endblock %}
