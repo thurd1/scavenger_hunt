@@ -23,6 +23,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from datetime import datetime, timedelta
 from django.db import models
 from django.views.decorators.csrf import csrf_exempt
+from django.db import connection
 
 logger = logging.getLogger(__name__)
 
@@ -614,21 +615,33 @@ def delete_lobby(request, lobby_id):
 @require_POST
 def delete_team(request, team_id):
     try:
+        # Get team details first for messaging
         team = get_object_or_404(Team, id=team_id)
-        
-        # Get team details before deletion for logging
         team_name = team.name
-        team_code = team.code
         
-        # Get lobby ID if team has any participating lobbies
+        # Get lobby ID if team has any participating lobbies (for later notification)
         lobby = team.participating_lobbies.first()
         lobby_id = lobby.id if lobby else None
         
-        # Delete the team directly without trying to access related objects that might not exist
-        team.delete()
-        logger.info(f"Team {team_id} ({team_name}) successfully deleted")
+        # Manual deletion using raw SQL to avoid cascade issues with non-existent tables
+        with connection.cursor() as cursor:
+            # Delete team members first
+            cursor.execute("DELETE FROM hunt_teammember WHERE team_id = %s", [team_id])
+            
+            # Remove team from lobbies (M2M relationship)
+            cursor.execute("DELETE FROM hunt_lobby_teams WHERE team_id = %s", [team_id])
+            
+            # Delete TeamRaceProgress if exists (check if table exists first)
+            tables = connection.introspection.table_names()
+            if 'hunt_teamraceprogress' in tables:
+                cursor.execute("DELETE FROM hunt_teamraceprogress WHERE team_id = %s", [team_id])
+            
+            # Finally delete the team
+            cursor.execute("DELETE FROM hunt_team WHERE id = %s", [team_id])
         
-        # Broadcast update if lobby exists
+        logger.info(f"Team {team_id} ({team_name}) successfully deleted using raw SQL")
+        
+        # Broadcast updates if needed
         if lobby_id:
             try:
                 channel_layer = get_channel_layer()

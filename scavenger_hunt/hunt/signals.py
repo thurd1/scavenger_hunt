@@ -5,6 +5,7 @@ from asgiref.sync import async_to_sync
 import json
 import logging
 from django.db import transaction
+from django.db import connection
 
 from .models import Team, TeamMember, Lobby, Race, TeamProgress, Question, Zone, TeamRaceProgress
 
@@ -341,22 +342,33 @@ def cleanup_after_lobby_deletion(sender, instance, **kwargs):
             
         # Find orphaned teams (not associated with any lobby)
         orphaned_teams = Team.objects.filter(participating_lobbies__isnull=True)
-        logger.info(f"Found {orphaned_teams.count()} orphaned teams to clean up")
+        team_ids = list(orphaned_teams.values_list('id', flat=True))
+        logger.info(f"Found {len(team_ids)} orphaned teams to clean up: {team_ids}")
         
-        # Delete the orphaned teams one by one with separate transactions
-        for team in orphaned_teams:
-            # Use a separate transaction for each team to prevent cascading failures
-            try:
-                with transaction.atomic():
-                    team_id = team.id
-                    team_name = team.name
-                    logger.info(f"Deleting orphaned team: {team_id} ({team_name})")
+        if not team_ids:
+            logger.info("No orphaned teams to delete.")
+            return
+            
+        # Use raw SQL to avoid cascade issues with non-existent tables
+        with connection.cursor() as cursor:
+            for team_id in team_ids:
+                try:
+                    logger.info(f"Deleting orphaned team {team_id} with raw SQL")
                     
-                    # Delete the team directly which should cascade to related objects via Django's ORM
-                    team.delete()
+                    # Delete team members first
+                    cursor.execute("DELETE FROM hunt_teammember WHERE team_id = %s", [team_id])
+                    
+                    # Check if TeamRaceProgress table exists
+                    tables = connection.introspection.table_names()
+                    if 'hunt_teamraceprogress' in tables:
+                        cursor.execute("DELETE FROM hunt_teamraceprogress WHERE team_id = %s", [team_id])
+                    
+                    # Finally delete the team
+                    cursor.execute("DELETE FROM hunt_team WHERE id = %s", [team_id])
+                    
                     logger.info(f"Successfully deleted orphaned team {team_id}")
-            except Exception as e:
-                logger.error(f"Error deleting orphaned team {team.id}: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Error deleting orphaned team {team_id}: {str(e)}")
                 
     except Exception as e:
         logger.error(f"Error in cleanup_after_lobby_deletion: {str(e)}") 
