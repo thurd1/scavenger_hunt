@@ -55,7 +55,7 @@
                                         <div id="questionContainer" class="question-container mb-4">
                                             {% if questions %}
                                                 {% for question in questions %}
-                                                    <div class="question-card" id="question-{{ forloop.counter0 }}" style="display: {% if forloop.first %}block{% else %}none{% endif %};">
+                                                    <div class="question-card" id="question-{{ forloop.counter0 }}" data-question-id="{{ question.id }}" style="display: {% if forloop.first %}block{% else %}none{% endif %};">
                                                         <h3 class="question-title">Question {{ forloop.counter }}</h3>
                                                         <div class="question-text">{{ question.text }}</div>
                                                         
@@ -66,7 +66,7 @@
                                                             </div>
                                                             
                                                             <div class="mt-3">
-                                                                <button type="button" class="btn btn-success submit-answer" data-question-id="{{ forloop.counter0 }}">Submit Answer</button>
+                                                                <button type="button" class="btn btn-success submit-answer" data-question-id="{{ forloop.counter0 }}" data-db-question-id="{{ question.id }}">Submit Answer</button>
                                                             </div>
                                                             
                                                             <div class="answer-feedback mt-3" id="feedback-{{ forloop.counter0 }}" style="display: none;"></div>
@@ -76,7 +76,7 @@
                                                             <div class="photo-upload mt-4" id="photo-upload-{{ forloop.counter0 }}" style="display: none;">
                                                                 <h4>Maximum attempts reached. Upload a photo instead:</h4>
                                                                 <input type="file" id="photo-{{ forloop.counter0 }}" class="form-control mt-3">
-                                                                <button type="button" class="btn btn-primary mt-3 upload-photo" data-question-id="{{ forloop.counter0 }}">Upload Photo</button>
+                                                                <button type="button" class="btn btn-primary mt-3 upload-photo" data-question-id="{{ forloop.counter0 }}" data-db-question-id="{{ question.id }}">Upload Photo</button>
                                                             </div>
                                                         </form>
                                                     </div>
@@ -444,11 +444,23 @@ document.addEventListener('DOMContentLoaded', function() {
             // Get the team code from the page
             const teamCode = '{{ team.code }}';
             
-            console.log(`Submitting answer for question ${questionId}: "${answer}"`);
+            // Get the actual database question ID
+            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+            if (!submitButton) {
+                console.error("Submit button not found");
+                return;
+            }
+            
+            const dbQuestionId = submitButton.getAttribute('data-db-question-id');
+            if (!dbQuestionId) {
+                console.error("Database question ID not found");
+                return;
+            }
+            
+            console.log(`Submitting answer for question ${dbQuestionId} (index: ${questionId}): "${answer}"`);
             console.log(`Team code: ${teamCode}`);
             
             // Disable the submit button during processing to prevent double submission
-            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
             if (submitButton) {
                 submitButton.disabled = true;
                 submitButton.textContent = "Checking...";
@@ -499,7 +511,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     'X-CSRFToken': getCookie('csrftoken')
                 },
                 body: JSON.stringify({
-                    question_id: questionId,
+                    question_id: dbQuestionId, // Use the database ID
                     answer: answer.trim(),
                     team_code: teamCode,
                     attempt_number: questionData[questionId].attempts
@@ -673,8 +685,20 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Show loading indicator
+        // Get the actual database question ID
         const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
+        if (!uploadButton) {
+            alert('Error: Cannot find upload button');
+            return;
+        }
+        
+        const dbQuestionId = uploadButton.getAttribute('data-db-question-id');
+        if (!dbQuestionId) {
+            alert('Error: Missing question ID');
+            return;
+        }
+        
+        // Show loading indicator
         if (uploadButton) {
             uploadButton.disabled = true;
             uploadButton.textContent = "Uploading...";
@@ -682,7 +706,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const formData = new FormData();
         formData.append('photo', photoInput.files[0]);
-        formData.append('question_id', questionId);
+        formData.append('question_id', dbQuestionId); // Use the database ID
         formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
         
         // Get the team code
