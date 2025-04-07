@@ -18,7 +18,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'hunt',
+    'hunt.apps.HuntConfig',
     'channels',
 ]
 

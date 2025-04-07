@@ -109,49 +109,100 @@ def team_lobby_association_changed(sender, instance, action, reverse, model, pk_
     """
     Signal handler to notify connected clients when a team joins or leaves a lobby
     """
-    if action == 'post_add' and not reverse:
-        # A team was added to lobbies
-        team = instance
-        lobby_ids = pk_set
+    if action == 'post_add':
+        channel_layer = get_channel_layer()
         
-        for lobby_id in lobby_ids:
-            channel_layer = get_channel_layer()
+        if not reverse:
+            # A team was added to lobbies (from Team side)
+            team = instance
+            lobby_ids = pk_set
             
-            # Format the team data
-            team_data = {
-                'id': team.id,
-                'name': team.name,
-                'code': team.code,
-                'members_count': team.members.count(),
-                'members': [{'role': member.role} for member in team.members.all()]
-            }
-            
-            print(f"SIGNAL: Team {team.name} joined lobby {lobby_id}")
-            
-            # Send to the lobby group
-            async_to_sync(channel_layer.group_send)(
-                f'lobby_{lobby_id}',
-                {
-                    'type': 'team_joined',
-                    'team': team_data
+            for lobby_id in lobby_ids:
+                # Format the team data
+                team_data = {
+                    'id': team.id,
+                    'name': team.name,
+                    'code': team.code,
+                    'members_count': team.members.count(),
+                    'members': [{'role': member.role} for member in team.members.all()]
                 }
-            )
+                
+                print(f"SIGNAL: Team {team.name} joined lobby {lobby_id}")
+                
+                # Send to the lobby group
+                async_to_sync(channel_layer.group_send)(
+                    f'lobby_{lobby_id}',
+                    {
+                        'type': 'team_joined',
+                        'team': team_data
+                    }
+                )
+        else:
+            # A lobby was added to teams (from Lobby side)
+            lobby = instance
+            team_ids = pk_set
             
-    elif action == 'post_remove' and not reverse:
-        # A team was removed from lobbies
-        team = instance
-        lobby_ids = pk_set
+            for team_id in team_ids:
+                try:
+                    team = Team.objects.get(id=team_id)
+                    
+                    # Format the team data
+                    team_data = {
+                        'id': team.id,
+                        'name': team.name,
+                        'code': team.code,
+                        'members_count': team.members.count(),
+                        'members': [{'role': member.role} for member in team.members.all()]
+                    }
+                    
+                    print(f"SIGNAL: Team {team.name} joined lobby {lobby.id}")
+                    
+                    # Send to the lobby group
+                    async_to_sync(channel_layer.group_send)(
+                        f'lobby_{lobby.id}',
+                        {
+                            'type': 'team_joined',
+                            'team': team_data
+                        }
+                    )
+                except Team.DoesNotExist:
+                    print(f"SIGNAL ERROR: Team with ID {team_id} not found")
+            
+    elif action == 'post_remove':
+        channel_layer = get_channel_layer()
         
-        for lobby_id in lobby_ids:
-            channel_layer = get_channel_layer()
+        if not reverse:
+            # A team was removed from lobbies
+            team = instance
+            lobby_ids = pk_set
             
-            print(f"SIGNAL: Team {team.name} left lobby {lobby_id}")
+            for lobby_id in lobby_ids:                
+                print(f"SIGNAL: Team {team.name} left lobby {lobby_id}")
+                
+                # Send to the lobby group
+                async_to_sync(channel_layer.group_send)(
+                    f'lobby_{lobby_id}',
+                    {
+                        'type': 'team_left',
+                        'team_id': team.id
+                    }
+                )
+        else:
+            # A lobby was removed from teams
+            lobby = instance
+            team_ids = pk_set
             
-            # Send to the lobby group
-            async_to_sync(channel_layer.group_send)(
-                f'lobby_{lobby_id}',
-                {
-                    'type': 'team_left',
-                    'team_id': team.id
-                }
-            ) 
+            for team_id in team_ids:
+                try:
+                    print(f"SIGNAL: Team {team_id} left lobby {lobby.id}")
+                    
+                    # Send to the lobby group
+                    async_to_sync(channel_layer.group_send)(
+                        f'lobby_{lobby.id}',
+                        {
+                            'type': 'team_left',
+                            'team_id': team_id
+                        }
+                    )
+                except Exception as e:
+                    print(f"SIGNAL ERROR in team_left: {str(e)}") 
