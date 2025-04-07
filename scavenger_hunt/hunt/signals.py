@@ -4,6 +4,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import json
 import logging
+from django.db import transaction
 
 from .models import Team, TeamMember, Lobby, Race, TeamProgress, Question, Zone, TeamRaceProgress
 
@@ -342,16 +343,18 @@ def cleanup_after_lobby_deletion(sender, instance, **kwargs):
         orphaned_teams = Team.objects.filter(participating_lobbies__isnull=True)
         logger.info(f"Found {orphaned_teams.count()} orphaned teams to clean up")
         
-        # Delete the orphaned teams
+        # Delete the orphaned teams one by one with separate transactions
         for team in orphaned_teams:
+            # Use a separate transaction for each team to prevent cascading failures
             try:
-                # Clean up related objects first
-                TeamMember.objects.filter(team=team).delete()
-                TeamRaceProgress.objects.filter(team=team).delete()
-                
-                # Log and delete the team
-                logger.info(f"Deleting orphaned team: {team.id} ({team.name})")
-                team.delete()
+                with transaction.atomic():
+                    team_id = team.id
+                    team_name = team.name
+                    logger.info(f"Deleting orphaned team: {team_id} ({team_name})")
+                    
+                    # Delete the team directly which should cascade to related objects via Django's ORM
+                    team.delete()
+                    logger.info(f"Successfully deleted orphaned team {team_id}")
             except Exception as e:
                 logger.error(f"Error deleting orphaned team {team.id}: {str(e)}")
                 

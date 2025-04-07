@@ -624,46 +624,24 @@ def delete_team(request, team_id):
         lobby = team.participating_lobbies.first()
         lobby_id = lobby.id if lobby else None
         
-        # First, delete related objects to avoid foreign key issues
-        logger.info(f"Deleting team {team_id} ({team_name}) and related objects")
-        
-        # Delete team members
-        team_members_count = team.members.count()
-        team.members.all().delete()
-        logger.info(f"Deleted {team_members_count} team members")
-        
-        # Delete team progress records
-        if hasattr(team, 'race_progress'):
-            progress_count = team.race_progress.count()
-            team.race_progress.all().delete()
-            logger.info(f"Deleted {progress_count} race progress records")
-        
-        # Delete answers
-        if hasattr(team, 'question_answers'):
-            answers_count = team.question_answers.count()
-            team.question_answers.all().delete()
-            logger.info(f"Deleted {answers_count} question answers")
-        
-        if hasattr(team, 'answers'):
-            answers_count = team.answers.count()
-            team.answers.all().delete()
-            logger.info(f"Deleted {answers_count} answer records")
-        
-        # Now delete the team
+        # Delete the team directly without trying to access related objects that might not exist
         team.delete()
         logger.info(f"Team {team_id} ({team_name}) successfully deleted")
         
         # Broadcast update if lobby exists
         if lobby_id:
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f'lobby_{lobby_id}',
-                {
-                    'type': 'team_left',  # Changed to match the expected event type
-                    'team_id': team_id
-                }
-            )
-            logger.info(f"Sent team_left event to lobby_{lobby_id}")
+            try:
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f'lobby_{lobby_id}',
+                    {
+                        'type': 'team_left',
+                        'team_id': team_id
+                    }
+                )
+                logger.info(f"Sent team_left event to lobby_{lobby_id}")
+            except Exception as e:
+                logger.error(f"Error sending team_left event: {str(e)}")
         
         # Also send update to leaderboard
         try:

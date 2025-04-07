@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Scavenger Hunt{% endblock %}</title>
-    <script src="{% static 'hunt/js/race-websocket.js' %}"></script>
     {% block head_extras %}{% endblock %}
     <style>
         body {
@@ -22,7 +21,7 @@
         .app-content {
             width: 100%;
             min-height: 100vh;
-            background-image: url('{% static "hunt/images/YoungLifeLogo.png" %}');
+            background-color: #003A5B;
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
