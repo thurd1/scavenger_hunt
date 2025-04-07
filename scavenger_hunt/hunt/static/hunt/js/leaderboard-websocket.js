@@ -277,6 +277,31 @@ function updateLeaderboard(teams) {
     
     console.log(`Updating leaderboard with ${teams.length} teams, filtering by lobby: ${selectedLobbyId}`);
     
+    // Validate and fix team data if necessary
+    teams = teams.map(team => {
+        // Ensure team name is proper - fix the "Team: 30" format issue
+        if (team.name && team.name.toString().includes(':')) {
+            // Log the issue for debugging
+            console.warn(`Found malformed team name: "${team.name}", extracting actual name`);
+            
+            // If it's in the format "Team: ID" but we have the actual name elsewhere
+            if (team.team_name) {
+                team.name = team.team_name;
+            }
+        }
+        
+        // Ensure the team has a valid name
+        if (!team.name || team.name === 'null' || team.name === 'undefined') {
+            console.warn(`Team with ID ${team.id} has invalid name: "${team.name}"`);
+            team.name = `Team ${team.id}`;
+        }
+        
+        // Make sure score is a number
+        team.score = parseInt(team.score) || 0;
+        
+        return team;
+    });
+    
     // Get current teams for comparison (to highlight changes)
     const currentTeams = {};
     document.querySelectorAll('.team-row').forEach(row => {

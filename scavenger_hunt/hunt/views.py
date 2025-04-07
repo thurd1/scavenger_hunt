@@ -512,48 +512,73 @@ def leaderboard(request):
 
 @csrf_exempt
 def leaderboard_data_api(request):
-    """
-    API endpoint to get leaderboard data in JSON format.
-    """
-    teams = []
+    """API endpoint to get leaderboard data"""
+    try:
+        lobby_filter = request.GET.get('lobby')
+        
+        teams = []
+        if not lobby_filter or lobby_filter == 'all':
+            # Get all teams with their progress data
+            team_race_progress_list = TeamRaceProgress.objects.select_related('team', 'race').all()
+        else:
+            # Filter to specific lobby
+            try:
+                lobby = Lobby.objects.get(id=lobby_filter)
+                race = lobby.race
+                if not race:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Selected lobby has no race assigned'
+                    })
+                team_race_progress_list = TeamRaceProgress.objects.filter(
+                    race=race,
+                    team__in=lobby.teams.all()
+                ).select_related('team', 'race')
+            except Lobby.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Lobby not found'
+                })
+        
+        # Organize teams by their total scores
+        for team_progress in team_race_progress_list:
+            team = team_progress.team
+            race = team_progress.race
+            if team:
+                # Get the lobby for this team that's associated with the race
+                lobby = Lobby.objects.filter(teams=team, race=race).first()
+                lobby_id = lobby.id if lobby else None
+                lobby_name = race.name if race else 'Unknown Race'
+                
+                # Ensure we're using a valid team name (not an ID or object reference)
+                # This fixes the "Team: 30" display issue
+                team_name = team.name
+                if not team_name or team_name == "None" or not isinstance(team_name, str):
+                    team_name = f"Team {team.id}"
+                
+                teams.append({
+                    'id': team.id,
+                    'name': team_name,
+                    'team_name': team_name,  # Add backup field for the client-side fix
+                    'score': team_progress.total_points,
+                    'lobby_id': str(lobby_id) if lobby_id else '',
+                    'lobby_name': lobby_name
+                })
+        
+        # Sort teams by score (highest first)
+        teams.sort(key=lambda x: x['score'], reverse=True)
+        
+        return JsonResponse({
+            'success': True,
+            'teams': teams
+        })
     
-    # Add logging for API request
-    logger.info(f"API: Leaderboard data requested via API from {request.META.get('REMOTE_ADDR')}")
-    
-    # Get teams with their progress data
-    team_race_progress_list = TeamRaceProgress.objects.select_related('team', 'race').all()
-    logger.info(f"API: Found {team_race_progress_list.count()} team race progress records")
-    
-    # Organize teams by their total scores
-    for team_progress in team_race_progress_list:
-        team = team_progress.team
-        race = team_progress.race
-        if team:
-            # Get the lobby for this team that's associated with the race
-            lobby = Lobby.objects.filter(teams=team, race=race).first()
-            lobby_id = lobby.id if lobby else None
-            lobby_name = race.name if race else 'Unknown Race'
-            
-            logger.debug(f"API: Team: {team.name}, Score: {team_progress.total_points}, Race: {race.name if race else 'None'}, Lobby ID: {lobby_id}")
-            
-            teams.append({
-                'id': team.id,
-                'name': team.name,
-                'score': team_progress.total_points,
-                'lobby_id': lobby_id,
-                'lobby_name': lobby_name
-            })
-    
-    # Sort teams by score (highest first)
-    teams.sort(key=lambda x: x['score'], reverse=True)
-    
-    # Log number of teams being returned
-    logger.info(f"API: Returning data for {len(teams)} teams in the leaderboard")
-    
-    return JsonResponse({
-        'success': True,
-        'teams': teams
-    })
+    except Exception as e:
+        logger.error(f"Error retrieving leaderboard data: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
 
 def team_details(request, team_id):
     team = Team.objects.get(id=team_id)
@@ -2032,9 +2057,16 @@ def trigger_leaderboard_update(request):
                 lobby_id = lobby.id if lobby else None
                 lobby_name = race.name if race else 'Unknown Race'
                 
+                # Ensure we're using a valid team name (not an ID or object reference)
+                # This fixes the "Team: 30" display issue
+                team_name = team.name
+                if not team_name or team_name == "None" or not isinstance(team_name, str):
+                    team_name = f"Team {team.id}"
+                
                 teams.append({
                     'id': team.id,
-                    'name': team.name,
+                    'name': team_name,  # Use the validated name
+                    'team_name': team_name,  # Add backup field for the client-side fix
                     'score': team_progress.total_points,
                     'lobby_id': lobby_id,
                     'lobby_name': lobby_name

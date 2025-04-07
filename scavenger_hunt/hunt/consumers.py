@@ -691,9 +691,16 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
                             # If no progress exists, score is 0
                             total_points = 0
                         
+                        # Ensure we're using a valid team name (not an ID or object reference)
+                        # This fixes the "Team: 30" display issue
+                        team_name = team.name
+                        if not team_name or team_name == "None" or not isinstance(team_name, str):
+                            team_name = f"Team {team.id}"
+                        
                         teams_data.append({
                             'id': team.id,
-                            'name': team.name,
+                            'name': team_name,
+                            'team_name': team_name,  # Add backup field for the client-side fix
                             'score': total_points,
                             'lobby_id': str(lobby.id),
                             'lobby_name': lobby.race.name if lobby.race else 'Unknown Race'

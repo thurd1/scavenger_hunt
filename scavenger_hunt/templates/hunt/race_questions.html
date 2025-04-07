@@ -40,7 +40,7 @@
                     <!-- Main content -->
                     <div id="race-questions">
                         <div class="stats mb-5">
-                            <h3>Team: {{ team.id }}</h3>
+                            <h3>Team: {{ team.name }}</h3>
                             <h3>Player: {{ team_member.role }}</h3>
                             <h3>Score: <span id="total-score">0</span> points</h3>
                         </div>
@@ -735,13 +735,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Mark photo as uploaded
                 questionData[questionId].photoUploaded = true;
                 
-                // Show navigation buttons after successful photo upload
+                // Show navigation buttons after successful photo upload - using multiple methods
                 console.log('Photo uploaded successfully, showing navigation buttons');
-                document.getElementById('navigation-buttons').style.display = 'block';
                 
-                // Force visibility through direct style manipulation
+                // Method 1: Using display property
                 const navButtons = document.getElementById('navigation-buttons');
                 navButtons.style.display = 'block';
+                
+                // Method 2: Force a re-render by removing and re-adding to the DOM
+                const parent = navButtons.parentNode;
+                const navClone = navButtons.cloneNode(true);
+                parent.removeChild(navButtons);
+                parent.appendChild(navClone);
+                
+                // Method 3: Update visibility and opacity as well
+                navClone.style.visibility = 'visible';
+                navClone.style.opacity = '1';
+                
+                // Re-add the event listener for the next button
+                document.getElementById('next-question').addEventListener('click', function() {
+                    if (currentQuestionIndex < totalQuestions - 1) {
+                        questions[currentQuestionIndex].style.display = 'none';
+                        currentQuestionIndex++;
+                        questions[currentQuestionIndex].style.display = 'block';
+                        updateQuestionCounter();
+                        saveCurrentQuestionIndex(currentQuestionIndex);
+                    }
+                });
                 
                 // Disable upload button
                 if (uploadButton) {
