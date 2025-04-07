@@ -284,30 +284,16 @@
     .btn-cancel {
         background-color: #6c757d;
     }
-    
-    /* Styles for real-time notifications */
-    .race-started-alert {
-        padding: 15px;
-        margin-top: 20px;
-        border-radius: 8px;
-        background-color: rgba(40, 167, 69, 0.2);
-        border: 1px solid rgba(40, 167, 69, 0.4);
-        color: #28a745;
-        text-align: center;
-        font-weight: bold;
-        transition: opacity 0.3s;
-    }
 </style>
 
 {% endblock %}
 
-{% block extra_js %}
-<script src="{% static 'hunt/js/lobby-websocket.js' %}"></script>
+{% block scripts %}
+<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
 <script>
-    // Global variable to store the team ID to delete
+    const lobbyId = {{ lobby.id }};
     let teamIdToDelete = null;
     
-    // Get CSRF token from cookies
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -324,7 +310,7 @@
     }
     
     function showModal() {
-        document.getElementById('deleteConfirmModal').style.display = 'block';
+        document.getElementById('deleteConfirmModal').style.display = 'flex';
     }
     
     function closeModal() {
@@ -413,64 +399,5 @@
             closeModal();
         }
     }
-    
-    // Function to refresh the team list
-    function refreshTeamList() {
-        fetch(window.location.href)
-            .then(response => response.text())
-            .then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Extract the teams grid from the fetched document
-                const newTeamsContent = doc.querySelector('.teams-grid');
-                const currentTeamsContent = document.querySelector('.teams-grid');
-                
-                // Extract the team count from the info card
-                const newInfoCard = doc.querySelector('.info-card');
-                const currentInfoCard = document.querySelector('.info-card');
-                
-                // Update the teams grid if it exists and has changed
-                if (newTeamsContent && currentTeamsContent && 
-                    newTeamsContent.innerHTML !== currentTeamsContent.innerHTML) {
-                    currentTeamsContent.innerHTML = newTeamsContent.innerHTML;
-                    console.log("Updated teams list");
-                }
-                
-                // Update the info card if it exists and has changed
-                if (newInfoCard && currentInfoCard && 
-                    newInfoCard.innerHTML !== currentInfoCard.innerHTML) {
-                    currentInfoCard.innerHTML = newInfoCard.innerHTML;
-                    console.log("Updated lobby info");
-                }
-                
-                // Check if there are no teams and update the message
-                if (!newTeamsContent) {
-                    const noTeamsElement = doc.querySelector('.no-teams');
-                    const currentContainer = document.querySelector('.teams-grid, .no-teams');
-                    const dashboardBox = document.querySelector('.dashboard-box');
-                    
-                    if (noTeamsElement && currentContainer && 
-                        noTeamsElement.innerHTML !== currentContainer.innerHTML) {
-                        // Replace teams grid with no teams message
-                        currentContainer.outerHTML = noTeamsElement.outerHTML;
-                        console.log("Updated to show no teams message");
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error refreshing team list:', error);
-            });
-    }
-    
-    // Initialize WebSocket and auto-refresh when the DOM is loaded
-    document.addEventListener('DOMContentLoaded', function() {
-        // Set the lobby ID for the WebSocket connection
-        window.lobbyId = '{{ lobby.id }}';
-        
-        // Set up automatic refresh every 1 second
-        console.log("Setting up auto-refresh for lobby details page");
-        setInterval(refreshTeamList, 1000);
-    });
 </script>
 {% endblock %}

@@ -205,26 +205,3 @@ class TeamRaceProgress(models.Model):
     
     def __str__(self):
         return f"{self.team.name} - Race {self.race.name} - Question #{self.current_question_index+1}"
-
-class Answer(models.Model):
-    """Tracks answers given by teams to questions"""
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='question_answers')
-    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answers')
-    answer_text = models.CharField(max_length=255, blank=True, null=True)
-    answered_correctly = models.BooleanField(default=False)
-    attempts = models.IntegerField(default=0)
-    points_awarded = models.IntegerField(default=0)
-    submitted_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    requires_photo = models.BooleanField(default=False)
-    photo = models.ImageField(upload_to='answer_photos/', null=True, blank=True)
-    matched_with = models.CharField(max_length=255, blank=True, null=True)
-    match_type = models.CharField(max_length=50, blank=True, null=True)
-    
-    class Meta:
-        unique_together = ('team', 'question')
-        ordering = ['submitted_at']
-    
-    def __str__(self):
-        status = "correct" if self.answered_correctly else "incorrect"
-        return f"{self.team.name} - {self.question} - {status}"

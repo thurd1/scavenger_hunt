@@ -25,21 +25,13 @@
                 <div class="card-body">
                     <h3>Race Status</h3>
                     {% if team.participating_lobbies.first.hunt_started %}
-                        <div class="race-status-area active" id="race-started-notification">
-                            <div class="race-started-content">
-                                <h2 class="race-title">Race Started!</h2>
-                                <p class="race-description">The race has begun! You will be redirected to the questions page.</p>
-                                <div class="countdown-container">
-                                    <div class="countdown-circle">
-                                        <div class="countdown-spinner"></div>
-                                        <span id="countdown" class="countdown-number">5</span>
-                                    </div>
-                                </div>
-                                <p id="race-countdown">Redirecting in 5 seconds...</p>
-                                <p class="mt-4">
-                                    <a href="{% url 'race_questions' race_id=team.participating_lobbies.first.race.id %}" class="btn btn-success btn-lg">Go to Race Now</a>
-                                </p>
-                            </div>
+                        <div class="alert alert-success">
+                            <h4>Race Started!</h4>
+                            <p>The race has begun! You will be redirected to the questions page.</p>
+                            <p>Redirecting in <span id="countdown">5</span> seconds...</p>
+                            <p>
+                                <a href="{% url 'race_questions' race_id=team.participating_lobbies.first.race.id %}" class="btn btn-success btn-lg">Go to Race Now</a>
+                            </p>
                         </div>
                     {% else %}
                         <div class="alert alert-warning">
@@ -51,28 +43,7 @@
             </div>
         {% endif %}
 
-        <div class="members-section mt-4">
-            <h3 class="section-title">Team Members</h3>
-            
-            <div class="members-grid">
-                {% for member in members %}
-                    <div class="member-card">
-                        <div class="member-header">
-                            <h3>{{ member.role }}</h3>
-                            {% if member.id == request.session.team_member_id %}
-                            <span class="badge bg-primary">You</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                {% empty %}
-                    <div class="no-members-message">
-                        <p>No members have joined this team yet.</p>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <a href="{% url 'join_team' %}" class="btn btn-primary">Back to Teams</a>
+        <a href="{% url 'team_list' %}" class="btn btn-primary">Back to Teams</a>
     </div>
 </div>
 
@@ -81,7 +52,20 @@
     background-color: rgba(33, 37, 41, 0.9);
     border-radius: 15px;
     border: 1px solid rgba(144, 200, 60, 0.2);
-    padding: 2rem;
+}
+
+.lobby-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+}
+
+.lobby-header h1 {
+    color: #90C83C;
+    margin: 0 0 15px 0;
 }
 
 .members-section {
@@ -145,70 +129,11 @@
     max-width: 800px;
     margin: 1rem auto;
     border-radius: 12px;
-    padding: 2rem;
-    text-align: center;
-    display: block !important;
 }
 
 .race-status-area.active {
-    background-color: rgba(40, 167, 69, 0.2);
+    background-color: rgba(144, 200, 60, 0.2);
     animation: pulse 2s infinite;
-    border: 2px solid rgba(144, 200, 60, 0.6);
-}
-
-.race-title {
-    color: #90C83C;
-    margin-bottom: 1.5rem;
-    font-size: 2rem;
-    text-shadow: 0 0 10px rgba(144, 200, 60, 0.5);
-}
-
-.race-description {
-    color: white;
-    font-size: 1.2rem;
-    margin-bottom: 2rem;
-}
-
-.countdown-container {
-    display: flex;
-    justify-content: center;
-    margin: 1.5rem 0;
-}
-
-.countdown-circle {
-    position: relative;
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto;
-    box-shadow: 0 0 20px rgba(144, 200, 60, 0.3);
-}
-
-.countdown-spinner {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    border: 4px solid rgba(144, 200, 60, 0.2);
-    border-top-color: #90C83C;
-    animation: spin 1s linear infinite;
-}
-
-.countdown-number {
-    font-size: 3rem;
-    font-weight: bold;
-    color: #90C83C;
-    z-index: 1;
-}
-
-#race-countdown {
-    font-size: 1.2rem;
-    color: #ddd;
-    margin-top: 1rem;
 }
 
 .actions-section {
@@ -222,15 +147,6 @@
     gap: 15px;
     justify-content: center;
     flex-wrap: wrap;
-}
-
-.team-action-form {
-    max-width: 500px;
-    margin: 0 auto;
-    background: rgba(33, 37, 41, 0.8);
-    padding: 20px;
-    border-radius: 10px;
-    border: 1px solid rgba(144, 200, 60, 0.3);
 }
 
 .back-button-container {
@@ -267,129 +183,132 @@
 
 @keyframes pulse {
     0% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.4); }
-    70% { box-shadow: 0 0 0 15px rgba(144, 200, 60, 0); }
+    70% { box-shadow: 0 0 0 10px rgba(144, 200, 60, 0); }
     100% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0); }
 }
 </style>
 
 <script>
-    // Initialize the team view functionality
-    document.addEventListener('DOMContentLoaded', function() {
-        // Get race information from the page
-        const hasRaceStarted = {% if team.participating_lobbies.first.hunt_started %}true{% else %}false{% endif %};
-        const raceId = {% if team.participating_lobbies.first.race.id %}{{ team.participating_lobbies.first.race.id }}{% else %}null{% endif %};
+// Add direct redirect function
+function goToRaceNow(event) {
+    if (event) {
+        event.preventDefault();
+    }
+    const raceId = '{{ race.id|default:race_id }}';
+    // Try to navigate directly
+    window.location.href = `/race/${raceId}/questions/`;
+}
+
+// Initialize the team and race functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const teamId = '{{ team.id }}';
+    const raceId = '{{ race.id|default:race_id }}';
+    const raceNotification = document.getElementById('race-started-notification');
+    const raceCountdown = document.getElementById('race-countdown');
+    
+    // Function to handle race start
+    function handleRaceStart() {
+        console.log('Race started event detected!');
         
-        // Start automatic countdown if race has started
-        if (hasRaceStarted && raceId) {
-            console.log("Race already started, showing notification");
-            // Show race started notification
-            startCountdownAndRedirect(raceId);
-        }
+        // Show the notification
+        raceNotification.style.display = 'block';
         
-        // Setup auto-refresh every second if race hasn't started
-        if (!hasRaceStarted) {
-            console.log("Setting up auto-refresh for team view page");
-            // Set up automatic refresh every 1 second
-            setInterval(function() {
-                // Fetch the current page again to check for updates
-                fetch(window.location.href)
-                    .then(response => response.text())
-                    .then(html => {
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(html, 'text/html');
-                        
-                        // Check if race has started in the new content
-                        const raceStartedElement = doc.querySelector('.race-status-area.active');
-                        if (raceStartedElement) {
-                            console.log("Race has started! Refreshing page...");
-                            window.location.reload();
-                        }
-                        
-                        // Update team members section
-                        const currentMembersGrid = document.querySelector('.members-grid');
-                        const newMembersGrid = doc.querySelector('.members-grid');
-                        if (currentMembersGrid && newMembersGrid && 
-                            currentMembersGrid.innerHTML !== newMembersGrid.innerHTML) {
-                            currentMembersGrid.innerHTML = newMembersGrid.innerHTML;
-                            console.log("Updated team members");
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error during auto-refresh:', error);
-                    });
-            }, 1000); // Refresh every 1 second
-        }
-        
-        // Connect to WebSocket for real-time race updates
-        if (raceId) {
-            try {
-                const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const raceSocket = new WebSocket(
-                    `${wsScheme}//${window.location.host}/ws/race/${raceId}/`
-                );
-                
-                raceSocket.onmessage = function(e) {
-                    const data = JSON.parse(e.data);
-                    console.log('Received WebSocket message:', data);
+        // Set up countdown for redirect
+        let countdown = 5;
+        const countdownTimer = setInterval(function() {
+            countdown--;
+            raceCountdown.textContent = `Redirecting in ${countdown} seconds...`;
+            
+            if (countdown <= 0) {
+                clearInterval(countdownTimer);
+                // Try different redirection methods
+                try {
+                    // Method 1: Direct assignment
+                    window.location.href = `/race/${raceId}/questions/`;
                     
-                    // Handle race started event
-                    if (data.type === 'race_started') {
-                        console.log('Race started! Showing notification...');
-                        startCountdownAndRedirect(raceId, data.redirect_url);
-                    }
-                };
-                
-                raceSocket.onclose = function(e) {
-                    console.log('Race WebSocket closed');
-                };
-                
-                raceSocket.onerror = function(e) {
-                    console.error('Race WebSocket error:', e);
-                };
-                
-            } catch (e) {
-                console.error('Error setting up WebSocket:', e);
-            }
-        }
-        
-        // Function to show race started notification and redirect
-        function startCountdownAndRedirect(raceId, redirectUrl) {
-            // Show race started notification
-            const notification = document.getElementById('race-started-notification');
-            if (notification) {
-                notification.style.display = 'block';
-                notification.classList.add('active');
-                
-                // Make sure the spinner is visible
-                const spinner = document.querySelector('.countdown-spinner');
-                if (spinner) {
-                    spinner.style.display = 'block';
+                    // Method 2 (after a brief delay if method 1 fails)
+                    setTimeout(function() {
+                        try {
+                            window.location.replace(`/race/${raceId}/questions/`);
+                        } catch (e) {
+                            console.error('Error with redirect method 2:', e);
+                        }
+                    }, 200);
+                } catch (e) {
+                    console.error('Error redirecting:', e);
                 }
             }
-            
-            // Start countdown
-            let countdownEl = document.getElementById('countdown');
-            let countdownMsgEl = document.getElementById('race-countdown');
-            
-            if (countdownEl && countdownMsgEl) {
-                let seconds = 5;
+        }, 1000);
+    }
+    
+    // Connect to WebSocket for race updates
+    if (raceId) {
+        // WebSocket for race start notification
+        const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const raceSocket = new WebSocket(
+            `${wsScheme}//${window.location.host}/ws/race/${raceId}/`
+        );
+        
+        raceSocket.onopen = function() {
+            console.log('Race WebSocket connected');
+        };
+        
+        raceSocket.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Race message received:', data);
                 
-                // Update countdown every second
-                let countdownInterval = setInterval(function() {
-                    seconds--;
-                    countdownEl.textContent = seconds;
-                    countdownMsgEl.textContent = `Redirecting in ${seconds} seconds...`;
-                    
-                    // When countdown reaches 0, redirect
-                    if (seconds <= 0) {
-                        clearInterval(countdownInterval);
-                        console.log("Countdown complete, redirecting to:", redirectUrl || `/race/${raceId}/questions/`);
-                        // Direct redirect without sessionStorage
-                        window.location.href = redirectUrl || `/race/${raceId}/questions/`;
-                    }
-                }, 1000);
+                if (data.type === 'race_started') {
+                    handleRaceStart();
+                }
+            } catch (e) {
+                console.error('Error handling message:', e);
             }
-        }
-    });
+        };
+        
+        raceSocket.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+        
+        // Setup polling as backup
+        setInterval(function() {
+            fetch(`/race/${raceId}/status/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.started || data.hunt_started || data.race_started) {
+                        handleRaceStart();
+                    }
+                })
+                .catch(error => {
+                    console.log('Poll error (expected if endpoint not configured):', error);
+                });
+        }, 3000);
+        
+        // Manual check: Add event listeners to all race buttons
+        document.querySelectorAll('.btn-success').forEach(button => {
+            if (button.textContent.includes('Race') || button.textContent.includes('Questions')) {
+                const originalHref = button.getAttribute('href');
+                button.setAttribute('href', `/race/${raceId}/questions/`);
+                console.log(`Updated button href from ${originalHref} to /race/${raceId}/questions/`);
+            }
+        });
+    }
+    
+    // Force check race status immediately for testing
+    setTimeout(function() {
+        const testButton = document.createElement('button');
+        testButton.style.position = 'fixed';
+        testButton.style.bottom = '10px';
+        testButton.style.right = '10px';
+        testButton.style.zIndex = '1000';
+        testButton.style.padding = '5px';
+        testButton.style.opacity = '0.5';
+        testButton.textContent = 'Test Race Start';
+        testButton.addEventListener('click', function() {
+            handleRaceStart();
+        });
+        document.body.appendChild(testButton);
+    }, 2000);
+});
 </script>
 {% endblock %} 
