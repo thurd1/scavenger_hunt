@@ -358,6 +358,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update the question counter
         const updateQuestionCounter = function() {
             const nextButton = document.getElementById('next-question');
+            const navigationButtons = document.getElementById('navigation-buttons');
             
             // Disable/enable next button
             if (currentQuestionIndex >= totalQuestions - 1) {
@@ -365,13 +366,13 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 nextButton.disabled = false;
             }
-            
-            // Show navigation buttons
-            document.getElementById('navigation-buttons').style.display = 'block';
         };
         
         // Initialize question counter
         updateQuestionCounter();
+        
+        // Initially hide navigation buttons - they'll only show after correct answer or photo upload
+        document.getElementById('navigation-buttons').style.display = 'none';
         
         // Next button event listener
         document.getElementById('next-question').addEventListener('click', function() {
@@ -383,12 +384,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Save current question index to server
                 saveCurrentQuestionIndex(currentQuestionIndex);
+                
+                // Hide navigation buttons for new question until it's answered correctly
+                const questionId = questions[currentQuestionIndex].id.split('-')[1];
+                if (questionData[questionId] && !questionData[questionId].answered && !questionData[questionId].photoUploaded) {
+                    document.getElementById('navigation-buttons').style.display = 'none';
+                }
             }
         });
         
-        // Show navigation buttons if we have any answered questions
-        if (document.querySelectorAll('.feedback.correct').length > 0) {
-            document.getElementById('navigation-buttons').style.display = 'block';
+        // Show navigation buttons only if we have any answered questions
+        const hasAnsweredQuestions = document.querySelectorAll('.feedback.correct').length > 0;
+        if (hasAnsweredQuestions) {
+            // Only show if current question is already answered or has photo uploaded
+            const currentQuestionId = questions[currentQuestionIndex].id.split('-')[1];
+            if (questionData[currentQuestionId] && (questionData[currentQuestionId].answered || questionData[currentQuestionId].photoUploaded)) {
+                document.getElementById('navigation-buttons').style.display = 'block';
+            }
         }
 
         // Add event listeners to submit buttons

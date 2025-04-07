@@ -96,6 +96,8 @@ def check_answer(request):
     
     # Do a more flexible comparison
     for correct_answer in correct_answers:
+        print(f"Comparing with correct answer: '{correct_answer}'")
+        
         # Try exact match
         if provided_answer == correct_answer:
             is_correct = True
@@ -113,7 +115,30 @@ def check_answer(request):
             is_correct = True
             print(f"CORRECT: Match found after stripping spaces for '{provided_answer}'")
             break
-    
+            
+        # Try removing punctuation
+        import re
+        clean_provided = re.sub(r'[^\w\s]', '', provided_answer).lower().strip()
+        clean_correct = re.sub(r'[^\w\s]', '', correct_answer).lower().strip()
+        
+        if clean_provided == clean_correct:
+            is_correct = True
+            print(f"CORRECT: Match found after removing punctuation '{provided_answer}'")
+            break
+            
+        # Try fuzzy matching for small differences (typos)
+        from difflib import SequenceMatcher
+        similarity = SequenceMatcher(None, clean_provided, clean_correct).ratio()
+        if similarity > 0.9:  # 90% similarity is considered a match
+            is_correct = True
+            print(f"CORRECT: Fuzzy match found with {similarity*100:.1f}% similarity: '{provided_answer}'")
+            break
+            
+    if is_correct:
+        print(f"FINAL RESULT: '{provided_answer}' is CORRECT!")
+    else:
+        print(f"FINAL RESULT: '{provided_answer}' is INCORRECT. Correct answers were: {correct_answers}")
+        
     # If correct, update the answer object and calculate points
     if is_correct:
         # Calculate points (more points for fewer attempts)
