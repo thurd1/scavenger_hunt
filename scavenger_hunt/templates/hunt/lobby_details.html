@@ -308,6 +308,12 @@
     const lobbyId = {{ lobby.id }};
     let teamIdToDelete = null;
     
+    // Set up auto-refresh every 5 seconds as a fallback for WebSocket issues
+    setTimeout(function() {
+        console.log("Auto-refreshing page to get latest lobby data");
+        location.reload();
+    }, 5000);
+    
     document.addEventListener('DOMContentLoaded', function() {
         // Connect to WebSocket for real-time lobby updates
         const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

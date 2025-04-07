@@ -635,8 +635,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitButton.disabled = true;
             }
             
-            // Show navigation buttons when photo upload is shown
-            document.getElementById('navigation-buttons').style.display = 'block';
+            // Do NOT show navigation buttons until photo is uploaded
+            // Instead, navigation buttons will be shown after photo upload is successful
+            document.getElementById('navigation-buttons').style.display = 'none';
         };
         
         // Add event listeners to upload photo buttons
@@ -672,6 +673,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Show loading indicator
+        const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
+        if (uploadButton) {
+            uploadButton.disabled = true;
+            uploadButton.textContent = "Uploading...";
+        }
+        
         const formData = new FormData();
         formData.append('photo', photoInput.files[0]);
         formData.append('question_id', questionId);
@@ -699,19 +707,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Mark photo as uploaded
                 questionData[questionId].photoUploaded = true;
                 
-                // Show navigation buttons
+                // Only NOW show navigation buttons - after successful photo upload
                 document.getElementById('navigation-buttons').style.display = 'block';
                 
                 // Disable upload button
-                const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
-                uploadButton.disabled = true;
+                if (uploadButton) {
+                    uploadButton.disabled = true;
+                    uploadButton.textContent = "Uploaded ✓";
+                }
             } else {
                 alert('Error uploading photo: ' + (data.error || 'Unknown error'));
+                
+                // Re-enable upload button on error
+                if (uploadButton) {
+                    uploadButton.disabled = false;
+                    uploadButton.textContent = "Upload Photo";
+                }
             }
         })
         .catch(error => {
             console.error('Error uploading photo:', error);
             alert('Error uploading photo. Please try again.');
+            
+            // Re-enable upload button on error
+            if (uploadButton) {
+                uploadButton.disabled = false;
+                uploadButton.textContent = "Upload Photo";
+            }
         });
     }
 });
