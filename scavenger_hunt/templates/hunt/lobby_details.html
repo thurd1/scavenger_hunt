@@ -294,6 +294,121 @@
     const lobbyId = {{ lobby.id }};
     let teamIdToDelete = null;
     
+    document.addEventListener('DOMContentLoaded', function() {
+        // Connect to WebSocket for real-time lobby updates
+        const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const lobbySocket = new WebSocket(
+            `${wsScheme}//${window.location.host}/ws/lobby/${lobbyId}/`
+        );
+        
+        lobbySocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            console.log('Received WebSocket message:', data);
+            
+            // Handle team joined event
+            if (data.type === 'team_joined') {
+                console.log('New team joined:', data.team);
+                addTeamToGrid(data.team);
+            }
+            
+            // Handle race status change
+            if (data.type === 'race_status_changed') {
+                console.log('Race status changed:', data.status);
+                updateRaceStatus(data.status);
+            }
+        };
+        
+        lobbySocket.onclose = function(e) {
+            console.log('Lobby WebSocket closed');
+        };
+        
+        lobbySocket.onerror = function(e) {
+            console.error('Lobby WebSocket error:', e);
+        };
+    });
+    
+    // Function to add new team to the grid without reload
+    function addTeamToGrid(team) {
+        const teamsGrid = document.querySelector('.teams-grid');
+        const noTeamsMessage = document.querySelector('.no-teams');
+        
+        // If there were no teams before, remove the "no teams" message
+        if (noTeamsMessage) {
+            noTeamsMessage.style.display = 'none';
+        }
+        
+        // Create team card if teams grid exists
+        if (teamsGrid) {
+            const teamCard = document.createElement('div');
+            teamCard.className = 'team-card';
+            teamCard.setAttribute('data-team-id', team.id);
+            
+            teamCard.innerHTML = `
+                <div class="team-header">
+                    <h3>${team.name}</h3>
+                    <span class="team-code">Code: ${team.code}</span>
+                </div>
+                <div class="team-body">
+                    <p><strong>Members:</strong> ${team.members_count || 0}</p>
+                    <ul class="members-list">
+                        ${team.members && team.members.length ? 
+                          team.members.map(member => `<li>${member.role}</li>`).join('') : 
+                          '<li class="no-members">No members</li>'}
+                    </ul>
+                </div>
+                <div class="team-actions">
+                    <a href="/team/${team.id}/view/" class="btn btn-view">View Team</a>
+                    <button class="btn btn-delete" onclick="deleteTeam(${team.id})">Delete Team</button>
+                </div>
+            `;
+            
+            teamsGrid.appendChild(teamCard);
+            
+            // Add animation effect
+            setTimeout(() => {
+                teamCard.style.transform = 'translateY(-5px)';
+                teamCard.style.boxShadow = '0 5px 15px rgba(144, 200, 60, 0.2)';
+            }, 100);
+        } else {
+            // If teams grid doesn't exist, just reload the page
+            location.reload();
+        }
+    }
+    
+    // Function to update race status
+    function updateRaceStatus(status) {
+        const statusIndicator = document.querySelector('.status-indicator');
+        
+        if (statusIndicator) {
+            if (status === 'active' || status === 'started') {
+                statusIndicator.textContent = 'Active';
+                statusIndicator.classList.remove('inactive');
+                statusIndicator.classList.add('active');
+                
+                // Add a notification that the race has started
+                const infoCard = document.querySelector('.info-card');
+                if (infoCard && !document.querySelector('.race-started-alert')) {
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-success race-started-alert';
+                    alert.innerHTML = '<strong>Race has started!</strong> Teams are now playing.';
+                    infoCard.appendChild(alert);
+                    
+                    // Make it flash to draw attention
+                    setInterval(() => {
+                        alert.style.opacity = alert.style.opacity === '0.7' ? '1' : '0.7';
+                    }, 800);
+                }
+            } else {
+                statusIndicator.textContent = 'Inactive';
+                statusIndicator.classList.remove('active');
+                statusIndicator.classList.add('inactive');
+            }
+        } else {
+            // If we can't find the status indicator, just reload
+            location.reload();
+        }
+    }
+    
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {

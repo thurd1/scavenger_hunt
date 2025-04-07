@@ -263,9 +263,50 @@ document.addEventListener('DOMContentLoaded', function() {
     const hasRaceStarted = {% if team.participating_lobbies.first.hunt_started %}true{% else %}false{% endif %};
     const raceId = {% if team.participating_lobbies.first.race.id %}{{ team.participating_lobbies.first.race.id }}{% else %}null{% endif %};
     
-    // Start automatic countdown if race has started
-    if (hasRaceStarted && raceId) {
+    // Keep track of whether we've seen a race start notification
+    let seenRaceStartNotification = sessionStorage.getItem('seenRaceStartForRace_' + raceId) === 'true';
+    
+    // Force notification to show even when first joining after race has started
+    if (hasRaceStarted && raceId && !seenRaceStartNotification) {
         console.log("Race already started, showing notification");
+        showRaceStartedNotification(raceId);
+        // Don't set the session storage yet - we'll set it after they see the notification
+    }
+    
+    // Connect to WebSocket for real-time race updates
+    if (raceId) {
+        try {
+            const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const raceSocket = new WebSocket(
+                `${wsScheme}//${window.location.host}/ws/race/${raceId}/`
+            );
+            
+            raceSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                console.log('Received WebSocket message:', data);
+                
+                // Handle race started event
+                if (data.type === 'race_started') {
+                    console.log('Race started! Showing notification...');
+                    showRaceStartedNotification(raceId, data.redirect_url);
+                }
+            };
+            
+            raceSocket.onclose = function(e) {
+                console.log('Race WebSocket closed');
+            };
+            
+            raceSocket.onerror = function(e) {
+                console.error('Race WebSocket error:', e);
+            };
+            
+        } catch (e) {
+            console.error('Error setting up WebSocket:', e);
+        }
+    }
+    
+    // Function to show race started notification
+    function showRaceStartedNotification(raceId, redirectUrl) {
         // Show race started notification
         const notification = document.getElementById('race-started-notification');
         if (notification) {
@@ -295,72 +336,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 // When countdown reaches 0, redirect
                 if (seconds <= 0) {
                     clearInterval(countdownInterval);
-                    window.location.href = `/race/${raceId}/questions/`;
+                    // Mark as seen so if they come back to this page via the back button
+                    // they'll automatically be redirected again
+                    sessionStorage.setItem('seenRaceStartForRace_' + raceId, 'true');
+                    // Redirect to race questions
+                    window.location.href = redirectUrl || `/race/${raceId}/questions/`;
                 }
             }, 1000);
-        }
-    }
-    
-    // Connect to WebSocket for real-time race updates
-    if (raceId) {
-        try {
-            const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const raceSocket = new WebSocket(
-                `${wsScheme}//${window.location.host}/ws/race/${raceId}/`
-            );
-            
-            raceSocket.onmessage = function(e) {
-                const data = JSON.parse(e.data);
-                console.log('Received WebSocket message:', data);
-                
-                // Handle race started event
-                if (data.type === 'race_started') {
-                    console.log('Race started! Redirecting...');
-                    
-                    // Show race started notification
-                    const notification = document.getElementById('race-started-notification');
-                    if (notification) {
-                        notification.style.display = 'block';
-                        notification.classList.add('active');
-                    }
-                    
-                    // Start countdown
-                    let countdownEl = document.getElementById('countdown');
-                    let countdownMsgEl = document.getElementById('race-countdown');
-                    
-                    if (countdownEl && countdownMsgEl) {
-                        let seconds = 5;
-                        
-                        // Update countdown every second
-                        let countdownInterval = setInterval(function() {
-                            seconds--;
-                            countdownEl.textContent = seconds;
-                            countdownMsgEl.textContent = `Redirecting in ${seconds} seconds...`;
-                            
-                            // When countdown reaches 0, redirect
-                            if (seconds <= 0) {
-                                clearInterval(countdownInterval);
-                                // Redirect to race questions
-                                window.location.href = data.redirect_url || `/race/${raceId}/questions/`;
-                            }
-                        }, 1000);
-                    } else {
-                        // Immediate redirect if no countdown element
-                        window.location.href = data.redirect_url || `/race/${raceId}/questions/`;
-                    }
-                }
-            };
-            
-            raceSocket.onclose = function(e) {
-                console.log('Race WebSocket closed');
-            };
-            
-            raceSocket.onerror = function(e) {
-                console.error('Race WebSocket error:', e);
-            };
-            
-        } catch (e) {
-            console.error('Error setting up WebSocket:', e);
         }
     }
 });

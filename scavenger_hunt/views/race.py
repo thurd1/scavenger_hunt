@@ -82,9 +82,36 @@ def check_answer(request):
     # Check if the answer is correct
     is_correct = False
     
+    # Handle empty answers
+    if not provided_answer:
+        return Response({
+            'correct': False,
+            'already_answered': False,
+            'points': 0,
+            'message': 'Please provide an answer.'
+        }, status=status.HTTP_200_OK)
+    
+    # Log more debugging information
+    print(f"Comparing provided answer '{provided_answer}' with correct answers: {correct_answers}")
+    
+    # Do a more flexible comparison
     for correct_answer in correct_answers:
+        # Try exact match
         if provided_answer == correct_answer:
             is_correct = True
+            print(f"CORRECT: Exact match found for '{provided_answer}'")
+            break
+        
+        # Try case-insensitive match (should already be handled by .lower() but just to be safe)
+        if provided_answer.lower() == correct_answer.lower():
+            is_correct = True
+            print(f"CORRECT: Case-insensitive match found for '{provided_answer}'")
+            break
+        
+        # Try stripping spaces
+        if provided_answer.strip() == correct_answer.strip():
+            is_correct = True
+            print(f"CORRECT: Match found after stripping spaces for '{provided_answer}'")
             break
     
     # If correct, update the answer object and calculate points
