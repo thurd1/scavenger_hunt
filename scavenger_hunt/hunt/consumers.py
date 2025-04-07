@@ -350,7 +350,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         
         # Send message to WebSocket with team id
         try:
-        await self.send(text_data=json.dumps({
+            await self.send(text_data=json.dumps({
                 'type': 'team_left',
                 'team_id': event['team_id']
             }))
@@ -363,7 +363,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         
         # Send message to WebSocket with member data
         try:
-        await self.send(text_data=json.dumps({
+            await self.send(text_data=json.dumps({
                 'type': 'team_member_joined',
                 'member': event['member'],
                 'team_id': event['team_id'],
