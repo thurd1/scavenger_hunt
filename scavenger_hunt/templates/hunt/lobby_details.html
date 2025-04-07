@@ -302,10 +302,12 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'hunt/js/lobby-websocket.js' %}"></script>
 <script>
     // Global variable to store the team ID to delete
     let teamIdToDelete = null;
+    let lastUpdateTime = 0;
+    let wsConnected = false;
+    let pollingEnabled = true;
     
     // Get CSRF token from cookies
     function getCookie(name) {
@@ -369,6 +371,9 @@
                 const teamElement = document.querySelector(`[data-team-id="${teamId}"]`);
                 if (teamElement && teamElement.parentElement) {
                     teamElement.parentElement.removeChild(teamElement);
+                    
+                    // Force an immediate refresh to show updated state
+                    refreshTeamData(true);
                 } else {
                     // If we can't find the team element, just reload the page
                     location.reload();
@@ -414,6 +419,77 @@
         }
     }
     
+    // Function to refresh team data using fetch
+    function refreshTeamData(force = false) {
+        // Skip if WebSocket is connected and we haven't forced a refresh
+        if (wsConnected && !force && !pollingEnabled) {
+            return;
+        }
+        
+        // Throttle updates to at most once per second unless forced
+        const now = Date.now();
+        if (!force && now - lastUpdateTime < 1000) {
+            return;
+        }
+        
+        lastUpdateTime = now;
+        
+        fetch(window.location.href)
+            .then(response => response.text())
+            .then(html => {
+                // Create a temporary DOM element to parse the HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Get the teams section
+                const newTeamsSection = doc.querySelector('.teams-grid') || doc.querySelector('.no-teams');
+                const currentTeamsSection = document.querySelector('.teams-grid') || document.querySelector('.no-teams');
+                
+                if (!newTeamsSection || !currentTeamsSection) {
+                    console.warn('Teams section not found in either the current page or fetched HTML');
+                    return;
+                }
+                
+                // Update only if there's a difference
+                if (newTeamsSection.innerHTML !== currentTeamsSection.innerHTML) {
+                    currentTeamsSection.innerHTML = newTeamsSection.innerHTML;
+                    
+                    // Highlight the section briefly to indicate update
+                    currentTeamsSection.style.transition = 'background-color 0.5s';
+                    currentTeamsSection.style.backgroundColor = 'rgba(144, 200, 60, 0.2)';
+                    setTimeout(() => {
+                        currentTeamsSection.style.backgroundColor = '';
+                    }, 500);
+                    
+                    // Update status indicator
+                    updateStatusIndicator('Teams updated!');
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing team data:', error);
+                updateStatusIndicator('Error refreshing', true);
+            });
+    }
+    
+    // Function to update the status indicator
+    function updateStatusIndicator(message, isError = false) {
+        const statusIndicator = document.getElementById('status-indicator');
+        if (!statusIndicator) return;
+        
+        statusIndicator.innerHTML = `<span style="display:inline-block;width:8px;height:8px;background:${isError ? '#dc3545' : '#90C83C'};border-radius:50%;margin-right:5px;"></span> ${message}`;
+        
+        if (!isError) {
+            // Reset the indicator after 1 second
+            setTimeout(() => {
+                if (wsConnected) {
+                    statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#90C83C;border-radius:50%;margin-right:5px;"></span> Connected via WebSocket';
+                } else {
+                    statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#ffc107;border-radius:50%;margin-right:5px;"></span> Polling for updates...';
+                }
+            }, 1000);
+        }
+    }
+    
     // Initialize WebSocket when the DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
         // Set the lobby ID for the WebSocket connection
@@ -421,59 +497,99 @@
         
         // Add a visual indicator for real-time updates
         const statusIndicator = document.createElement('div');
+        statusIndicator.id = 'status-indicator';
         statusIndicator.style.position = 'fixed';
         statusIndicator.style.bottom = '10px';
         statusIndicator.style.right = '10px';
         statusIndicator.style.padding = '8px 12px';
-        statusIndicator.style.background = 'rgba(144, 200, 60, 0.2)';
+        statusIndicator.style.background = 'rgba(33, 37, 41, 0.8)';
         statusIndicator.style.color = '#90C83C';
         statusIndicator.style.borderRadius = '4px';
         statusIndicator.style.fontSize = '12px';
         statusIndicator.style.zIndex = '9999';
-        statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#90C83C;border-radius:50%;margin-right:5px;"></span> Auto-refreshing...';
+        statusIndicator.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+        statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#ffc107;border-radius:50%;margin-right:5px;"></span> Initializing connection...';
         document.body.appendChild(statusIndicator);
         
-        // Set up automatic refresh with fetch instead of full page reload
-        function refreshTeamData() {
-            fetch(window.location.href)
-                .then(response => response.text())
-                .then(html => {
-                    // Create a temporary DOM element to parse the HTML
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
+        // Set up WebSocket connection
+        try {
+            const lobbyId = '{{ lobby.id }}';
+            const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const socket = new WebSocket(`${wsScheme}://${window.location.host}/ws/lobby/${lobbyId}/`);
+            
+            socket.onopen = function() {
+                console.log(`WebSocket connected for lobby ${lobbyId}`);
+                wsConnected = true;
+                updateStatusIndicator('Connected via WebSocket');
+                
+                // Continue polling as a fallback, but slow it down
+                pollingEnabled = true;
+            };
+            
+            socket.onmessage = function(e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    console.log(`WebSocket message received:`, data);
                     
-                    // Get the teams grid from the fetched HTML
-                    const newTeamsSection = doc.querySelector('.teams-grid') || doc.querySelector('.no-teams');
-                    const currentTeamsSection = document.querySelector('.teams-grid') || document.querySelector('.no-teams');
-                    
-                    // Update only if there's a difference
-                    if (newTeamsSection && currentTeamsSection) {
-                        if (newTeamsSection.innerHTML !== currentTeamsSection.innerHTML) {
-                            currentTeamsSection.innerHTML = newTeamsSection.innerHTML;
-                            statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#90C83C;border-radius:50%;margin-right:5px;"></span> Teams updated!';
-                            
-                            // Reset the indicator after 1 second
-                            setTimeout(() => {
-                                statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#90C83C;border-radius:50%;margin-right:5px;"></span> Auto-refreshing...';
-                            }, 1000);
-                        }
-                    } else {
-                        // If structure is different, do a full reload
-                        location.reload();
+                    if (data.type === 'connection_established') {
+                        updateStatusIndicator('WebSocket connected!');
+                    } else if (data.type === 'team_joined' || data.type === 'team_left' || 
+                               data.type === 'team_member_joined') {
+                        // Force refresh on team updates
+                        refreshTeamData(true);
+                        updateStatusIndicator('Team update received!');
                     }
-                })
-                .catch(error => {
-                    console.error('Error refreshing team data:', error);
-                    // If there's an error, fallback to full page reload
-                    location.reload();
-                });
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            };
+            
+            socket.onclose = function() {
+                console.log(`WebSocket disconnected for lobby ${lobbyId}`);
+                wsConnected = false;
+                updateStatusIndicator('WebSocket disconnected, using polling', true);
+                
+                // Fallback to more frequent polling
+                pollingEnabled = true;
+            };
+            
+            socket.onerror = function(error) {
+                console.error(`WebSocket error:`, error);
+                wsConnected = false;
+                updateStatusIndicator('WebSocket error, using polling', true);
+                
+                // Fallback to more frequent polling
+                pollingEnabled = true;
+            };
+        } catch (error) {
+            console.error('Error setting up WebSocket:', error);
+            updateStatusIndicator('Could not connect WebSocket, using polling', true);
+            
+            // Fallback to polling only
+            wsConnected = false;
+            pollingEnabled = true;
         }
         
-        // Initial refresh after 1 second
-        setTimeout(refreshTeamData, 1000);
+        // Initial refresh immediately
+        refreshTeamData(true);
         
-        // Then refresh every 2 seconds
-        setInterval(refreshTeamData, 2000);
+        // Set up multiple polling intervals for better reliability
+        // Fast polling every 1.5 seconds when using polling as primary method
+        setInterval(() => {
+            if (pollingEnabled) {
+                refreshTeamData();
+            }
+        }, 1500);
+        
+        // Slow background polling every 5 seconds as a backup
+        setInterval(() => {
+            refreshTeamData();
+        }, 5000);
+        
+        // Force refresh every 20 seconds regardless of WebSocket state
+        setInterval(() => {
+            refreshTeamData(true);
+        }, 20000);
     });
 </script>
 {% endblock %}

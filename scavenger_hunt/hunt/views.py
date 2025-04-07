@@ -66,21 +66,44 @@ def create_lobby(request):
 
 @login_required
 def lobby_details(request, lobby_id):
-    lobby = get_object_or_404(Lobby, id=lobby_id)
-    teams = lobby.teams.all().prefetch_related('members')
-    
-    # Debug prints
-    for team in teams:
-        members = team.members.all()
-        print(f"Team {team.name} (ID: {team.id}) members:")
-        for member in members:
-            print(f"- {member.role}")
-    
-    context = {
-        'lobby': lobby,
-        'teams': teams,
-    }
-    return render(request, 'hunt/lobby_details.html', context)
+    """
+    View to display lobby details and teams.
+    Optimized to ensure fresh data on each request.
+    """
+    try:
+        # Get lobby with prefetched teams and members to reduce DB queries
+        lobby = Lobby.objects.prefetch_related(
+            'teams', 
+            'teams__members'
+        ).get(id=lobby_id)
+        
+        # Log access for debugging
+        logger.info(f"User {request.user.username} accessed lobby details for {lobby.name} ({lobby_id})")
+        
+        # Mark as accessed to help with debugging
+        lobby.last_accessed = timezone.now()
+        lobby.save(update_fields=['last_accessed'])
+        
+        # Add a timestamp to prevent browser caching
+        response = render(request, 'hunt/lobby_details.html', {
+            'lobby': lobby,
+            'timestamp': timezone.now().timestamp(),
+        })
+        
+        # Set cache control headers to prevent caching
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        
+        return response
+        
+    except Lobby.DoesNotExist:
+        messages.error(request, "Lobby not found")
+        return redirect('manage_lobbies')
+    except Exception as e:
+        logger.error(f"Error in lobby_details view: {str(e)}")
+        messages.error(request, "An error occurred while loading the lobby")
+        return redirect('manage_lobbies')
 
 @login_required
 def start_race(request, lobby_id):

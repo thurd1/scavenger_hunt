@@ -10,13 +10,15 @@ def generate_lobby_code():
 
 class Lobby(models.Model):
     name = models.CharField(max_length=100)
-    code = models.CharField(max_length=6, unique=True)
+    code = models.CharField(max_length=10, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_accessed = models.DateTimeField(null=True, blank=True)
     teams = models.ManyToManyField('Team', related_name='participating_lobbies')
     is_active = models.BooleanField(default=True)
     hunt_started = models.BooleanField(default=False)
     start_time = models.DateTimeField(null=True, blank=True)
-    race = models.ForeignKey('Race', on_delete=models.CASCADE, null=True)
+    race = models.ForeignKey('Race', on_delete=models.SET_NULL, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.code:
@@ -32,6 +34,9 @@ class Lobby(models.Model):
     def __str__(self):
         return f"Lobby {self.code}"
     
+    class Meta:
+        verbose_name_plural = "Lobbies"
+
 class Team(models.Model):
     name = models.CharField(max_length=100, unique=True)
     code = models.CharField(max_length=6, unique=True)
