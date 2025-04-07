@@ -284,15 +284,15 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
 
 
 class LobbyConsumer(AsyncWebsocketConsumer):
+    """
+    WebSocket consumer for lobby updates.
+    Handles real-time updates when teams join/leave and when race status changes.
+    """
     async def connect(self):
-        """Handle connection to lobby websocket"""
         self.lobby_id = self.scope['url_route']['kwargs']['lobby_id']
         self.lobby_group_name = f'lobby_{self.lobby_id}'
-        self.player_name = self.scope.get('session', {}).get('player_name')
         
-        logger.info(f"WebSocket connecting for lobby {self.lobby_id} with player {self.player_name}")
-        
-        # Join the group
+        # Join the lobby group
         await self.channel_layer.group_add(
             self.lobby_group_name,
             self.channel_name
@@ -301,165 +301,113 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         # Accept the connection
         await self.accept()
         
-        # Send initial state
-        await self.send_lobby_state()
+        # Log for debugging
+        print(f"WebSocket CONNECTED: Lobby {self.lobby_id}")
+        
+        # Send a confirmation message
+        await self.send(text_data=json.dumps({
+            'type': 'connection_established',
+            'message': f'Connected to lobby {self.lobby_id}'
+        }))
 
     async def disconnect(self, close_code):
-        """Handle disconnection from lobby"""
-        logger.info(f"WebSocket disconnected from lobby {self.lobby_id} for player {self.player_name}")
-        
-        # Leave the group
+        # Leave the lobby group
         await self.channel_layer.group_discard(
             self.lobby_group_name,
             self.channel_name
         )
-
-    @database_sync_to_async
-    def get_lobby_state(self):
-        """Get the current state of the lobby"""
-        try:
-            lobby = Lobby.objects.get(id=self.lobby_id)
-            teams = []
-            
-            for team in lobby.teams.all().prefetch_related('members'):
-                team_data = {
-                    'id': team.id,
-                    'name': team.name,
-                    'code': team.code,
-                    'members': list(team.members.all().values('role'))
-                }
-                teams.append(team_data)
-            
-            return {
-                'lobby_id': lobby.id,
-                'name': lobby.name,
-                'code': lobby.code,
-                'teams': teams,
-                'race_in_progress': lobby.race is not None and lobby.hunt_started,
-                'start_time': lobby.start_time.isoformat() if lobby.start_time else None,
-                'time_limit_minutes': lobby.race.time_limit_minutes if lobby.race else 60
-            }
-        except Lobby.DoesNotExist:
-            logger.error(f"Lobby {self.lobby_id} not found")
-            return {
-                'error': 'Lobby not found'
-            }
-        except Exception as e:
-            logger.error(f"Error getting lobby state: {e}")
-            return {
-                'error': str(e)
-            }
-
-    async def send_lobby_state(self):
-        """Send the current state of the lobby"""
-        state = await self.get_lobby_state()
-        await self.send(text_data=json.dumps({
-            'type': 'lobby_update',
-            **state
-        }))
-
-    async def lobby_update(self, event):
-        """Handle lobby update event"""
-        # Forward the update to the WebSocket
-        await self.send(text_data=json.dumps(event))
-
-    async def race_started(self, event):
-        """Handle race started event"""
-        # Forward the race started event to the WebSocket
-        await self.send(text_data=json.dumps({
-            'type': 'race_started',
-            'redirect_url': event.get('redirect_url')
-        }))
-        
-        # Also send updated lobby state
-        await self.send_lobby_state()
+        print(f"WebSocket DISCONNECTED: Lobby {self.lobby_id}")
 
     async def receive(self, text_data):
-        """Handle received messages"""
-        try:
-            data = json.loads(text_data)
-            logger.info(f"Received data in LobbyConsumer: {data}")
-            
-            if data.get('type') == 'request_update':
-                await self.send_lobby_state()
-            
-        except json.JSONDecodeError:
-            logger.error("Failed to decode JSON in LobbyConsumer")
-        except Exception as e:
-            logger.error(f"Error in LobbyConsumer receive: {e}")
+        # We don't expect to receive messages from clients
+        # This is mainly for broadcasting from server to clients
+        pass
 
-    @database_sync_to_async
-    def get_lobby_data(self):
-        """Get detailed lobby data"""
-        lobby = Lobby.objects.get(id=self.lobby_id)
-        return {
-            'id': lobby.id,
-            'name': lobby.name,
-            'code': lobby.code,
-            'hunt_started': lobby.hunt_started,
-            'start_time': lobby.start_time.isoformat() if lobby.start_time else None,
-            'race': {
-                'id': lobby.race.id,
-                'name': lobby.race.name,
-                'time_limit_minutes': lobby.race.time_limit_minutes
-            } if lobby.race else None
-        }
+    async def team_joined(self, event):
+        """
+        Broadcast to clients when a team joins the lobby
+        """
+        print(f"BROADCASTING team_joined event in lobby {self.lobby_id}")
+        await self.send(text_data=json.dumps({
+            'type': 'team_joined',
+            'team': event['team']
+        }))
 
-# Add this new consumer class
+    async def team_left(self, event):
+        """
+        Broadcast to clients when a team leaves the lobby
+        """
+        await self.send(text_data=json.dumps({
+            'type': 'team_left',
+            'team_id': event['team_id']
+        }))
+
+    async def team_member_joined(self, event):
+        """
+        Broadcast to clients when a new member joins a team
+        """
+        await self.send(text_data=json.dumps({
+            'type': 'team_member_joined',
+            'member': event['member'],
+            'team_id': event['team_id'],
+            'team_name': event['team_name']
+        }))
+
+    async def race_status_changed(self, event):
+        """
+        Broadcast to clients when race status changes
+        """
+        print(f"BROADCASTING race_status_changed event in lobby {self.lobby_id} - status: {event['status']}")
+        await self.send(text_data=json.dumps({
+            'type': 'race_status_changed',
+            'status': event['status'],
+            'race_id': event.get('race_id')
+        }))
+
 class RaceConsumer(AsyncWebsocketConsumer):
+    """
+    WebSocket consumer for race updates.
+    Handles real-time updates when race status changes.
+    """
     async def connect(self):
-        # Get race ID from URL
         self.race_id = self.scope['url_route']['kwargs']['race_id']
         self.race_group_name = f'race_{self.race_id}'
         
-        # Join race group
+        # Join the race group
         await self.channel_layer.group_add(
             self.race_group_name,
             self.channel_name
         )
         
+        # Accept the connection
         await self.accept()
-        logging.info(f"WebSocket connected to race {self.race_id}")
-    
+        
+        # Log for debugging
+        print(f"WebSocket CONNECTED: Race {self.race_id}")
+
     async def disconnect(self, close_code):
-        # Leave race group
+        # Leave the race group
         await self.channel_layer.group_discard(
             self.race_group_name,
             self.channel_name
         )
-        logging.info(f"WebSocket disconnected from race {self.race_id} with code {close_code}")
-    
+        print(f"WebSocket DISCONNECTED: Race {self.race_id}")
+
     async def receive(self, text_data):
-        try:
-            text_data_json = json.loads(text_data)
-            message_type = text_data_json.get('type')
-            
-            if message_type == 'ping':
-                await self.send(text_data=json.dumps({
-                    'type': 'pong',
-                    'timestamp': datetime.now().isoformat()
-                }))
-            
-            logging.info(f"Received message in race {self.race_id}: {text_data_json}")
-        except json.JSONDecodeError:
-            logging.error(f"Failed to decode JSON in race {self.race_id}: {text_data}")
-        except Exception as e:
-            logging.error(f"Error in race {self.race_id} receive: {str(e)}")
-    
+        # We don't expect to receive messages from clients
+        # This is mainly for broadcasting from server to clients
+        pass
+
     async def race_started(self, event):
-        """Event handler for when a race starts"""
-        # Construct redirect URL
-        redirect_url = f"/race/{self.race_id}/questions/"
-        
-        # Send message to WebSocket
+        """
+        Broadcast to clients when race starts
+        """
+        print(f"BROADCASTING race_started event for race {self.race_id}")
         await self.send(text_data=json.dumps({
             'type': 'race_started',
             'race_id': self.race_id,
-            'redirect_url': redirect_url,
-            'message': 'Race has started! Get ready to answer questions.'
+            'redirect_url': event.get('redirect_url', f'/race/{self.race_id}/questions/')
         }))
-        
-        logging.info(f"Sent race_started event to client in race {self.race_id}") 
 
 class LeaderboardConsumer(AsyncWebsocketConsumer):
     async def connect(self):

@@ -10,6 +10,8 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from scavenger_hunt.models import Race, Team, Question, Answer, TeamMember, RaceProgress, Zone
+import re
+from difflib import SequenceMatcher
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -32,7 +34,7 @@ def check_answer(request):
     
     # Extract data from request
     question_id = request.data.get('question_id')
-    provided_answer = request.data.get('answer', '').strip().lower()
+    provided_answer = request.data.get('answer', '').strip()
     team_code = request.data.get('team_code')
     attempt_number = request.data.get('attempt_number', 1)
     
@@ -50,10 +52,14 @@ def check_answer(request):
     except Question.DoesNotExist:
         return Response({'error': 'Question not found'}, status=status.HTTP_404_NOT_FOUND)
     
-    # Log the expected answers for debugging
-    correct_answers = [a.strip().lower() for a in question.answer.split('|')]
-    print(f"Correct answers for question {question_id}: {correct_answers}")
-    print(f"User provided: '{provided_answer}'")
+    # Handle empty answers
+    if not provided_answer:
+        return Response({
+            'correct': False,
+            'already_answered': False,
+            'points': 0,
+            'message': 'Please provide an answer.'
+        }, status=status.HTTP_200_OK)
     
     # Get or create answer object
     answer_obj, created = Answer.objects.get_or_create(
@@ -79,66 +85,124 @@ def check_answer(request):
         answer_obj.attempts = attempt_number
         answer_obj.save()
     
-    # Check if the answer is correct
+    # Prepare correct answers and the provided answer for comparison
+    # Keep original answers for logging
+    original_correct_answers = question.answer.split('|')
+    original_provided = provided_answer
+    
+    # Normalized answers (lowercase, trimmed)
+    correct_answers = [a.strip().lower() for a in original_correct_answers]
+    provided_normalized = provided_answer.strip().lower()
+    
+    # Clean answers (lowercase, trimmed, no punctuation, normalized whitespace)
+    clean_correct_answers = [re.sub(r'[^\w\s]', '', a).lower().strip() for a in correct_answers]
+    clean_provided = re.sub(r'[^\w\s]', '', provided_normalized).lower().strip()
+    
+    # Super clean answers (no spaces, lowercase, alphanumeric only)
+    super_clean_correct = [''.join(re.findall(r'\w', a.lower())) for a in correct_answers]
+    super_clean_provided = ''.join(re.findall(r'\w', provided_normalized))
+    
+    # Log extensive debug information
+    print("\n==== ANSWER VALIDATION DEBUG ====")
+    print(f"Question ID: {question_id}, Question Text: {question.question_text[:50]}...")
+    print(f"Original correct answers: {original_correct_answers}")
+    print(f"Original provided answer: '{original_provided}'")
+    print(f"Normalized correct answers: {correct_answers}")
+    print(f"Normalized provided answer: '{provided_normalized}'")
+    print(f"Clean correct answers: {clean_correct_answers}")
+    print(f"Clean provided answer: '{clean_provided}'")
+    print(f"Super clean correct answers: {super_clean_correct}")
+    print(f"Super clean provided answer: '{super_clean_provided}'")
+    
+    # Initialize is_correct and match_type for tracking
     is_correct = False
+    match_type = None
+    matched_answer = None
     
-    # Handle empty answers
-    if not provided_answer:
-        return Response({
-            'correct': False,
-            'already_answered': False,
-            'points': 0,
-            'message': 'Please provide an answer.'
-        }, status=status.HTTP_200_OK)
+    # Perform increasingly flexible matching
+    # 1. Exact match (case-sensitive)
+    for i, correct in enumerate(original_correct_answers):
+        if provided_answer == correct:
+            is_correct = True
+            match_type = "exact"
+            matched_answer = correct
+            print(f"MATCH: Exact match found with answer option {i+1}")
+            break
     
-    # Log more debugging information
-    print(f"Comparing provided answer '{provided_answer}' with correct answers: {correct_answers}")
+    # 2. Case-insensitive match
+    if not is_correct:
+        for i, correct in enumerate(correct_answers):
+            if provided_normalized == correct:
+                is_correct = True
+                match_type = "case-insensitive"
+                matched_answer = original_correct_answers[i]
+                print(f"MATCH: Case-insensitive match found with answer option {i+1}")
+                break
     
-    # Do a more flexible comparison
-    for correct_answer in correct_answers:
-        print(f"Comparing with correct answer: '{correct_answer}'")
+    # 3. Whitespace-insensitive match
+    if not is_correct:
+        provided_nospace = provided_normalized.replace(" ", "")
+        for i, correct in enumerate(correct_answers):
+            correct_nospace = correct.replace(" ", "")
+            if provided_nospace == correct_nospace:
+                is_correct = True
+                match_type = "whitespace-insensitive"
+                matched_answer = original_correct_answers[i]
+                print(f"MATCH: Whitespace-insensitive match found with answer option {i+1}")
+                break
+    
+    # 4. Punctuation-insensitive match
+    if not is_correct:
+        for i, clean_correct in enumerate(clean_correct_answers):
+            if clean_provided == clean_correct:
+                is_correct = True
+                match_type = "punctuation-insensitive"
+                matched_answer = original_correct_answers[i]
+                print(f"MATCH: Punctuation-insensitive match found with answer option {i+1}")
+                break
+    
+    # 5. Super clean match (alphanumeric only, no spaces)
+    if not is_correct:
+        for i, super_clean in enumerate(super_clean_correct):
+            if super_clean_provided == super_clean:
+                is_correct = True
+                match_type = "alphanumeric-only"
+                matched_answer = original_correct_answers[i]
+                print(f"MATCH: Alphanumeric-only match found with answer option {i+1}")
+                break
+    
+    # 6. Fuzzy matching (for typos)
+    if not is_correct:
+        best_ratio = 0
+        best_index = -1
         
-        # Try exact match
-        if provided_answer == correct_answer:
-            is_correct = True
-            print(f"CORRECT: Exact match found for '{provided_answer}'")
-            break
+        for i, clean_correct in enumerate(clean_correct_answers):
+            # Skip if lengths are too different
+            if abs(len(clean_provided) - len(clean_correct)) > max(3, len(clean_correct) * 0.3):
+                continue
+                
+            ratio = SequenceMatcher(None, clean_provided, clean_correct).ratio()
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_index = i
         
-        # Try case-insensitive match (should already be handled by .lower() but just to be safe)
-        if provided_answer.lower() == correct_answer.lower():
+        # Accept if similarity is high enough
+        if best_ratio >= 0.9:  # 90% similarity threshold
             is_correct = True
-            print(f"CORRECT: Case-insensitive match found for '{provided_answer}'")
-            break
-        
-        # Try stripping spaces
-        if provided_answer.strip() == correct_answer.strip():
-            is_correct = True
-            print(f"CORRECT: Match found after stripping spaces for '{provided_answer}'")
-            break
-            
-        # Try removing punctuation
-        import re
-        clean_provided = re.sub(r'[^\w\s]', '', provided_answer).lower().strip()
-        clean_correct = re.sub(r'[^\w\s]', '', correct_answer).lower().strip()
-        
-        if clean_provided == clean_correct:
-            is_correct = True
-            print(f"CORRECT: Match found after removing punctuation '{provided_answer}'")
-            break
-            
-        # Try fuzzy matching for small differences (typos)
-        from difflib import SequenceMatcher
-        similarity = SequenceMatcher(None, clean_provided, clean_correct).ratio()
-        if similarity > 0.9:  # 90% similarity is considered a match
-            is_correct = True
-            print(f"CORRECT: Fuzzy match found with {similarity*100:.1f}% similarity: '{provided_answer}'")
-            break
-            
+            match_type = f"fuzzy-{best_ratio:.2f}"
+            matched_answer = original_correct_answers[best_index]
+            print(f"MATCH: Fuzzy match found with answer option {best_index+1}, similarity: {best_ratio:.2f}")
+    
+    # Log final result
     if is_correct:
-        print(f"FINAL RESULT: '{provided_answer}' is CORRECT!")
+        print(f"FINAL RESULT: CORRECT ✓ - '{original_provided}' matched '{matched_answer}' via {match_type}")
     else:
-        print(f"FINAL RESULT: '{provided_answer}' is INCORRECT. Correct answers were: {correct_answers}")
-        
+        print(f"FINAL RESULT: INCORRECT ✗ - '{original_provided}' did not match any answer")
+        # Log best fuzzy match for debugging
+        if 'best_ratio' in locals() and best_ratio > 0.7:
+            print(f"Closest match was with '{original_correct_answers[best_index]}', similarity: {best_ratio:.2f}")
+    print("==== END ANSWER VALIDATION ====\n")
+    
     # If correct, update the answer object and calculate points
     if is_correct:
         # Calculate points (more points for fewer attempts)
@@ -148,6 +212,9 @@ def check_answer(request):
         # Update answer object
         answer_obj.answered_correctly = True
         answer_obj.points_awarded = points_awarded
+        answer_obj.answer_text = provided_answer
+        answer_obj.matched_with = matched_answer
+        answer_obj.match_type = match_type
         answer_obj.save()
         
         # Log the successful answer
