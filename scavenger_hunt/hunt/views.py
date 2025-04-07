@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question, TeamAnswer
+from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question, TeamAnswer, TeamRaceProgress
 from django.http import JsonResponse
 from .forms import JoinLobbyForm, LobbyForm, TeamForm
 from django.http import HttpResponse
@@ -1117,6 +1117,7 @@ def check_answer(request):
             question_id = data.get('question_id')
             answer = data.get('answer')
             team_code = data.get('team_code')
+            attempt_number = data.get('attempt_number', 1)
             
             if not all([question_id, answer, team_code]):
                 return JsonResponse({'success': False, 'error': 'Missing required fields'})
@@ -1131,7 +1132,10 @@ def check_answer(request):
                 return JsonResponse({'success': False, 'error': 'Team not found'})
             
             # Check if the answer is correct (case-insensitive comparison)
-            is_correct = answer.lower() == question.answer.lower()
+            is_correct = answer.lower().strip() == question.answer.lower().strip()
+            
+            # Calculate points based on attempt number (3 for first, 2 for second, 1 for third)
+            points = max(4 - attempt_number, 0) if is_correct else 0
             
             # If correct, record the answer
             if is_correct:
@@ -1139,17 +1143,38 @@ def check_answer(request):
                 answer_record, created = TeamAnswer.objects.get_or_create(
                     team=team,
                     question=question,
-                    defaults={'answered_correctly': True}
+                    defaults={
+                        'answered_correctly': True,
+                        'attempts': attempt_number,
+                        'points_awarded': points
+                    }
                 )
                 
                 if not created:
                     # Update existing record
                     answer_record.answered_correctly = True
+                    answer_record.attempts = attempt_number
+                    answer_record.points_awarded = points
                     answer_record.save()
+                
+                # Update team's total score for this race (if applicable)
+                try:
+                    team_race_progress, created = TeamRaceProgress.objects.get_or_create(
+                        team=team,
+                        race=question.zone.race,
+                        defaults={'total_points': points}
+                    )
+                    
+                    if not created:
+                        team_race_progress.total_points += points
+                        team_race_progress.save()
+                except Exception as e:
+                    print(f"Error updating team race progress: {e}")
             
             return JsonResponse({
                 'success': True,
-                'correct': is_correct
+                'correct': is_correct,
+                'points': points
             })
             
         except json.JSONDecodeError:
@@ -1409,3 +1434,92 @@ def get_team_race(request, team_id):
         return JsonResponse({'success': False, 'error': 'Team not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+def upload_photo_api(request):
+    """API to handle photo uploads from the race questions page"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=405)
+    
+    # Check if a photo was uploaded
+    if 'photo' not in request.FILES:
+        return JsonResponse({'success': False, 'error': 'No photo uploaded'}, status=400)
+    
+    # Get question ID from POST data
+    question_id = request.POST.get('question_id')
+    if not question_id:
+        return JsonResponse({'success': False, 'error': 'Missing question ID'}, status=400)
+    
+    try:
+        # Get the question
+        question = Question.objects.get(id=question_id)
+        
+        # Get the team from the session or team code in POST
+        team_code = request.POST.get('team_code', None)
+        team_id = request.session.get('team_id', None)
+        player_name = request.session.get('player_name')
+        
+        if not player_name:
+            return JsonResponse({'success': False, 'error': 'No player name found'}, status=400)
+        
+        # Try to get the team
+        if team_code:
+            try:
+                team = Team.objects.get(code=team_code)
+            except Team.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Team not found with provided code'}, status=404)
+        elif team_id:
+            try:
+                team = Team.objects.get(id=team_id)
+            except Team.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Team not found with session ID'}, status=404)
+        else:
+            # Try to find the team based on player name
+            try:
+                team_member = TeamMember.objects.get(role=player_name)
+                team = team_member.team
+            except TeamMember.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Team not found for player'}, status=404)
+        
+        # Get or create a team answer record
+        team_answer, created = TeamAnswer.objects.get_or_create(
+            team=team,
+            question=question,
+            defaults={
+                'answered_correctly': False,
+                'attempts': 3,  # Assume they've used all attempts if they're uploading a photo
+                'requires_photo': True
+            }
+        )
+        
+        # Update the team answer with the photo
+        photo = request.FILES['photo']
+        team_answer.photo = photo
+        team_answer.save()
+        
+        # Also update/create team progress
+        team_progress, created = TeamProgress.objects.get_or_create(
+            team=team,
+            question=question,
+            defaults={
+                'completed': True,
+                'completion_time': timezone.now(),
+                'photo': photo
+            }
+        )
+        
+        if not created:
+            team_progress.completed = True
+            team_progress.completion_time = timezone.now()
+            team_progress.photo = photo
+            team_progress.save()
+        
+        # Return success response
+        return JsonResponse({
+            'success': True,
+            'message': 'Photo uploaded successfully!',
+        })
+        
+    except Question.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Question not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

@@ -68,18 +68,18 @@
                                                         <div class="points-info mb-2">
                                                             Points: <span id="points-{{ question.id }}">3</span> for first try, 2 for second, 1 for third
                                                         </div>
-                                                        <button type="button" class="btn btn-primary submit-answer" data-question-id="{{ question.id }}">Submit Answer</button>
+                                                        <button type="button" class="btn btn-success submit-answer" data-question-id="{{ question.id }}">Submit Answer</button>
                                                     </form>
                                                     
                                                     <div id="feedback-{{ question.id }}" class="feedback mt-2 mb-3" style="display: none;"></div>
                                                     
                                                     <div id="photo-upload-{{ question.id }}" class="photo-upload" style="display: none;">
                                                         <p>You've used all 3 attempts. Please upload a photo instead:</p>
-                                                        <form id="photo-form-{{ question.id }}" class="mb-3">
+                                                        <form id="photo-form-{{ question.id }}" class="mb-3" enctype="multipart/form-data">
                                                             <div class="form-group">
-                                                                <input type="file" id="photo-{{ question.id }}" class="form-control-file">
+                                                                <input type="file" id="photo-{{ question.id }}" name="photo" class="form-control-file">
                                                             </div>
-                                                            <button type="button" class="btn btn-info upload-photo" data-question-id="{{ question.id }}">Upload Photo</button>
+                                                            <button type="button" class="btn btn-success upload-photo" data-question-id="{{ question.id }}">Upload Photo</button>
                                                         </form>
                                                     </div>
                                                 </div>
@@ -90,7 +90,7 @@
                             {% endfor %}
                             
                             <!-- Navigation buttons -->
-                            <div class="navigation-buttons d-flex justify-content-between mt-4">
+                            <div class="navigation-buttons d-flex justify-content-between mt-4" style="display: none;" id="navigation-buttons">
                                 <button id="prev-question" class="btn btn-secondary">Previous</button>
                                 <button id="next-question" class="btn btn-primary">Next</button>
                             </div>
@@ -262,6 +262,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
+        // Show navigation buttons
+        const showNavigationButtons = function() {
+            document.getElementById('navigation-buttons').style.display = 'flex';
+        };
+        
         // Track attempts and points for each question
         const questionData = {};
         
@@ -271,7 +276,8 @@ document.addEventListener('DOMContentLoaded', function() {
             questionData[questionId] = {
                 attempts: 0,
                 points: 0,
-                maxAttempts: 3
+                maxAttempts: 3,
+                photoUploaded: false
             };
         });
         
@@ -324,6 +330,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Disable further submissions for this question
                     const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
                     submitButton.disabled = true;
+                    
+                    // Show navigation buttons
+                    showNavigationButtons();
                     
                     // Automatically move to next question after a delay
                     setTimeout(() => {
@@ -379,8 +388,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.upload-photo').forEach(button => {
             button.addEventListener('click', function() {
                 const questionId = this.getAttribute('data-question-id');
-                // Photo upload functionality would go here
-                alert('Photo upload not implemented in this demo.');
+                uploadPhoto(questionId);
             });
         });
     }
@@ -399,6 +407,57 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         return cookieValue;
+    }
+    
+    // Photo upload function
+    function uploadPhoto(questionId) {
+        const photoInput = document.getElementById(`photo-${questionId}`);
+        if (!photoInput.files || !photoInput.files[0]) {
+            alert('Please select a photo to upload.');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('photo', photoInput.files[0]);
+        formData.append('question_id', questionId);
+        formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+        
+        // Get the team code
+        const teamCode = '{{ team.code }}';
+        formData.append('team_code', teamCode);
+        
+        fetch('/api/upload-photo/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                feedbackElement.className = 'feedback correct';
+                feedbackElement.style.display = 'block';
+                feedbackElement.textContent = 'Photo uploaded successfully!';
+                
+                // Mark photo as uploaded
+                questionData[questionId].photoUploaded = true;
+                
+                // Show navigation buttons
+                showNavigationButtons();
+                
+                // Disable upload button
+                const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
+                uploadButton.disabled = true;
+            } else {
+                alert('Error uploading photo: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error uploading photo:', error);
+            alert('Error uploading photo. Please try again.');
+        });
     }
 });
 </script>
