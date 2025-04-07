@@ -286,6 +286,24 @@
             startCountdownAndRedirect(raceId);
         }
         
+        // Fallback mechanism to check race status directly
+        if (raceId) {
+            // Check race status every 2 seconds as a fallback in case WebSocket fails
+            setInterval(function() {
+                if (!hasRaceStarted) {
+                    fetch(`/race/${raceId}/status/`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.race_started) {
+                                console.log('Race status check: Race has started, redirecting...');
+                                startCountdownAndRedirect(raceId, data.redirect_url);
+                            }
+                        })
+                        .catch(error => console.error('Error checking race status:', error));
+                }
+            }, 2000);
+        }
+        
         // Connect to WebSocket for real-time race updates
         if (raceId) {
             try {

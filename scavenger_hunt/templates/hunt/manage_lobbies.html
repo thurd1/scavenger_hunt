@@ -487,6 +487,18 @@ function startRace(lobbyId) {
                 }
             }
             
+            // Store the redirect URL for fallback
+            const redirectUrl = data.redirect_url;
+            
+            // Set a fallback timeout to redirect everyone to the race 
+            // in case the WebSocket notification fails
+            setTimeout(() => {
+                // For admin, ask if they want to go to the race too
+                if (confirm('Race has started successfully! Would you like to go to the race page as well?')) {
+                    window.location.href = redirectUrl;
+                }
+            }, 2000);
+            
             // Remove notification after 3 seconds
             setTimeout(() => {
                 notificationEl.remove();
