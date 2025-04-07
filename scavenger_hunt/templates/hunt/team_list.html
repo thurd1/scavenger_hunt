@@ -379,6 +379,8 @@ function confirmDelete() {
         // Create a form and submit it to delete the team
         const form = document.createElement('form');
         form.method = 'POST';
+        
+        // Fix the URL format to match Django URL pattern
         form.action = `/team/${teamIdToDelete}/delete/`;
         
         // Add CSRF token
@@ -389,6 +391,10 @@ function confirmDelete() {
         csrfInput.value = csrfToken;
         form.appendChild(csrfInput);
         
+        // Log to console for debugging
+        console.log(`Deleting team with ID: ${teamIdToDelete}, form action: ${form.action}`);
+        
+        // Append form to body and submit
         document.body.appendChild(form);
         form.submit();
     }

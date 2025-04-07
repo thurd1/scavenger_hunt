@@ -36,30 +36,23 @@ def check_answer(request):
     question_id = request.data.get('question_id')
     provided_answer = request.data.get('answer', '').strip()
     team_code = request.data.get('team_code')
-    attempt_number = request.data.get('attempt_number', 1)
+    attempt_number = int(request.data.get('attempt_number', 1))
     
-    print(f"Processing answer: '{provided_answer}' for question {question_id} by team {team_code}")
+    print(f"Processing answer: '{provided_answer}' for question {question_id} by team {team_code}, attempt #{attempt_number}")
     
     # Get the team
     try:
         team = Team.objects.get(code=team_code)
     except Team.DoesNotExist:
+        print(f"ERROR: Team with code {team_code} not found")
         return Response({'error': 'Invalid team code'}, status=status.HTTP_400_BAD_REQUEST)
     
     # Get the question
     try:
         question = Question.objects.get(id=question_id)
     except Question.DoesNotExist:
+        print(f"ERROR: Question with ID {question_id} not found")
         return Response({'error': 'Question not found'}, status=status.HTTP_404_NOT_FOUND)
-    
-    # Handle empty answers
-    if not provided_answer:
-        return Response({
-            'correct': False,
-            'already_answered': False,
-            'points': 0,
-            'message': 'Please provide an answer.'
-        }, status=status.HTTP_200_OK)
     
     # Get or create answer object
     answer_obj, created = Answer.objects.get_or_create(
@@ -74,16 +67,28 @@ def check_answer(request):
     
     # Check if already answered correctly
     if answer_obj.answered_correctly:
+        print(f"Question {question_id} was already answered correctly by team {team_code}")
         return Response({
             'correct': True,
             'already_answered': True,
             'points': answer_obj.points_awarded,
         }, status=status.HTTP_200_OK)
     
-    # If not created, update attempts
+    # Update attempts
     if not created:
+        print(f"Existing answer object found with {answer_obj.attempts} attempts so far")
         answer_obj.attempts = attempt_number
         answer_obj.save()
+    
+    # Validation for empty answers
+    if not provided_answer:
+        print("ERROR: Empty answer provided")
+        return Response({
+            'correct': False,
+            'already_answered': False,
+            'points': 0,
+            'message': 'Please provide an answer.'
+        }, status=status.HTTP_200_OK)
     
     # Prepare correct answers and the provided answer for comparison
     # Keep original answers for logging
@@ -171,61 +176,24 @@ def check_answer(request):
                 print(f"MATCH: Alphanumeric-only match found with answer option {i+1}")
                 break
     
-    # 6. Fuzzy matching (for typos)
+    # 6. Similarity based match (as a last resort)
     if not is_correct:
-        best_ratio = 0
-        best_index = -1
-        
-        for i, clean_correct in enumerate(clean_correct_answers):
-            # Skip if lengths are too different
-            if abs(len(clean_provided) - len(clean_correct)) > max(3, len(clean_correct) * 0.3):
-                continue
-                
-            ratio = SequenceMatcher(None, clean_provided, clean_correct).ratio()
-            if ratio > best_ratio:
-                best_ratio = ratio
-                best_index = i
-        
-        # Accept if similarity is high enough
-        if best_ratio >= 0.8:  # Lowered from 0.9 to 0.8 for better matching
-            is_correct = True
-            match_type = f"fuzzy-{best_ratio:.2f}"
-            matched_answer = original_correct_answers[best_index]
-            print(f"MATCH: Fuzzy match found with answer option {best_index+1}, similarity: {best_ratio:.2f}")
-    
-    # 7. Contained-in match (for cases where the answer is part of a longer correct answer)
-    if not is_correct:
-        for i, correct in enumerate(correct_answers):
-            # Check if the provided answer is completely contained in the correct answer
-            # (useful for partial answers or abbreviations)
-            if len(provided_normalized) >= 3 and provided_normalized in correct:
-                # Check that it's at least 50% the length of the correct answer or at least 5 chars
-                if len(provided_normalized) >= max(5, len(correct) * 0.5):
+        for i, correct in enumerate(clean_correct_answers):
+            if len(clean_provided) > 3 and len(correct) > 3:  # Only do this for longer answers
+                similarity = SequenceMatcher(None, clean_provided, correct).ratio()
+                if similarity >= 0.85:  # High similarity threshold
                     is_correct = True
-                    match_type = "contained-in"
+                    match_type = f"similarity-match-{similarity:.2f}"
                     matched_answer = original_correct_answers[i]
-                    print(f"MATCH: Contained-in match found with answer option {i+1}")
-                    break
-            
-            # Check if the correct answer is completely contained in the provided answer
-            # (useful when the user gives more detail than needed)
-            elif len(correct) >= 3 and correct in provided_normalized:
-                # Check that it's at least 70% the length of the provided answer or at least 5 chars
-                if len(correct) >= max(5, len(provided_normalized) * 0.7):
-                    is_correct = True
-                    match_type = "contains"
-                    matched_answer = original_correct_answers[i]
-                    print(f"MATCH: Contains match found with answer option {i+1}")
+                    print(f"MATCH: Similarity match ({similarity:.2f}) found with answer option {i+1}")
                     break
     
-    # Log final result
+    # Final match result
     if is_correct:
-        print(f"FINAL RESULT: CORRECT ✓ - '{original_provided}' matched '{matched_answer}' via {match_type}")
+        print(f"RESULT: CORRECT - matched with {matched_answer} using {match_type}")
     else:
-        print(f"FINAL RESULT: INCORRECT ✗ - '{original_provided}' did not match any answer")
-        # Log best fuzzy match for debugging
-        if 'best_ratio' in locals() and best_ratio > 0.7:
-            print(f"Closest match was with '{original_correct_answers[best_index]}', similarity: {best_ratio:.2f}")
+        print(f"RESULT: INCORRECT - no match found")
+    
     print("==== END ANSWER VALIDATION ====\n")
     
     # If correct, update the answer object and calculate points
@@ -271,9 +239,19 @@ def check_answer(request):
             'points': points_awarded,
         }, status=status.HTTP_200_OK)
     else:
+        # Check if max attempts reached
+        max_attempts = 3  # Hardcoded for now, could be made configurable
+        attempts_left = max_attempts - attempt_number
+        message = f"Incorrect answer. You have {attempts_left} attempts remaining."
+        
+        if attempts_left <= 0:
+            message = "Maximum attempts reached. Please upload a photo instead."
+        
         # Return incorrect response
         return Response({
             'correct': False,
             'already_answered': False,
             'points': 0,
+            'attempts_left': attempts_left,
+            'message': message
         }, status=status.HTTP_200_OK) 
