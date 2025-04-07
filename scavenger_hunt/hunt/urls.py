@@ -13,6 +13,8 @@ urlpatterns = [
     path('riddles/<int:riddle_id>/', views.riddle_detail, name='riddle_detail'),
     path('join-game-session/', views.join_game_session, name='join_game_session'),
     path('join-team/', views.join_team, name='join_team'),
+    path('join-team/<int:team_id>/', views.join_team, name='join_team'),
+    path('leave-team/<int:team_id>/', views.leave_team, name='leave_team'),
     path('register-team/', views.register_team, name='register_team'),
     path('assign-riddles/', views.assign_riddles, name='assign_riddles'),
     path('leaderboard/', views.leaderboard, name='leaderboard'),
@@ -60,4 +62,6 @@ urlpatterns = [
     path('api/team/<int:team_id>/race/', views.get_team_race, name='get_team_race'),
     path('api/upload-photo/', views.upload_photo_api, name='upload_photo_api'),
     path('api/leaderboard-data/', views.leaderboard_data_api, name='leaderboard_data_api'),
+    path('api/save-question-index/', views.save_question_index, name='save_question_index'),
+    path('api/trigger-leaderboard-update/', views.trigger_leaderboard_update, name='trigger_leaderboard_update'),
 ]

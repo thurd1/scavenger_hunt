@@ -51,40 +51,40 @@
                                     <div class="zone mb-5" id="zone-{{ zone.id }}">
                                         <h2 class="zone-title mb-4">Zone: {{ zone.name }}</h2>
                                         
-                                        {% for question in questions %}
-                                            <div class="question-card mb-5" id="question-{{ question.id }}">
-                                                <h3 class="question-title mb-4">Question {{ forloop.counter }}</h3>
-                                                <div class="question-text mb-5">{{ question.text }}</div>
-                                                
-                                                <div class="answer-form">
-                                                    <form id="answer-form-{{ question.id }}" class="mb-4">
-                                                        <div class="form-group mb-4">
-                                                            <label for="answer-{{ question.id }}" class="mb-2">Your Answer:</label>
-                                                            <input type="text" id="answer-{{ question.id }}" class="form-control" placeholder="Enter your answer">
-                                                        </div>
-                                                        <div class="attempts-info mb-4">
-                                                            Attempts: <span id="attempts-{{ question.id }}">0</span>/3
-                                                        </div>
-                                                        <div class="points-info mb-4">
-                                                            Points: <span id="points-{{ question.id }}">3</span> for first try, 2 for second, 1 for third
-                                                        </div>
-                                                        <button type="button" class="btn btn-success btn-lg mt-3 submit-answer" data-question-id="{{ question.id }}">Submit Answer</button>
-                                                    </form>
-                                                    
-                                                    <div id="feedback-{{ question.id }}" class="feedback mt-4 mb-5" style="display: none;"></div>
-                                                    
-                                                    <div id="photo-upload-{{ question.id }}" class="photo-upload mt-4" style="display: none;">
-                                                        <p class="mb-3">You've used all 3 attempts. Please upload a photo instead:</p>
-                                                        <form id="photo-form-{{ question.id }}" class="mb-4" enctype="multipart/form-data">
-                                                            <div class="form-group mb-4">
-                                                                <input type="file" id="photo-{{ question.id }}" name="photo" class="form-control-file mb-3">
+                                        <!-- Current question container -->
+                                        <div id="questionContainer" class="question-container mb-4">
+                                            {% if questions %}
+                                                {% for question in questions %}
+                                                    <div class="question-card" id="question-{{ forloop.counter0 }}" data-question-id="{{ question.id }}" style="display: {% if forloop.first %}block{% else %}none{% endif %};">
+                                                        <h3 class="question-title">Question {{ forloop.counter }}</h3>
+                                                        <div class="question-text">{{ question.text }}</div>
+                                                        
+                                                        <form id="answer-form-{{ forloop.counter0 }}" class="answer-form mt-4">
+                                                            <div class="form-group">
+                                                                <label for="answer-{{ forloop.counter0 }}">Your Answer:</label>
+                                                                <input type="text" id="answer-{{ forloop.counter0 }}" name="answer" class="form-control" required>
                                                             </div>
-                                                            <button type="button" class="btn btn-success btn-lg mt-3 upload-photo" data-question-id="{{ question.id }}">Upload Photo</button>
+                                                            
+                                                            <div class="mt-3">
+                                                                <button type="button" class="btn btn-success submit-answer" data-question-id="{{ forloop.counter0 }}" data-db-question-id="{{ question.id }}">Submit Answer</button>
+                                                            </div>
+                                                            
+                                                            <div class="answer-feedback mt-3" id="feedback-{{ forloop.counter0 }}" style="display: none;"></div>
+                                                            <div class="mt-2">
+                                                                <span class="attempts-info">Attempts: <span id="attempts-{{ forloop.counter0 }}">0</span></span>
+                                                            </div>
+                                                            <div class="photo-upload mt-4" id="photo-upload-{{ forloop.counter0 }}" style="display: none;">
+                                                                <h4>Maximum attempts reached. Upload a photo instead:</h4>
+                                                                <input type="file" id="photo-{{ forloop.counter0 }}" class="form-control mt-3">
+                                                                <button type="button" class="btn btn-primary mt-3 upload-photo" data-question-id="{{ forloop.counter0 }}" data-db-question-id="{{ question.id }}">Upload Photo</button>
+                                                            </div>
                                                         </form>
                                                     </div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
+                                                {% endfor %}
+                                            {% else %}
+                                                <div class="alert alert-warning">No questions available.</div>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 {% endwith %}
                             {% endfor %}
@@ -261,6 +261,21 @@
 </style>
 
 <script>
+// Pre-process Django template variables to JavaScript variables
+const currentQuestionIndexFromServer = {% if current_question_index %}{{ current_question_index }}{% else %}0{% endif %};
+const totalPointsFromServer = {% if total_points %}{{ total_points }}{% else %}0{% endif %};
+
+// Store answers from server in a variable that JavaScript can process
+const answersFromServer = {
+{% for question_id, answer_data in answers_by_question.items %}
+    "{{ question_id }}": {
+        attempts: {{ answer_data.attempts }},
+        points: {{ answer_data.points_awarded }},
+        answered: {{ answer_data.answered_correctly|yesno:"true,false" }}
+    }{% if not forloop.last %},{% endif %}
+{% endfor %}
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     // Simple way to handle the conditional logic without template tags in JS
     const questionContainer = document.getElementById('question-container');
@@ -269,46 +284,17 @@ document.addEventListener('DOMContentLoaded', function() {
     if (questionContainer) {
         // We're in questions display mode
         // Keep track of current question index
-        let currentQuestionIndex = 0;
+        let currentQuestionIndex = currentQuestionIndexFromServer;
         
         // Collect all questions
         const questions = document.querySelectorAll('.question-card');
         const totalQuestions = questions.length;
         
-        // Hide all questions initially except the first one
-        for (let i = 1; i < questions.length; i++) {
-            questions[i].style.display = 'none';
+        // Initialize total score
+        const totalScoreElement = document.getElementById('total-score');
+        if (totalScoreElement) {
+            totalScoreElement.textContent = totalPointsFromServer;
         }
-        
-        // Update the question counter
-        const updateQuestionCounter = function() {
-            const nextButton = document.getElementById('next-question');
-            
-            // Disable/enable next button
-            if (currentQuestionIndex === totalQuestions - 1) {
-                nextButton.disabled = true;
-            } else {
-                nextButton.disabled = false;
-            }
-        };
-        
-        // Initialize question counter
-        updateQuestionCounter();
-        
-        // Next button event listener
-        document.getElementById('next-question').addEventListener('click', function() {
-            if (currentQuestionIndex < totalQuestions - 1) {
-                questions[currentQuestionIndex].style.display = 'none';
-                currentQuestionIndex++;
-                questions[currentQuestionIndex].style.display = 'block';
-                updateQuestionCounter();
-            }
-        });
-        
-        // Show navigation buttons
-        const showNavigationButtons = function() {
-            document.getElementById('navigation-buttons').style.display = 'flex';
-        };
         
         // Track attempts and points for each question
         const questionData = {};
@@ -320,27 +306,202 @@ document.addEventListener('DOMContentLoaded', function() {
                 attempts: 0,
                 points: 0,
                 maxAttempts: 3,
-                photoUploaded: false
+                photoUploaded: false,
+                answered: false
             };
+            
+            // Apply data from server if available
+            if (answersFromServer[questionId]) {
+                const serverData = answersFromServer[questionId];
+                questionData[questionId].attempts = serverData.attempts;
+                questionData[questionId].points = serverData.points;
+                questionData[questionId].answered = serverData.answered;
+                
+                // Update UI to match the state
+                const attemptsElement = document.getElementById(`attempts-${questionId}`);
+                if (attemptsElement) {
+                    attemptsElement.textContent = serverData.attempts;
+                }
+                
+                // If question was already answered correctly, show feedback and disable submission
+                if (serverData.answered) {
+                    const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                    if (feedbackElement) {
+                        feedbackElement.className = 'feedback correct';
+                        feedbackElement.style.display = 'block';
+                        feedbackElement.textContent = `Correct! You earned ${serverData.points} points.`;
+                    }
+                    
+                    // Disable answer submission
+                    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
+                }
+                
+                // If max attempts reached, show photo upload
+                if (serverData.attempts >= 3 && !serverData.answered) {
+                    showPhotoUpload(questionId);
+                }
+            }
         });
         
-        // Submit answer function
-        const submitAnswer = function(questionId, answer) {
+        // Hide all questions initially except the current one
+        for (let i = 0; i < questions.length; i++) {
+            if (i === currentQuestionIndex) {
+                questions[i].style.display = 'block';
+            } else {
+                questions[i].style.display = 'none';
+            }
+        }
+        
+        // Update the question counter
+        const updateQuestionCounter = function() {
+            const nextButton = document.getElementById('next-question');
+            const navigationButtons = document.getElementById('navigation-buttons');
+            
+            // Disable/enable next button
+            if (currentQuestionIndex >= totalQuestions - 1) {
+                nextButton.disabled = true;
+            } else {
+                nextButton.disabled = false;
+            }
+        };
+        
+        // Initialize question counter
+        updateQuestionCounter();
+        
+        // Initially hide navigation buttons - they'll only show after correct answer or photo upload
+        document.getElementById('navigation-buttons').style.display = 'none';
+        
+        // Next button event listener
+        document.getElementById('next-question').addEventListener('click', function() {
+            if (currentQuestionIndex < totalQuestions - 1) {
+                questions[currentQuestionIndex].style.display = 'none';
+                currentQuestionIndex++;
+                questions[currentQuestionIndex].style.display = 'block';
+                updateQuestionCounter();
+                
+                // Save current question index to server
+                saveCurrentQuestionIndex(currentQuestionIndex);
+                
+                // Hide navigation buttons for new question until it's answered correctly
+                const questionId = questions[currentQuestionIndex].id.split('-')[1];
+                if (questionData[questionId] && !questionData[questionId].answered && !questionData[questionId].photoUploaded) {
+                    document.getElementById('navigation-buttons').style.display = 'none';
+                }
+            }
+        });
+        
+        // Show navigation buttons only if we have any answered questions
+        const hasAnsweredQuestions = document.querySelectorAll('.feedback.correct').length > 0;
+        if (hasAnsweredQuestions) {
+            // Only show if current question is already answered or has photo uploaded
+            const currentQuestionId = questions[currentQuestionIndex].id.split('-')[1];
+            if (questionData[currentQuestionId] && (questionData[currentQuestionId].answered || questionData[currentQuestionId].photoUploaded)) {
+                document.getElementById('navigation-buttons').style.display = 'block';
+            }
+        }
+
+        // Add event listeners for form submissions
+        document.querySelectorAll('.answer-form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const questionId = this.id.split('-')[2];
+                const answerInput = document.getElementById(`answer-${questionId}`);
+                if (answerInput && answerInput.value.trim()) {
+                    submitAnswer(questionId, answerInput.value);
+                }
+            });
+        });
+
+        // Add event listeners to submit buttons
+        document.querySelectorAll('.submit-answer').forEach(button => {
+            button.addEventListener('click', function() {
+                const questionId = this.getAttribute('data-question-id');
+                const answerInput = document.getElementById(`answer-${questionId}`);
+                if (answerInput && answerInput.value) {
+                    submitAnswer(questionId, answerInput.value);
+                }
+            });
+        });
+        
+        // Add event listeners to input fields to handle Enter key
+        document.querySelectorAll('input[id^="answer-"]').forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const questionId = this.id.split('-')[1];
+                    if (this.value) {
+                        submitAnswer(questionId, this.value);
+                    }
+                }
+            });
+        });
+        
+        // Function to handle answer submission
+        function submitAnswer(questionId, answer) {
             // Get the team code from the page
             const teamCode = '{{ team.code }}';
             
-            console.log(`Submitting answer for question ${questionId}: "${answer}"`);
+            // Get the actual database question ID
+            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+            if (!submitButton) {
+                console.error("Submit button not found");
+                return;
+            }
+            
+            const dbQuestionId = submitButton.getAttribute('data-db-question-id');
+            if (!dbQuestionId) {
+                console.error("Database question ID not found");
+                return;
+            }
+            
+            console.log(`Submitting answer for question ${dbQuestionId} (index: ${questionId}): "${answer}"`);
             console.log(`Team code: ${teamCode}`);
             
+            // Disable the submit button during processing to prevent double submission
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = "Checking...";
+            }
+            
+            // Check if this question was already answered correctly
+            if (questionData[questionId] && questionData[questionId].answered) {
+                const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                feedbackElement.className = 'feedback correct';
+                feedbackElement.style.display = 'block';
+                feedbackElement.textContent = `You've already correctly answered this question!`;
+                
+                // Re-enable the submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
+                
+                // Show navigation buttons
+                document.getElementById('navigation-buttons').style.display = 'block';
+                return;
+            }
+            
             // Check if max attempts reached
-            if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
+            if (questionData[questionId] && questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
                 showPhotoUpload(questionId);
+                
+                // Re-enable the submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
                 return;
             }
             
             // Increment attempts
             questionData[questionId].attempts++;
-            document.getElementById(`attempts-${questionId}`).textContent = questionData[questionId].attempts;
+            const attemptsElement = document.getElementById(`attempts-${questionId}`);
+            if (attemptsElement) {
+                attemptsElement.textContent = questionData[questionId].attempts;
+            }
             
             // Make API call to check answer
             fetch('/check-answer/', {
@@ -350,7 +511,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     'X-CSRFToken': getCookie('csrftoken')
                 },
                 body: JSON.stringify({
-                    question_id: questionId,
+                    question_id: dbQuestionId, // Use the database ID
                     answer: answer.trim(),
                     team_code: teamCode,
                     attempt_number: questionData[questionId].attempts
@@ -363,22 +524,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 const feedbackElement = document.getElementById(`feedback-${questionId}`);
                 feedbackElement.style.display = 'block';
                 
+                // Re-enable the submit button if needed
+                if (submitButton) {
+                    submitButton.textContent = "Submit Answer";
+                }
+                
+                if (data.already_answered) {
+                    // Question was already answered correctly before
+                    feedbackElement.className = 'feedback correct';
+                    feedbackElement.textContent = `You have already answered this question correctly.`;
+                    
+                    // Mark as answered
+                    questionData[questionId].answered = true;
+                    questionData[questionId].points = data.points;
+                    
+                    // Disable further submissions for this question
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
+                    
+                    // Show navigation buttons
+                    document.getElementById('navigation-buttons').style.display = 'block';
+                    
+                    return;
+                }
+                
                 if (data.correct) {
                     feedbackElement.className = 'feedback correct';
                     feedbackElement.textContent = `Correct! You earned ${data.points} points.`;
                     
                     // Update points
                     questionData[questionId].points = data.points;
+                    questionData[questionId].answered = true;
                     
                     // Update total score
                     updateTotalScore();
                     
                     // Disable further submissions for this question
-                    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
-                    submitButton.disabled = true;
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
                     
                     // Show navigation buttons
-                    showNavigationButtons();
+                    document.getElementById('navigation-buttons').style.display = 'block';
                     
                     // Automatically move to next question after a delay
                     setTimeout(() => {
@@ -390,6 +578,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     feedbackElement.className = 'feedback incorrect';
                     feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
                     
+                    // Re-enable the submit button for next attempt
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
+                    
                     // If max attempts reached, show photo upload
                     if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
                         showPhotoUpload(questionId);
@@ -399,17 +592,39 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Error checking answer:', error);
                 alert('Error checking answer. Please try again.');
+                
+                // Re-enable the submit button on error
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
             });
-        };
+        }
         
-        // Show photo upload form
-        const showPhotoUpload = function(questionId) {
-            const photoUploadElement = document.getElementById(`photo-upload-${questionId}`);
-            photoUploadElement.style.display = 'block';
+        // Save current question index to server
+        const saveCurrentQuestionIndex = function(index) {
+            const teamCode = '{{ team.code }}';
+            const raceId = '{{ race.id }}';
             
-            // Disable answer submission
-            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
-            submitButton.disabled = true;
+            fetch('/api/save-question-index/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    team_code: teamCode,
+                    race_id: raceId,
+                    question_index: index
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Saved current question index:', data);
+            })
+            .catch(error => {
+                console.error('Error saving question index:', error);
+            });
         };
         
         // Update total score
@@ -421,14 +636,21 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('total-score').textContent = totalScore;
         };
         
-        // Add event listeners to submit buttons
-        document.querySelectorAll('.submit-answer').forEach(button => {
-            button.addEventListener('click', function() {
-                const questionId = this.getAttribute('data-question-id');
-                const answerInput = document.getElementById(`answer-${questionId}`);
-                submitAnswer(questionId, answerInput.value);
-            });
-        });
+        // Show photo upload form
+        const showPhotoUpload = function(questionId) {
+            const photoUploadElement = document.getElementById(`photo-upload-${questionId}`);
+            photoUploadElement.style.display = 'block';
+            
+            // Disable answer submission
+            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            
+            // Do NOT show navigation buttons until photo is uploaded
+            // Instead, navigation buttons will be shown after photo upload is successful
+            document.getElementById('navigation-buttons').style.display = 'none';
+        };
         
         // Add event listeners to upload photo buttons
         document.querySelectorAll('.upload-photo').forEach(button => {
@@ -463,9 +685,28 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Get the actual database question ID
+        const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
+        if (!uploadButton) {
+            alert('Error: Cannot find upload button');
+            return;
+        }
+        
+        const dbQuestionId = uploadButton.getAttribute('data-db-question-id');
+        if (!dbQuestionId) {
+            alert('Error: Missing question ID');
+            return;
+        }
+        
+        // Show loading indicator
+        if (uploadButton) {
+            uploadButton.disabled = true;
+            uploadButton.textContent = "Uploading...";
+        }
+        
         const formData = new FormData();
         formData.append('photo', photoInput.files[0]);
-        formData.append('question_id', questionId);
+        formData.append('question_id', dbQuestionId); // Use the database ID
         formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
         
         // Get the team code
@@ -490,19 +731,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Mark photo as uploaded
                 questionData[questionId].photoUploaded = true;
                 
-                // Show navigation buttons
-                showNavigationButtons();
+                // Only NOW show navigation buttons - after successful photo upload
+                document.getElementById('navigation-buttons').style.display = 'block';
                 
                 // Disable upload button
-                const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
-                uploadButton.disabled = true;
+                if (uploadButton) {
+                    uploadButton.disabled = true;
+                    uploadButton.textContent = "Uploaded ✓";
+                }
             } else {
                 alert('Error uploading photo: ' + (data.error || 'Unknown error'));
+                
+                // Re-enable upload button on error
+                if (uploadButton) {
+                    uploadButton.disabled = false;
+                    uploadButton.textContent = "Upload Photo";
+                }
             }
         })
         .catch(error => {
             console.error('Error uploading photo:', error);
             alert('Error uploading photo. Please try again.');
+            
+            // Re-enable upload button on error
+            if (uploadButton) {
+                uploadButton.disabled = false;
+                uploadButton.textContent = "Upload Photo";
+            }
         });
     }
 });

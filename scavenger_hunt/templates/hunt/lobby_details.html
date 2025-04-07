@@ -284,16 +284,30 @@
     .btn-cancel {
         background-color: #6c757d;
     }
+    
+    /* Styles for real-time notifications */
+    .race-started-alert {
+        padding: 15px;
+        margin-top: 20px;
+        border-radius: 8px;
+        background-color: rgba(40, 167, 69, 0.2);
+        border: 1px solid rgba(40, 167, 69, 0.4);
+        color: #28a745;
+        text-align: center;
+        font-weight: bold;
+        transition: opacity 0.3s;
+    }
 </style>
 
 {% endblock %}
 
-{% block scripts %}
-<script src="{% static 'hunt/js/race-websocket.js' %}"></script>
+{% block extra_js %}
+<script src="{% static 'hunt/js/lobby-websocket.js' %}"></script>
 <script>
-    const lobbyId = {{ lobby.id }};
+    // Global variable to store the team ID to delete
     let teamIdToDelete = null;
     
+    // Get CSRF token from cookies
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -310,7 +324,7 @@
     }
     
     function showModal() {
-        document.getElementById('deleteConfirmModal').style.display = 'flex';
+        document.getElementById('deleteConfirmModal').style.display = 'block';
     }
     
     function closeModal() {
@@ -399,5 +413,11 @@
             closeModal();
         }
     }
+    
+    // Initialize WebSocket when the DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set the lobby ID for the WebSocket connection
+        window.lobbyId = '{{ lobby.id }}';
+    });
 </script>
 {% endblock %}
