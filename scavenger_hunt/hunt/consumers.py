@@ -1,7 +1,7 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import Team, TeamMember, Lobby
+from .models import Team, TeamMember, Lobby, TeamRaceProgress
 import logging
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -9,6 +9,7 @@ from asgiref.sync import sync_to_async
 from django.utils import timezone
 import asyncio
 from datetime import datetime
+from django.db.models import Sum
 
 logger = logging.getLogger(__name__)
 
@@ -459,3 +460,58 @@ class RaceConsumer(AsyncWebsocketConsumer):
         }))
         
         logging.info(f"Sent race_started event to client in race {self.race_id}") 
+
+class LeaderboardConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        # Join leaderboard group
+        await async_to_sync(self.channel_layer.group_add)(
+            "leaderboard",
+            self.channel_name
+        )
+
+        # Accept the connection
+        await self.accept()
+        
+        # Send initial leaderboard data
+        await self.send_leaderboard_data()
+
+    async def disconnect(self, close_code):
+        # Leave leaderboard group
+        await async_to_sync(self.channel_layer.group_discard)(
+            "leaderboard",
+            self.channel_name
+        )
+
+    async def receive(self, text_data):
+        # We don't expect to receive anything from clients,
+        # but if we do, we can handle it here
+        pass
+
+    async def leaderboard_update(self, event):
+        # Send leaderboard update to WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'leaderboard_update',
+            'teams': event['teams']
+        }))
+    
+    async def send_leaderboard_data(self):
+        # Get all teams with their scores
+        teams_data = []
+        teams = Team.objects.all()
+        
+        for team in teams:
+            # Get total score from TeamRaceProgress
+            total_score = TeamRaceProgress.objects.filter(team=team).aggregate(Sum('total_points'))['total_points__sum'] or 0
+            
+            # Get team data
+            teams_data.append({
+                'id': team.id,
+                'name': team.name,
+                'score': total_score
+            })
+        
+        # Send to WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'leaderboard_update',
+            'teams': teams_data
+        })) 

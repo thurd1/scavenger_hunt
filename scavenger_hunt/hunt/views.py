@@ -21,6 +21,7 @@ import string
 import json
 from django.core.serializers.json import DjangoJSONEncoder
 from datetime import datetime, timedelta
+from django.db import models
 
 logger = logging.getLogger(__name__)
 
@@ -501,7 +502,46 @@ def assign_riddles(request):
     return HttpResponse("Riddles. wow.")
 
 def leaderboard(request):
-    return render(request, 'hunt/leaderboard.html')
+    # Get all teams with their scores
+    teams = Team.objects.all()
+    teams_data = []
+    
+    for team in teams:
+        # Get total score from TeamRaceProgress
+        total_score = TeamRaceProgress.objects.filter(team=team).aggregate(models.Sum('total_points'))['total_points__sum'] or 0
+        
+        # Add team with score
+        team.score = total_score
+        teams_data.append(team)
+    
+    # Sort by score
+    teams_data.sort(key=lambda x: x.score, reverse=True)
+    
+    return render(request, 'hunt/leaderboard.html', {'teams': teams_data})
+
+def leaderboard_data(request):
+    """API endpoint to get leaderboard data for real-time updates"""
+    teams = Team.objects.all()
+    teams_data = []
+    
+    for team in teams:
+        # Get total score from TeamRaceProgress
+        total_score = TeamRaceProgress.objects.filter(team=team).aggregate(models.Sum('total_points'))['total_points__sum'] or 0
+        
+        # Add team data
+        teams_data.append({
+            'id': team.id,
+            'name': team.name,
+            'score': total_score
+        })
+    
+    # Sort by score
+    teams_data.sort(key=lambda x: x['score'], reverse=True)
+    
+    return JsonResponse({
+        'success': True,
+        'teams': teams_data
+    })
 
 def team_details(request, team_id):
     team = Team.objects.get(id=team_id)

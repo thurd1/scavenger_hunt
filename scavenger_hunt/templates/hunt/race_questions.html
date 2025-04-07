@@ -91,8 +91,8 @@
                             
                             <!-- Navigation buttons -->
                             <div class="navigation-buttons d-flex justify-content-between mt-4" style="display: none;" id="navigation-buttons">
-                                <button id="prev-question" class="btn btn-secondary">Previous</button>
-                                <button id="next-question" class="btn btn-primary">Next</button>
+                                <button id="prev-question" class="btn btn-success">Previous</button>
+                                <button id="next-question" class="btn btn-success">Next</button>
                             </div>
                         </div>
                     </div>
@@ -286,6 +286,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Get the team code from the page
             const teamCode = '{{ team.code }}';
             
+            console.log(`Submitting answer for question ${questionId}: "${answer}"`);
+            console.log(`Team code: ${teamCode}`);
+            
             // Check if max attempts reached
             if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
                 showPhotoUpload(questionId);
@@ -305,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     question_id: questionId,
-                    answer: answer,
+                    answer: answer.trim(),
                     team_code: teamCode,
                     attempt_number: questionData[questionId].attempts
                 })

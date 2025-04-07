@@ -59,4 +59,5 @@ urlpatterns = [
     path('race/<int:race_id>/status/', views.check_race_status, name='check_race_status'),
     path('api/team/<int:team_id>/race/', views.get_team_race, name='get_team_race'),
     path('api/upload-photo/', views.upload_photo_api, name='upload_photo_api'),
+    path('api/leaderboard-data/', views.leaderboard_data, name='leaderboard_data'),
 ]

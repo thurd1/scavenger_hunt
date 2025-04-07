@@ -10,7 +10,7 @@
     <div class="container">
         <div class="dashboard-box">
             <h2 style="color: #90C83C" class="mb-4">Leaderboard</h2>
-            <div class="table-responsive mb-4">
+            <div id="leaderboard-container" class="table-responsive mb-4">
                 <table class="w-100">
                     <thead>
                         <tr>
@@ -18,11 +18,11 @@
                             <th>Score</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="leaderboard-body">
                         {% for team in teams %}
-                        <tr>
-                            <td>{{ team.name }}</td>
-                            <td>{{ team.score }}</td>
+                        <tr class="team-row" data-team-id="{{ team.id }}">
+                            <td class="team-name">{{ team.name }}</td>
+                            <td class="team-score">{{ team.score }}</td>
                         </tr>
                         {% empty %}
                         <tr>
@@ -75,5 +75,122 @@
         display: grid;
         gap: 1rem;
     }
+    .team-row.updated {
+        animation: highlight 2s ease-in-out;
+    }
+    @keyframes highlight {
+        0% { background-color: rgba(144, 200, 60, 0.4); }
+        100% { background-color: transparent; }
+    }
     </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Connect to WebSocket for real-time updates
+            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+            const socket = new WebSocket(
+                protocol + window.location.host + '/ws/leaderboard/'
+            );
+
+            // Handle incoming messages
+            socket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                console.log('Received WebSocket message:', data);
+                
+                if (data.type === 'leaderboard_update') {
+                    updateLeaderboard(data.teams);
+                }
+            };
+
+            socket.onclose = function(e) {
+                console.error('WebSocket closed unexpectedly');
+            };
+
+            socket.onerror = function(e) {
+                console.error('WebSocket error:', e);
+            };
+
+            // Function to update the leaderboard
+            function updateLeaderboard(teams) {
+                const leaderboardBody = document.getElementById('leaderboard-body');
+                
+                if (!teams || teams.length === 0) {
+                    leaderboardBody.innerHTML = '<tr><td colspan="2" class="text-center">No teams available</td></tr>';
+                    return;
+                }
+                
+                // Sort teams by score (highest first)
+                teams.sort((a, b) => b.score - a.score);
+                
+                // Keep track of existing team rows
+                const existingTeams = {};
+                document.querySelectorAll('.team-row').forEach(row => {
+                    existingTeams[row.dataset.teamId] = row;
+                });
+                
+                // Clear the table
+                leaderboardBody.innerHTML = '';
+                
+                // Add each team to the table
+                teams.forEach(team => {
+                    let row;
+                    
+                    // Check if we already have this team in the table
+                    if (existingTeams[team.id]) {
+                        row = existingTeams[team.id];
+                        
+                        // Update score if changed
+                        const scoreCell = row.querySelector('.team-score');
+                        const currentScore = parseInt(scoreCell.textContent);
+                        
+                        if (currentScore !== team.score) {
+                            scoreCell.textContent = team.score;
+                            row.classList.add('updated');
+                            
+                            // Remove the highlight class after animation completes
+                            setTimeout(() => {
+                                row.classList.remove('updated');
+                            }, 2000);
+                        }
+                    } else {
+                        // Create new row for this team
+                        row = document.createElement('tr');
+                        row.className = 'team-row';
+                        row.dataset.teamId = team.id;
+                        
+                        const nameCell = document.createElement('td');
+                        nameCell.className = 'team-name';
+                        nameCell.textContent = team.name;
+                        
+                        const scoreCell = document.createElement('td');
+                        scoreCell.className = 'team-score';
+                        scoreCell.textContent = team.score;
+                        
+                        row.appendChild(nameCell);
+                        row.appendChild(scoreCell);
+                        row.classList.add('updated');
+                        
+                        // Remove the highlight class after animation completes
+                        setTimeout(() => {
+                            row.classList.remove('updated');
+                        }, 2000);
+                    }
+                    
+                    leaderboardBody.appendChild(row);
+                });
+            }
+
+            // Fetch initial leaderboard data
+            fetch('/api/leaderboard-data/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateLeaderboard(data.teams);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching leaderboard data:', error);
+                });
+        });
+    </script>
 {% endblock %}
