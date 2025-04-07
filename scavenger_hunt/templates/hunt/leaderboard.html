@@ -11,23 +11,36 @@
         <div class="dashboard-box p-4">
             <h2 style="color: #90C83C; text-align: center; margin-bottom: 2rem;">Leaderboard</h2>
             
+            <!-- Lobby Selector -->
+            <div class="lobby-selector mb-4">
+                <label for="lobby-select" class="mb-2" style="color: #90C83C; display: block;">Select Race:</label>
+                <select id="lobby-select" class="form-control custom-select">
+                    <option value="all" selected>All Races</option>
+                    {% for lobby in lobbies %}
+                        <option value="{{ lobby.id }}">{{ lobby.race.name }} (Code: {{ lobby.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
             <div id="leaderboard-container" class="table-responsive mb-4">
                 <table class="w-100">
                     <thead>
                         <tr>
                             <th>Team Name</th>
                             <th>Score</th>
+                            <th>Race</th>
                         </tr>
                     </thead>
                     <tbody id="leaderboard-body">
                         {% for team in teams %}
-                        <tr class="team-row" data-team-id="{{ team.id }}">
+                        <tr class="team-row" data-team-id="{{ team.id }}" data-lobby-id="{{ team.lobby_id }}">
                             <td class="team-name">{{ team.name }}</td>
                             <td class="team-score">{{ team.score }}</td>
+                            <td class="team-lobby">{{ team.lobby_name }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="2" class="text-center">No teams available</td>
+                            <td colspan="3" class="text-center">No teams available</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -45,6 +58,29 @@
         background-color: rgba(33, 37, 41, 0.9);
         border-radius: 15px;
         border: 1px solid rgba(144, 200, 60, 0.2);
+    }
+    
+    .lobby-selector {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+    }
+    
+    .custom-select {
+        background-color: rgba(33, 37, 41, 0.8);
+        color: white;
+        border: 1px solid rgba(144, 200, 60, 0.3);
+        padding: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    
+    .custom-select:focus {
+        border-color: #90C83C;
+        outline: none;
+        box-shadow: 0 0 0 0.2rem rgba(144, 200, 60, 0.25);
     }
     
     .table-responsive {
@@ -112,36 +148,73 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Leaderboard page loaded, connecting to WebSocket...');
+            
             // Connect to WebSocket for real-time updates
             const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
             const socket = new WebSocket(
                 protocol + window.location.host + '/ws/leaderboard/'
             );
 
-            // Handle incoming messages
+            // Handle WebSocket events
+            socket.onopen = function(e) {
+                console.log('WebSocket connection established');
+            };
+
             socket.onmessage = function(e) {
+                console.log('Received WebSocket message:', e.data);
                 const data = JSON.parse(e.data);
-                console.log('Received WebSocket message:', data);
                 
                 if (data.type === 'leaderboard_update') {
+                    console.log('Leaderboard update received:', data.teams);
                     updateLeaderboard(data.teams);
                 }
             };
 
             socket.onclose = function(e) {
-                console.error('WebSocket closed unexpectedly');
+                console.error('WebSocket closed unexpectedly', e);
             };
 
             socket.onerror = function(e) {
-                console.error('WebSocket error:', e);
+                console.error('WebSocket error occurred:', e);
             };
+            
+            // Handle lobby selector changes
+            const lobbySelector = document.getElementById('lobby-select');
+            lobbySelector.addEventListener('change', function() {
+                const selectedLobbyId = this.value;
+                filterLeaderboardByLobby(selectedLobbyId);
+            });
+
+            // Function to filter leaderboard by lobby
+            function filterLeaderboardByLobby(lobbyId) {
+                const rows = document.querySelectorAll('.team-row');
+                
+                if (lobbyId === 'all') {
+                    // Show all teams
+                    rows.forEach(row => {
+                        row.style.display = '';
+                    });
+                } else {
+                    // Show only teams in the selected lobby
+                    rows.forEach(row => {
+                        const teamLobbyId = row.getAttribute('data-lobby-id');
+                        if (teamLobbyId === lobbyId) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+                }
+            }
 
             // Function to update the leaderboard
             function updateLeaderboard(teams) {
                 const leaderboardBody = document.getElementById('leaderboard-body');
+                const selectedLobbyId = document.getElementById('lobby-select').value;
                 
                 if (!teams || teams.length === 0) {
-                    leaderboardBody.innerHTML = '<tr><td colspan="2" class="text-center">No teams available</td></tr>';
+                    leaderboardBody.innerHTML = '<tr><td colspan="3" class="text-center">No teams available</td></tr>';
                     return;
                 }
                 
@@ -183,6 +256,7 @@
                         row = document.createElement('tr');
                         row.className = 'team-row';
                         row.dataset.teamId = team.id;
+                        row.dataset.lobbyId = team.lobby_id || '';
                         
                         const nameCell = document.createElement('td');
                         nameCell.className = 'team-name';
@@ -192,9 +266,19 @@
                         scoreCell.className = 'team-score';
                         scoreCell.textContent = team.score;
                         
+                        const lobbyCell = document.createElement('td');
+                        lobbyCell.className = 'team-lobby';
+                        lobbyCell.textContent = team.lobby_name || 'Unknown';
+                        
                         row.appendChild(nameCell);
                         row.appendChild(scoreCell);
+                        row.appendChild(lobbyCell);
                         row.classList.add('updated');
+                        
+                        // Apply filter based on current selection
+                        if (selectedLobbyId !== 'all' && team.lobby_id !== selectedLobbyId) {
+                            row.style.display = 'none';
+                        }
                         
                         // Remove the highlight class after animation completes
                         setTimeout(() => {

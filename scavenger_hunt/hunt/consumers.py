@@ -463,35 +463,32 @@ class RaceConsumer(AsyncWebsocketConsumer):
 
 class LeaderboardConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        # Join leaderboard group
+        # Join the leaderboard group
         await self.channel_layer.group_add(
             "leaderboard",
             self.channel_name
         )
-
-        # Accept the connection
         await self.accept()
-        
-        # Send initial leaderboard data
-        await self.send_leaderboard_data()
 
     async def disconnect(self, close_code):
-        # Leave leaderboard group
+        # Leave the leaderboard group
         await self.channel_layer.group_discard(
             "leaderboard",
             self.channel_name
         )
 
+    # Receive message from WebSocket (not used but needed for completeness)
     async def receive(self, text_data):
-        # We don't expect to receive anything from clients,
-        # but if we do, we can handle it here
         pass
 
+    # Receive message from the leaderboard group
     async def leaderboard_update(self, event):
-        # Send leaderboard update to WebSocket
+        teams = event['teams']
+        
+        # Send message to WebSocket
         await self.send(text_data=json.dumps({
             'type': 'leaderboard_update',
-            'teams': event['teams']
+            'teams': teams
         }))
     
     async def send_leaderboard_data(self):

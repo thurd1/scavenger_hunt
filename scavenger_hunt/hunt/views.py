@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question, TeamAnswer, TeamRaceProgress
+from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question, TeamAnswer, TeamRaceProgress, TeamProgress
 from django.http import JsonResponse
 from .forms import JoinLobbyForm, LobbyForm, TeamForm
 from django.http import HttpResponse
@@ -22,6 +22,7 @@ import json
 from django.core.serializers.json import DjangoJSONEncoder
 from datetime import datetime, timedelta
 from django.db import models
+from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger(__name__)
 
@@ -502,45 +503,67 @@ def assign_riddles(request):
     return HttpResponse("Riddles. wow.")
 
 def leaderboard(request):
-    # Get all teams with their scores
-    teams = Team.objects.all()
-    teams_data = []
+    """
+    Display the leaderboard for all races.
+    """
+    teams = []
     
-    for team in teams:
-        # Get total score from TeamRaceProgress
-        total_score = TeamRaceProgress.objects.filter(team=team).aggregate(models.Sum('total_points'))['total_points__sum'] or 0
-        
-        # Add team with score
-        team.score = total_score
-        teams_data.append(team)
+    # Get all team progress records
+    team_progress_list = TeamProgress.objects.select_related('team', 'team__lobby', 'team__lobby__race')
     
-    # Sort by score
-    teams_data.sort(key=lambda x: x.score, reverse=True)
+    # Organize teams by their total scores
+    for team_progress in team_progress_list:
+        team = team_progress.team
+        if team and team.lobby:
+            teams.append({
+                'id': team.id,
+                'name': team.name,
+                'score': team_progress.total_score,
+                'lobby_id': team.lobby.id,
+                'lobby_name': team.lobby.race.name if team.lobby.race else 'Unknown Race'
+            })
     
-    return render(request, 'hunt/leaderboard.html', {'teams': teams_data})
+    # Sort teams by score (highest first)
+    teams.sort(key=lambda x: x['score'], reverse=True)
+    
+    # Get all active lobbies for the selector
+    lobbies = Lobby.objects.filter(is_active=True).select_related('race')
+    
+    context = {
+        'teams': teams,
+        'lobbies': lobbies
+    }
+    
+    return render(request, 'hunt/leaderboard.html', context)
 
-def leaderboard_data(request):
-    """API endpoint to get leaderboard data for real-time updates"""
-    teams = Team.objects.all()
-    teams_data = []
+@csrf_exempt
+def leaderboard_data_api(request):
+    """
+    API endpoint to get leaderboard data in JSON format.
+    """
+    teams = []
     
-    for team in teams:
-        # Get total score from TeamRaceProgress
-        total_score = TeamRaceProgress.objects.filter(team=team).aggregate(models.Sum('total_points'))['total_points__sum'] or 0
-        
-        # Add team data
-        teams_data.append({
-            'id': team.id,
-            'name': team.name,
-            'score': total_score
-        })
+    # Get all team progress records
+    team_progress_list = TeamProgress.objects.select_related('team', 'team__lobby', 'team__lobby__race')
     
-    # Sort by score
-    teams_data.sort(key=lambda x: x['score'], reverse=True)
+    # Organize teams by their total scores
+    for team_progress in team_progress_list:
+        team = team_progress.team
+        if team and team.lobby:
+            teams.append({
+                'id': team.id,
+                'name': team.name,
+                'score': team_progress.total_score,
+                'lobby_id': team.lobby.id,
+                'lobby_name': team.lobby.race.name if team.lobby.race else 'Unknown Race'
+            })
+    
+    # Sort teams by score (highest first)
+    teams.sort(key=lambda x: x['score'], reverse=True)
     
     return JsonResponse({
         'success': True,
-        'teams': teams_data
+        'teams': teams
     })
 
 def team_details(request, team_id):
@@ -637,9 +660,23 @@ def toggle_lobby(request, lobby_id):
 
 @require_POST
 def delete_lobby(request, lobby_id):
-        lobby = get_object_or_404(Lobby, id=lobby_id)
+    """Delete a lobby and all teams associated with it"""
+    try:
+        lobby = Lobby.objects.get(id=lobby_id)
+        
+        # Store associated teams for deletion
+        teams_to_delete = list(lobby.teams.all())
+        
+        # Delete the lobby
         lobby.delete()
-        return JsonResponse({'status': 'success'})
+        
+        # Now delete all the teams that were in this lobby
+        for team in teams_to_delete:
+            team.delete()
+            
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 @require_POST
 def delete_team(request, team_id):
@@ -1208,6 +1245,41 @@ def check_answer(request):
                     if not created:
                         team_race_progress.total_points += points
                         team_race_progress.save()
+                    
+                    # Update team progress (for overall leaderboard)
+                    team_progress, created = TeamProgress.objects.get_or_create(
+                        team=team,
+                        defaults={'total_score': 0}
+                    )
+                    team_progress.total_score = team_race_progress.total_points
+                    team_progress.save()
+                    
+                    # Also update WebSocket for real-time leaderboard updates
+                    try:
+                        # Get all team progress records with related team and lobby info
+                        teams_data = []
+                        for tp in TeamProgress.objects.select_related('team', 'team__lobby', 'team__lobby__race'):
+                            if tp.team and tp.team.lobby:
+                                teams_data.append({
+                                    'id': tp.team.id,
+                                    'name': tp.team.name,
+                                    'score': tp.total_score,
+                                    'lobby_id': tp.team.lobby.id,
+                                    'lobby_name': tp.team.lobby.race.name if tp.team.lobby.race else 'Unknown Race'
+                                })
+                        
+                        # Send update to channel layer
+                        channel_layer = get_channel_layer()
+                        async_to_sync(channel_layer.group_send)(
+                            "leaderboard",
+                            {
+                                "type": "leaderboard_update",
+                                "teams": teams_data
+                            }
+                        )
+                    except Exception as e:
+                        # Log exception but don't interrupt the flow
+                        logger.error(f"Error sending WebSocket update: {str(e)}")
                 except Exception as e:
                     print(f"Error updating team race progress: {e}")
             
@@ -1537,7 +1609,6 @@ def upload_photo_api(request):
         team_answer.save()
         
         # Also update/create team progress
-        from .models import TeamProgress
         team_progress, created = TeamProgress.objects.get_or_create(
             team=team,
             question=question,
