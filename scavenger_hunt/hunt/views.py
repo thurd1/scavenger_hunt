@@ -1227,6 +1227,23 @@ def check_answer(request):
             except Team.DoesNotExist:
                 return JsonResponse({'success': False, 'error': 'Team not found'})
             
+            # First check if this question has already been answered correctly by this team
+            existing_answer = TeamAnswer.objects.filter(
+                team=team,
+                question=question,
+                answered_correctly=True
+            ).first()
+            
+            if existing_answer:
+                # Question already answered correctly, return the previous points without adding new ones
+                return JsonResponse({
+                    'success': True,
+                    'correct': True,
+                    'points': existing_answer.points_awarded,
+                    'already_answered': True,
+                    'message': 'You have already answered this question correctly'
+                })
+            
             # Check if the answer is correct (case-insensitive comparison)
             is_correct = answer.lower().strip() == question.answer.lower().strip()
             
@@ -1235,7 +1252,7 @@ def check_answer(request):
             
             # If correct, record the answer
             if is_correct:
-                # Check if we already have this answer recorded
+                # Get or create the answer record
                 answer_record, created = TeamAnswer.objects.get_or_create(
                     team=team,
                     question=question,
@@ -1247,11 +1264,15 @@ def check_answer(request):
                 )
                 
                 if not created:
-                    # Update existing record
-                    answer_record.answered_correctly = True
-                    answer_record.attempts = attempt_number
-                    answer_record.points_awarded = points
-                    answer_record.save()
+                    # Update existing record if not already correct
+                    if not answer_record.answered_correctly:
+                        answer_record.answered_correctly = True
+                        answer_record.attempts = attempt_number
+                        answer_record.points_awarded = points
+                        answer_record.save()
+                    else:
+                        # Already answered correctly, don't add points again
+                        points = answer_record.points_awarded
                 
                 # Update team's total score for this race (if applicable)
                 try:
@@ -1262,8 +1283,10 @@ def check_answer(request):
                     )
                     
                     if not created:
-                        team_race_progress.total_points += points
-                        team_race_progress.save()
+                        # Only update points if this is the first time answering correctly
+                        if created or (answer_record and answer_record.answered_correctly and not answer_record.answered_at):
+                            team_race_progress.total_points += points
+                            team_race_progress.save()
                     
                     # Update team progress (for overall leaderboard)
                     team_progress, created = TeamProgress.objects.get_or_create(
@@ -1308,6 +1331,21 @@ def check_answer(request):
                         logger.error(f"Error sending WebSocket update: {str(e)}")
                 except Exception as e:
                     print(f"Error updating team race progress: {e}")
+            else:
+                # Record the failed attempt
+                answer_record, created = TeamAnswer.objects.get_or_create(
+                    team=team,
+                    question=question,
+                    defaults={
+                        'answered_correctly': False,
+                        'attempts': attempt_number
+                    }
+                )
+                
+                if not created and not answer_record.answered_correctly:
+                    # Update attempt count for existing record
+                    answer_record.attempts = attempt_number
+                    answer_record.save()
             
             return JsonResponse({
                 'success': True,
@@ -1494,12 +1532,36 @@ def race_questions(request, race_id):
     for question in questions:
         questions_by_zone[question.zone.id].append(question)
     
+    # Get existing team answers
+    team_answers = TeamAnswer.objects.filter(team=team, question__zone__race=race)
+    
+    # Organize answers by question ID for easy lookup
+    answers_by_question = {}
+    for answer in team_answers:
+        answers_by_question[answer.question_id] = {
+            'answered_correctly': answer.answered_correctly,
+            'attempts': answer.attempts,
+            'points_awarded': answer.points_awarded
+        }
+    
+    # Get team race progress
+    team_race_progress = TeamRaceProgress.objects.filter(team=team, race=race).first()
+    current_question_index = 0
+    total_points = 0
+    
+    if team_race_progress:
+        current_question_index = team_race_progress.current_question_index
+        total_points = team_race_progress.total_points
+    
     context = {
         'race': race,
         'team': team,
         'team_member': team_member,
         'zones': zones,
         'questions_by_zone': questions_by_zone,
+        'answers_by_question': answers_by_question,
+        'current_question_index': current_question_index,
+        'total_points': total_points
     }
     
     return render(request, 'hunt/race_questions.html', context)
@@ -1659,5 +1721,48 @@ def upload_photo_api(request):
         
     except Question.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Question not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@csrf_exempt
+def save_question_index(request):
+    """API to save the current question index for a team in a race"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        team_code = data.get('team_code')
+        race_id = data.get('race_id')
+        question_index = data.get('question_index')
+        
+        if not all([team_code, race_id, question_index is not None]):
+            return JsonResponse({'success': False, 'error': 'Missing required fields'}, status=400)
+        
+        try:
+            team = Team.objects.get(code=team_code)
+            race = Race.objects.get(id=race_id)
+        except Team.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Team not found'}, status=404)
+        except Race.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Race not found'}, status=404)
+        
+        # Update or create team race progress
+        team_race_progress, created = TeamRaceProgress.objects.update_or_create(
+            team=team,
+            race=race,
+            defaults={'current_question_index': question_index}
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Question index saved successfully',
+            'team_id': team.id,
+            'race_id': race.id,
+            'question_index': question_index
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
