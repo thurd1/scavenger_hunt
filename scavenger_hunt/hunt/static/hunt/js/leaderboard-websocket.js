@@ -8,34 +8,90 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 3;
 let socket = null;
 
+// Export socket to window for external access
+window.socket = null;
+
+// Function to show debug info on page
+function showDebugInfo(message, isError = false) {
+    console.log(message);
+    
+    // Check if debug container exists, create if not
+    let debugContainer = document.getElementById('debug-container');
+    if (!debugContainer) {
+        debugContainer = document.createElement('div');
+        debugContainer.id = 'debug-container';
+        debugContainer.style.position = 'fixed';
+        debugContainer.style.bottom = '10px';
+        debugContainer.style.right = '10px';
+        debugContainer.style.width = '300px';
+        debugContainer.style.maxHeight = '150px';
+        debugContainer.style.overflowY = 'auto';
+        debugContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        debugContainer.style.color = '#fff';
+        debugContainer.style.padding = '10px';
+        debugContainer.style.borderRadius = '5px';
+        debugContainer.style.zIndex = '9999';
+        debugContainer.style.fontSize = '12px';
+        document.body.appendChild(debugContainer);
+    }
+    
+    // Add message
+    const msgElement = document.createElement('div');
+    msgElement.style.marginBottom = '5px';
+    msgElement.style.borderBottom = '1px solid rgba(255,255,255,0.2)';
+    msgElement.style.paddingBottom = '5px';
+    msgElement.style.color = isError ? '#ff6b6b' : '#90C83C';
+    msgElement.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+    
+    // Add to container (at top)
+    debugContainer.insertBefore(msgElement, debugContainer.firstChild);
+    
+    // Limit number of messages
+    if (debugContainer.children.length > 5) {
+        debugContainer.removeChild(debugContainer.lastChild);
+    }
+}
+
 // Function to initialize the WebSocket connection
 function initLeaderboardWebSocket() {
     // Set up WebSocket connection
     const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const socketUrl = `${wsScheme}//${window.location.host}/ws/leaderboard/`;
     
-    console.log(`Initializing leaderboard WebSocket connection to: ${socketUrl}`);
+    showDebugInfo(`Initializing WebSocket to: ${socketUrl}`);
     
-    // Create new WebSocket connection
-    socket = new WebSocket(socketUrl);
-    
-    // Setup event handlers
-    socket.onopen = handleSocketOpen;
-    socket.onmessage = handleSocketMessage;
-    socket.onclose = handleSocketClose;
-    socket.onerror = handleSocketError;
-    
-    return socket;
+    try {
+        // Create new WebSocket connection
+        socket = new WebSocket(socketUrl);
+        window.socket = socket; // Make accessible to window
+        
+        // Setup event handlers
+        socket.onopen = handleSocketOpen;
+        socket.onmessage = handleSocketMessage;
+        socket.onclose = handleSocketClose;
+        socket.onerror = handleSocketError;
+        
+        return socket;
+    } catch (error) {
+        showDebugInfo(`Error creating WebSocket: ${error.message}`, true);
+        return null;
+    }
 }
 
 // Handle WebSocket open event
 function handleSocketOpen(event) {
-    console.log('Leaderboard WebSocket connection established');
+    showDebugInfo('WebSocket connection established successfully');
     reconnectAttempts = 0; // Reset reconnect attempts on successful connection
     
     // Add a connected indicator to the page
     const dashboardBox = document.querySelector('.dashboard-box');
     if (dashboardBox) {
+        // Remove any existing status indicator
+        const existingStatus = document.getElementById('websocket-status');
+        if (existingStatus) {
+            existingStatus.remove();
+        }
+        
         const statusIndicator = document.createElement('div');
         statusIndicator.id = 'websocket-status';
         statusIndicator.className = 'websocket-status connected';
@@ -43,7 +99,16 @@ function handleSocketOpen(event) {
         dashboardBox.prepend(statusIndicator);
     }
     
+    // Update the real-time indicator if it exists
+    const rtIndicator = document.getElementById('realtime-indicator');
+    if (rtIndicator) {
+        rtIndicator.style.backgroundColor = 'rgba(144, 200, 60, 0.2) !important';
+        rtIndicator.style.color = '#90C83C !important';
+        rtIndicator.innerHTML = '<span class="pulse-dot">●</span> Live Updates Active';
+    }
+    
     // Request initial data
+    showDebugInfo('Requesting initial leaderboard data...');
     socket.send(JSON.stringify({
         action: 'get_data'
     }));
@@ -53,25 +118,39 @@ function handleSocketOpen(event) {
 function handleSocketMessage(event) {
     try {
         const data = JSON.parse(event.data);
-        console.log('Received leaderboard WebSocket message:', data);
+        showDebugInfo(`Received message: ${data.type}`);
         
         if (data.type === 'leaderboard_update') {
+            showDebugInfo(`Updating leaderboard with ${data.teams.length} teams`);
             updateLeaderboard(data.teams);
+        } else if (data.type === 'error') {
+            showDebugInfo(`Server reported error: ${data.message}`, true);
+        } else {
+            showDebugInfo(`Unhandled message type: ${data.type}`);
         }
     } catch (error) {
-        console.error('Error processing WebSocket message:', error);
+        showDebugInfo(`Error processing message: ${error.message}`, true);
+        showDebugInfo(`Raw message data: ${event.data}`, true);
     }
 }
 
 // Handle WebSocket close event
 function handleSocketClose(event) {
-    console.log(`Leaderboard WebSocket connection closed. Code: ${event.code}, Reason: ${event.reason}`);
+    showDebugInfo(`WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`, true);
     
     // Update status indicator
     const statusIndicator = document.getElementById('websocket-status');
     if (statusIndicator) {
         statusIndicator.className = 'websocket-status disconnected';
         statusIndicator.textContent = '● Live Updates Disconnected - Reconnecting...';
+    }
+    
+    // Update the real-time indicator if it exists
+    const rtIndicator = document.getElementById('realtime-indicator');
+    if (rtIndicator) {
+        rtIndicator.style.backgroundColor = 'rgba(220, 53, 69, 0.2) !important';
+        rtIndicator.style.color = '#dc3545 !important';
+        rtIndicator.innerHTML = '<span class="pulse-dot">●</span> Reconnecting...';
     }
     
     // Attempt to reconnect if not closing intentionally
@@ -82,13 +161,21 @@ function handleSocketClose(event) {
 
 // Handle WebSocket errors
 function handleSocketError(error) {
-    console.error('Leaderboard WebSocket error:', error);
+    showDebugInfo(`WebSocket error: ${error.message || 'Unknown error'}`, true);
     
     // Update status indicator
     const statusIndicator = document.getElementById('websocket-status');
     if (statusIndicator) {
         statusIndicator.className = 'websocket-status error';
         statusIndicator.textContent = '● Connection Error';
+    }
+    
+    // Update the real-time indicator if it exists
+    const rtIndicator = document.getElementById('realtime-indicator');
+    if (rtIndicator) {
+        rtIndicator.style.backgroundColor = 'rgba(220, 53, 69, 0.2) !important';
+        rtIndicator.style.color = '#dc3545 !important';
+        rtIndicator.innerHTML = '<span class="pulse-dot">●</span> Connection Error';
     }
 }
 
@@ -159,10 +246,17 @@ function fetchLeaderboardData() {
                 updateLeaderboard(data.teams);
             } else {
                 console.error('API returned error:', data.error);
+                
+                // If API doesn't exist, try a simple page refresh as last resort
+                if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS * 2) {
+                    console.log('API polling failed too many times, refreshing page...');
+                    window.location.reload();
+                }
             }
         })
         .catch(error => {
             console.error('Error fetching leaderboard data:', error);
+            reconnectAttempts++;
         });
 }
 
@@ -180,6 +274,8 @@ function updateLeaderboard(teams) {
         leaderboardBody.innerHTML = '<tr><td colspan="3" class="text-center">No teams available</td></tr>';
         return;
     }
+    
+    console.log(`Updating leaderboard with ${teams.length} teams, filtering by lobby: ${selectedLobbyId}`);
     
     // Get current teams for comparison (to highlight changes)
     const currentTeams = {};
@@ -233,6 +329,7 @@ function updateLeaderboard(teams) {
         if (currentTeams[team.id]) {
             const currentScore = currentTeams[team.id].score;
             if (team.score > currentScore) {
+                console.log(`Team ${team.name} score increased from ${currentScore} to ${team.score}`);
                 scoreCell.classList.add('score-increased');
                 
                 // Add animation class
@@ -246,6 +343,7 @@ function updateLeaderboard(teams) {
             }
         } else {
             // New team added
+            console.log(`New team added: ${team.name}`);
             row.classList.add('new-team');
             
             // Remove the highlight class after animation completes
@@ -257,6 +355,14 @@ function updateLeaderboard(teams) {
         leaderboardBody.appendChild(row);
     });
 }
+
+// Force a reload if we've been sitting here too long
+setTimeout(() => {
+    if (reconnectAttempts > 0) {
+        console.log('Page has been inactive for too long, refreshing...');
+        window.location.reload();
+    }
+}, 60000); // 1 minute
 
 // Close WebSocket when page is unloaded
 window.addEventListener('beforeunload', () => {
@@ -271,5 +377,41 @@ window.addEventListener('beforeunload', () => {
 
 // Initialize WebSocket when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    showDebugInfo('DOM loaded, initializing WebSocket connection');
+    
+    // Create a toggle button for debug container
+    const toggleBtn = document.createElement('button');
+    toggleBtn.textContent = 'Debug';
+    toggleBtn.style.position = 'fixed';
+    toggleBtn.style.bottom = '10px';
+    toggleBtn.style.right = '10px';
+    toggleBtn.style.zIndex = '10000';
+    toggleBtn.style.padding = '5px 10px';
+    toggleBtn.style.backgroundColor = '#90C83C';
+    toggleBtn.style.color = 'white';
+    toggleBtn.style.border = 'none';
+    toggleBtn.style.borderRadius = '3px';
+    toggleBtn.style.cursor = 'pointer';
+    toggleBtn.onclick = function() {
+        const debugContainer = document.getElementById('debug-container');
+        if (debugContainer) {
+            debugContainer.style.display = debugContainer.style.display === 'none' ? 'block' : 'none';
+        }
+    };
+    document.body.appendChild(toggleBtn);
+    
     initLeaderboardWebSocket();
+    
+    // As a fallback, request an update every 30 seconds even if websocket is working
+    setInterval(() => {
+        showDebugInfo('Requesting periodic leaderboard refresh');
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                action: 'get_data'
+            }));
+        } else {
+            showDebugInfo('WebSocket not connected, falling back to API');
+            fetchLeaderboardData();
+        }
+    }, 30000);
 }); 

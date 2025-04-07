@@ -431,8 +431,12 @@ def leaderboard_data_api(request):
     """
     teams = []
     
+    # Add logging for API request
+    logger.info(f"API: Leaderboard data requested via API from {request.META.get('REMOTE_ADDR')}")
+    
     # Get teams with their progress data
     team_race_progress_list = TeamRaceProgress.objects.select_related('team', 'race').all()
+    logger.info(f"API: Found {team_race_progress_list.count()} team race progress records")
     
     # Organize teams by their total scores
     for team_progress in team_race_progress_list:
@@ -444,6 +448,8 @@ def leaderboard_data_api(request):
             lobby_id = lobby.id if lobby else None
             lobby_name = race.name if race else 'Unknown Race'
             
+            logger.debug(f"API: Team: {team.name}, Score: {team_progress.total_points}, Race: {race.name if race else 'None'}, Lobby ID: {lobby_id}")
+            
             teams.append({
                 'id': team.id,
                 'name': team.name,
@@ -454,6 +460,9 @@ def leaderboard_data_api(request):
     
     # Sort teams by score (highest first)
     teams.sort(key=lambda x: x['score'], reverse=True)
+    
+    # Log number of teams being returned
+    logger.info(f"API: Returning data for {len(teams)} teams in the leaderboard")
     
     return JsonResponse({
         'success': True,
@@ -1855,3 +1864,61 @@ def leave_team(request, team_id):
         return redirect('join_team')
     else:
         return redirect('view_team', team_id=team_id)
+
+@csrf_exempt
+def trigger_leaderboard_update(request):
+    """
+    API endpoint to manually trigger a leaderboard update broadcast.
+    This is useful for testing WebSocket functionality.
+    """
+    try:
+        logger.info("Manual leaderboard update triggered via API")
+        
+        # Get all teams with their progress data (similar to leaderboard_data_api)
+        teams = []
+        team_race_progress_list = TeamRaceProgress.objects.select_related('team', 'race').all()
+        
+        # Organize teams by their total scores
+        for team_progress in team_race_progress_list:
+            team = team_progress.team
+            race = team_progress.race
+            if team:
+                # Get the lobby for this team that's associated with the race
+                lobby = Lobby.objects.filter(teams=team, race=race).first()
+                lobby_id = lobby.id if lobby else None
+                lobby_name = race.name if race else 'Unknown Race'
+                
+                teams.append({
+                    'id': team.id,
+                    'name': team.name,
+                    'score': team_progress.total_points,
+                    'lobby_id': lobby_id,
+                    'lobby_name': lobby_name
+                })
+        
+        # Sort teams by score (highest first)
+        teams.sort(key=lambda x: x['score'], reverse=True)
+        
+        # Send update to channel layer
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "leaderboard",
+            {
+                "type": "leaderboard_update",
+                "teams": teams
+            }
+        )
+        
+        logger.info(f"Sent manual leaderboard update with {len(teams)} teams")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Leaderboard update triggered with {len(teams)} teams'
+        })
+    
+    except Exception as e:
+        logger.error(f"Error triggering leaderboard update: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })

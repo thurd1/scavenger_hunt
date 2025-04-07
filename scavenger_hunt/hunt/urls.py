@@ -63,4 +63,5 @@ urlpatterns = [
     path('api/upload-photo/', views.upload_photo_api, name='upload_photo_api'),
     path('api/leaderboard-data/', views.leaderboard_data_api, name='leaderboard_data_api'),
     path('api/save-question-index/', views.save_question_index, name='save_question_index'),
+    path('api/trigger-leaderboard-update/', views.trigger_leaderboard_update, name='trigger_leaderboard_update'),
 ]

@@ -13,6 +13,13 @@ function initLobbyWebSocket() {
     // Ensure we have a lobby ID to connect to
     if (!window.lobbyId) {
         console.error('Lobby ID not found in window object');
+        
+        // Auto-refresh after a brief delay as fallback
+        setTimeout(() => {
+            console.log('No lobby ID found, refreshing page...');
+            window.location.reload();
+        }, 5000);
+        
         return null;
     }
     
@@ -36,16 +43,23 @@ function initLobbyWebSocket() {
 
 // Handle WebSocket open event
 function handleSocketOpen(event) {
-    console.log('Lobby WebSocket connection established');
+    console.log('Lobby WebSocket connection established successfully');
     reconnectAttempts = 0; // Reset reconnect attempts on successful connection
     
     // Add a connected indicator to the page
     const dashboardBox = document.querySelector('.dashboard-box');
     if (dashboardBox) {
+        // Remove any existing status indicator
+        const existingStatus = document.getElementById('websocket-status');
+        if (existingStatus) {
+            existingStatus.remove();
+        }
+        
         const statusIndicator = document.createElement('div');
         statusIndicator.id = 'websocket-status';
         statusIndicator.className = 'websocket-status connected';
         statusIndicator.textContent = '● Live Updates Active';
+        statusIndicator.style.color = '#90C83C';
         dashboardBox.prepend(statusIndicator);
     }
 }
@@ -56,25 +70,36 @@ function handleSocketMessage(event) {
         const data = JSON.parse(event.data);
         console.log('Received lobby WebSocket message:', data);
         
+        // Reset reconnect counter on successful message
+        reconnectAttempts = 0;
+        
         // Handle different types of messages
         switch (data.type) {
             case 'team_joined':
+                console.log('Team joined event received:', data.team);
                 handleTeamJoined(data.team);
                 break;
             case 'team_left':
+                console.log('Team left event received:', data.team_id);
                 handleTeamLeft(data.team_id);
                 break;
             case 'team_member_joined':
+                console.log('Team member joined event received:', data.team_id, data.member);
                 handleTeamMemberJoined(data.team_id, data.member);
                 break;
             case 'race_status_changed':
+                console.log('Race status changed event received:', data.status);
                 handleRaceStatusChanged(data.status);
+                break;
+            case 'connection_established':
+                console.log('Connection confirmation received from server');
                 break;
             default:
                 console.log(`Unhandled message type: ${data.type}`);
         }
     } catch (error) {
         console.error('Error processing WebSocket message:', error);
+        console.error('Raw message data:', event.data);
     }
 }
 
@@ -87,6 +112,7 @@ function handleSocketClose(event) {
     if (statusIndicator) {
         statusIndicator.className = 'websocket-status disconnected';
         statusIndicator.textContent = '● Live Updates Disconnected - Reconnecting...';
+        statusIndicator.style.color = '#dc3545';
     }
     
     // Attempt to reconnect if not closing intentionally
@@ -104,6 +130,7 @@ function handleSocketError(error) {
     if (statusIndicator) {
         statusIndicator.className = 'websocket-status error';
         statusIndicator.textContent = '● Connection Error';
+        statusIndicator.style.color = '#dc3545';
     }
 }
 
@@ -117,6 +144,7 @@ function attemptReconnect() {
         if (statusIndicator) {
             statusIndicator.className = 'websocket-status error';
             statusIndicator.textContent = '● Live Updates Failed - Page will refresh shortly';
+            statusIndicator.style.color = '#dc3545';
         }
         
         // Reload page after a delay as fallback
@@ -135,6 +163,7 @@ function attemptReconnect() {
     if (statusIndicator) {
         statusIndicator.className = 'websocket-status reconnecting';
         statusIndicator.textContent = `● Reconnecting (${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})...`;
+        statusIndicator.style.color = '#ffc107';
     }
     
     setTimeout(() => {
@@ -296,18 +325,6 @@ function addWebSocketStyles() {
             display: inline-block;
         }
         
-        .websocket-status.connected {
-            color: #28a745;
-        }
-        
-        .websocket-status.disconnected, .websocket-status.error {
-            color: #dc3545;
-        }
-        
-        .websocket-status.reconnecting {
-            color: #ffc107;
-        }
-        
         .team-card.new-team {
             animation: fadeIn 1s;
         }
@@ -329,6 +346,14 @@ function addWebSocketStyles() {
     document.head.appendChild(styleElement);
 }
 
+// Force a reload if we've been sitting here too long
+setTimeout(() => {
+    if (reconnectAttempts > 0) {
+        console.log('Page has been inactive for too long, refreshing...');
+        window.location.reload();
+    }
+}, 60000); // 1 minute
+
 // Close WebSocket when page is unloaded
 window.addEventListener('beforeunload', () => {
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -342,8 +367,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add styles for WebSocket status indicator
     addWebSocketStyles();
     
+    console.log('DOM loaded, initializing WebSocket connection');
+    
     // Wait a moment for any other scripts to set lobbyId
     setTimeout(() => {
         initLobbyWebSocket();
     }, 100);
+    
+    // As a fallback, manually refresh the page every 2 minutes
+    // This ensures updates even if WebSockets fail silently
+    setTimeout(() => {
+        console.log('Periodic refresh timeout reached, reloading page');
+        window.location.reload();
+    }, 120000);
 }); 
