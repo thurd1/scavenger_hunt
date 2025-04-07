@@ -18,15 +18,15 @@
                         
                         <div class="join-form-container">
                             <form action="" method="get" class="join-race-form">
-                                <div class="form-group mb-3">
-                                    <label for="team_code">Team Code:</label>
+                                <div class="form-group mb-4">
+                                    <label for="team_code" class="mb-2">Team Code:</label>
                                     <input type="text" id="team_code" name="team_code" class="form-control" required placeholder="Enter your team code">
                                 </div>
-                                <div class="form-group mb-3">
-                                    <label for="player_name">Your Name:</label>
+                                <div class="form-group mb-4">
+                                    <label for="player_name" class="mb-2">Your Name:</label>
                                     <input type="text" id="player_name" name="player_name" class="form-control" required placeholder="Enter your name">
                                 </div>
-                                <button type="submit" class="btn btn-success btn-lg">Join Race</button>
+                                <button type="submit" class="btn btn-success btn-lg mt-3">Join Race</button>
                             </form>
                         </div>
                         
@@ -35,11 +35,11 @@
                         </div>
                     </div>
                 {% else %}
-                    <h1 class="text-center mb-4">{{ race.name }}</h1>
+                    <h1 class="text-center mb-5">{{ race.name }}</h1>
                     
                     <!-- Main content -->
                     <div id="race-questions">
-                        <div class="stats mb-4">
+                        <div class="stats mb-5">
                             <h3>Team: {{ team.id }}</h3>
                             <h3>Player: {{ team_member.role }}</h3>
                             <h3>Score: <span id="total-score">0</span> points</h3>
@@ -49,37 +49,37 @@
                             {% for zone_id, questions in questions_by_zone.items %}
                                 {% with zone=zones|filter_by:'id'|get:zone_id %}
                                     <div class="zone mb-5" id="zone-{{ zone.id }}">
-                                        <h2 class="zone-title">Zone: {{ zone.name }}</h2>
+                                        <h2 class="zone-title mb-4">Zone: {{ zone.name }}</h2>
                                         
                                         {% for question in questions %}
-                                            <div class="question-card mb-4" id="question-{{ question.id }}">
-                                                <h3 class="question-title">Question {{ forloop.counter }}</h3>
-                                                <div class="question-text mb-4">{{ question.text }}</div>
+                                            <div class="question-card mb-5" id="question-{{ question.id }}">
+                                                <h3 class="question-title mb-4">Question {{ forloop.counter }}</h3>
+                                                <div class="question-text mb-5">{{ question.text }}</div>
                                                 
                                                 <div class="answer-form">
                                                     <form id="answer-form-{{ question.id }}" class="mb-4">
-                                                        <div class="form-group mb-3">
-                                                            <label for="answer-{{ question.id }}">Your Answer:</label>
+                                                        <div class="form-group mb-4">
+                                                            <label for="answer-{{ question.id }}" class="mb-2">Your Answer:</label>
                                                             <input type="text" id="answer-{{ question.id }}" class="form-control" placeholder="Enter your answer">
                                                         </div>
-                                                        <div class="attempts-info mb-3">
+                                                        <div class="attempts-info mb-4">
                                                             Attempts: <span id="attempts-{{ question.id }}">0</span>/3
                                                         </div>
-                                                        <div class="points-info mb-3">
+                                                        <div class="points-info mb-4">
                                                             Points: <span id="points-{{ question.id }}">3</span> for first try, 2 for second, 1 for third
                                                         </div>
-                                                        <button type="button" class="btn btn-success btn-lg submit-answer" data-question-id="{{ question.id }}">Submit Answer</button>
+                                                        <button type="button" class="btn btn-success btn-lg mt-3 submit-answer" data-question-id="{{ question.id }}">Submit Answer</button>
                                                     </form>
                                                     
-                                                    <div id="feedback-{{ question.id }}" class="feedback mt-3 mb-4" style="display: none;"></div>
+                                                    <div id="feedback-{{ question.id }}" class="feedback mt-4 mb-5" style="display: none;"></div>
                                                     
-                                                    <div id="photo-upload-{{ question.id }}" class="photo-upload" style="display: none;">
-                                                        <p>You've used all 3 attempts. Please upload a photo instead:</p>
+                                                    <div id="photo-upload-{{ question.id }}" class="photo-upload mt-4" style="display: none;">
+                                                        <p class="mb-3">You've used all 3 attempts. Please upload a photo instead:</p>
                                                         <form id="photo-form-{{ question.id }}" class="mb-4" enctype="multipart/form-data">
-                                                            <div class="form-group mb-3">
-                                                                <input type="file" id="photo-{{ question.id }}" name="photo" class="form-control-file">
+                                                            <div class="form-group mb-4">
+                                                                <input type="file" id="photo-{{ question.id }}" name="photo" class="form-control-file mb-3">
                                                             </div>
-                                                            <button type="button" class="btn btn-success btn-lg upload-photo" data-question-id="{{ question.id }}">Upload Photo</button>
+                                                            <button type="button" class="btn btn-success btn-lg mt-3 upload-photo" data-question-id="{{ question.id }}">Upload Photo</button>
                                                         </form>
                                                     </div>
                                                 </div>
@@ -89,9 +89,9 @@
                                 {% endwith %}
                             {% endfor %}
                             
-                            <!-- Navigation buttons -->
-                            <div class="navigation-buttons d-flex justify-content-center mt-5" style="display: none;" id="navigation-buttons">
-                                <button id="next-question" class="btn btn-success btn-lg">Next Question</button>
+                            <!-- Navigation buttons - centered -->
+                            <div class="text-center mt-5 mb-4" id="navigation-buttons">
+                                <button id="next-question" class="btn btn-success btn-lg px-5">Next Question</button>
                             </div>
                         </div>
                     </div>
@@ -106,6 +106,7 @@
     background-color: rgba(33, 37, 41, 0.9);
     border-radius: 15px;
     border: 1px solid rgba(144, 200, 60, 0.2);
+    padding: 2rem !important;
 }
 
 .join-form-container {
@@ -120,13 +121,17 @@
 .join-race-form label {
     color: #90C83C;
     font-weight: bold;
-    margin-bottom: 5px;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    display: block;
 }
 
 .join-race-form input {
     background-color: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(144, 200, 60, 0.3);
     color: white;
+    padding: 12px;
+    font-size: 1.1rem;
 }
 
 .join-race-form input:focus {
@@ -139,36 +144,43 @@
 .zone-title {
     color: #90C83C;
     border-bottom: 1px solid rgba(144, 200, 60, 0.4);
-    padding-bottom: 10px;
-    margin-bottom: 20px;
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+    font-size: 1.8rem;
 }
 
 .question-card {
     background: rgba(33, 37, 41, 0.8);
     border: 1px solid rgba(144, 200, 60, 0.3);
     border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 30px;
+    padding: 30px;
+    margin-bottom: 40px;
 }
 
 .question-title {
     color: #ffffff;
-    margin-bottom: 15px;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
 }
 
 .question-text {
-    font-size: 1.2rem;
-    line-height: 1.5;
+    font-size: 1.3rem;
+    line-height: 1.6;
+    color: white;
+    margin-bottom: 30px;
 }
 
 .attempts-info, .points-info {
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     color: #aaa;
+    margin-bottom: 15px;
 }
 
 .feedback {
-    padding: 15px;
+    padding: 20px;
     border-radius: 5px;
+    margin: 25px 0;
+    font-size: 1.1rem;
 }
 
 .feedback.correct {
@@ -183,33 +195,68 @@
     color: #dc3545;
 }
 
-.navigation-buttons {
-    margin-top: 30px;
-}
-
 .stats {
     background: rgba(144, 200, 60, 0.1);
     border: 1px solid rgba(144, 200, 60, 0.3);
     border-radius: 10px;
-    padding: 20px;
+    padding: 25px;
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 40px;
 }
 
 .stats h3 {
-    margin: 10px 0;
-    font-size: 1.2rem;
+    margin: 12px 0;
+    font-size: 1.3rem;
     color: #90C83C;
 }
 
 .btn-success {
     background-color: #90C83C;
     border-color: #90C83C;
+    padding: 12px 25px;
+    font-size: 1.1rem;
+    margin-top: 15px;
 }
 
 .btn-success:hover {
     background-color: #7ab32f;
     border-color: #7ab32f;
+}
+
+.form-group label {
+    color: #90C83C;
+    font-weight: bold;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    display: block;
+}
+
+.form-control {
+    padding: 12px;
+    font-size: 1.1rem;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    color: white;
+}
+
+.form-control:focus {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: #90C83C;
+    color: white;
+    box-shadow: 0 0 0 0.2rem rgba(144, 200, 60, 0.25);
+}
+
+/* Center the next question button */
+#navigation-buttons {
+    text-align: center;
+    margin-top: 40px;
+    margin-bottom: 30px;
+}
+
+#next-question {
+    padding: 15px 40px;
+    font-size: 1.2rem;
+    min-width: 200px;
 }
 </style>
 

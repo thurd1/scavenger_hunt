@@ -9,11 +9,11 @@
 {% block content %}
     <div class="container py-4">
         <div class="dashboard-box p-4">
-            <h2 style="color: #90C83C; text-align: center; margin-bottom: 2rem;">Leaderboard</h2>
+            <h2 style="color: #90C83C; text-align: center; margin-bottom: 3rem;">Leaderboard</h2>
             
             <!-- Lobby Selector -->
-            <div class="lobby-selector mb-4">
-                <label for="lobby-select" class="mb-2" style="color: #90C83C; display: block;">Select Race:</label>
+            <div class="lobby-selector mb-5">
+                <label for="lobby-select" class="mb-3" style="color: #90C83C; display: block; font-size: 1.2rem;">Select Race:</label>
                 <select id="lobby-select" class="form-control custom-select">
                     <option value="all" selected>All Races</option>
                     {% for lobby in lobbies %}
@@ -22,7 +22,7 @@
                 </select>
             </div>
             
-            <div id="leaderboard-container" class="table-responsive mb-4">
+            <div id="leaderboard-container" class="table-responsive mb-5">
                 <table class="w-100">
                     <thead>
                         <tr>
@@ -47,7 +47,7 @@
                 </table>
             </div>
             
-            <div class="text-center">
+            <div class="text-center mt-5">
                 <a href="{% url 'leader_dashboard' %}" class="btn btn-success btn-lg">Back to Dashboard</a>
             </div>
         </div>
@@ -58,12 +58,13 @@
         background-color: rgba(33, 37, 41, 0.9);
         border-radius: 15px;
         border: 1px solid rgba(144, 200, 60, 0.2);
+        padding: 2.5rem !important;
     }
     
     .lobby-selector {
         max-width: 500px;
-        margin: 0 auto;
-        padding: 1rem;
+        margin: 0 auto 2.5rem auto;
+        padding: 1.5rem;
         background: rgba(0, 0, 0, 0.3);
         border-radius: 8px;
     }
@@ -72,9 +73,10 @@
         background-color: rgba(33, 37, 41, 0.8);
         color: white;
         border: 1px solid rgba(144, 200, 60, 0.3);
-        padding: 10px;
+        padding: 12px;
         border-radius: 5px;
         cursor: pointer;
+        font-size: 1.1rem;
     }
     
     .custom-select:focus {
@@ -87,8 +89,8 @@
         overflow-x: auto;
         background: rgba(0, 0, 0, 0.3);
         border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 2rem;
+        padding: 1.5rem;
+        margin-bottom: 2.5rem;
     }
     
     table {
@@ -97,7 +99,7 @@
     }
     
     th, td {
-        padding: 1rem;
+        padding: 1.2rem;
         text-align: left;
         border-bottom: 1px solid rgba(144, 200, 60, 0.2);
     }
@@ -129,6 +131,9 @@
     .btn-success {
         background-color: #90C83C;
         border-color: #90C83C;
+        padding: 0.8rem 2rem;
+        font-size: 1.1rem;
+        margin-top: 1.5rem;
     }
     
     .btn-success:hover {
