@@ -144,6 +144,19 @@
         0% { background-color: rgba(144, 200, 60, 0.4); }
         100% { background-color: transparent; }
     }
+
+    /* Override any button styles to ensure they're all green */
+    .btn, .btn-primary, button[type="submit"] {
+        background: linear-gradient(135deg, #90C83C, #7AAF2F) !important;
+        color: white !important;
+        border-color: #7AAF2F !important;
+    }
+
+    .btn:hover, .btn-primary:hover, button[type="submit"]:hover {
+        background: linear-gradient(135deg, #7AAF2F, #618825) !important;
+        color: white !important;
+        border-color: #618825 !important;
+    }
     </style>
 
     <script>

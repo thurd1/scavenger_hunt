@@ -508,19 +508,31 @@ def leaderboard(request):
     """
     teams = []
     
-    # Get all team progress records
-    team_progress_list = TeamProgress.objects.select_related('team', 'team__lobby', 'team__lobby__race')
+    # Debug logging
+    logger.info("Leaderboard view accessed")
+    
+    # Get teams with their progress data
+    team_race_progress_list = TeamRaceProgress.objects.select_related('team', 'race').all()
+    logger.info(f"Found {team_race_progress_list.count()} team race progress records")
     
     # Organize teams by their total scores
-    for team_progress in team_progress_list:
+    for team_progress in team_race_progress_list:
         team = team_progress.team
-        if team and team.lobby:
+        race = team_progress.race
+        if team:
+            # Get the lobby for this team that's associated with the race
+            lobby = Lobby.objects.filter(teams=team, race=race).first()
+            lobby_id = lobby.id if lobby else None
+            lobby_name = race.name if race else 'Unknown Race'
+            
+            logger.debug(f"Team: {team.name}, Score: {team_progress.total_points}, Race: {race.name if race else 'None'}, Lobby ID: {lobby_id}")
+            
             teams.append({
                 'id': team.id,
                 'name': team.name,
-                'score': team_progress.total_score,
-                'lobby_id': team.lobby.id,
-                'lobby_name': team.lobby.race.name if team.lobby.race else 'Unknown Race'
+                'score': team_progress.total_points,
+                'lobby_id': lobby_id,
+                'lobby_name': lobby_name
             })
     
     # Sort teams by score (highest first)
@@ -528,6 +540,7 @@ def leaderboard(request):
     
     # Get all active lobbies for the selector
     lobbies = Lobby.objects.filter(is_active=True).select_related('race')
+    logger.info(f"Found {lobbies.count()} active lobbies")
     
     context = {
         'teams': teams,
@@ -543,19 +556,25 @@ def leaderboard_data_api(request):
     """
     teams = []
     
-    # Get all team progress records
-    team_progress_list = TeamProgress.objects.select_related('team', 'team__lobby', 'team__lobby__race')
+    # Get teams with their progress data
+    team_race_progress_list = TeamRaceProgress.objects.select_related('team', 'race').all()
     
     # Organize teams by their total scores
-    for team_progress in team_progress_list:
+    for team_progress in team_race_progress_list:
         team = team_progress.team
-        if team and team.lobby:
+        race = team_progress.race
+        if team:
+            # Get the lobby for this team that's associated with the race
+            lobby = Lobby.objects.filter(teams=team, race=race).first()
+            lobby_id = lobby.id if lobby else None
+            lobby_name = race.name if race else 'Unknown Race'
+            
             teams.append({
                 'id': team.id,
                 'name': team.name,
-                'score': team_progress.total_score,
-                'lobby_id': team.lobby.id,
-                'lobby_name': team.lobby.race.name if team.lobby.race else 'Unknown Race'
+                'score': team_progress.total_points,
+                'lobby_id': lobby_id,
+                'lobby_name': lobby_name
             })
     
     # Sort teams by score (highest first)
@@ -1256,16 +1275,23 @@ def check_answer(request):
                     
                     # Also update WebSocket for real-time leaderboard updates
                     try:
-                        # Get all team progress records with related team and lobby info
+                        # Get all team progress records with related team and race info
                         teams_data = []
-                        for tp in TeamProgress.objects.select_related('team', 'team__lobby', 'team__lobby__race'):
-                            if tp.team and tp.team.lobby:
+                        for tp in TeamRaceProgress.objects.select_related('team', 'race'):
+                            team = tp.team
+                            race = tp.race
+                            if team:
+                                # Get the lobby for this team that's associated with the race
+                                lobby = Lobby.objects.filter(teams=team, race=race).first()
+                                lobby_id = lobby.id if lobby else None
+                                lobby_name = race.name if race else 'Unknown Race'
+                                
                                 teams_data.append({
-                                    'id': tp.team.id,
-                                    'name': tp.team.name,
-                                    'score': tp.total_score,
-                                    'lobby_id': tp.team.lobby.id,
-                                    'lobby_name': tp.team.lobby.race.name if tp.team.lobby.race else 'Unknown Race'
+                                    'id': team.id,
+                                    'name': team.name,
+                                    'score': tp.total_points,
+                                    'lobby_id': lobby_id,
+                                    'lobby_name': lobby_name
                                 })
                         
                         # Send update to channel layer
