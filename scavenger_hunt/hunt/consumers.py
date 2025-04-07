@@ -546,29 +546,48 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
                 if not lobby.race:
                     continue
                     
-                # Get teams in this lobby - FIXED: Use participating_lobbies relation
-                teams = Team.objects.filter(participating_lobbies=lobby)
+                # Get teams in this lobby with extra validation
+                valid_teams = []
+                try:
+                    # Use prefetch_related to optimize query
+                    teams = Team.objects.filter(participating_lobbies=lobby).prefetch_related('race_progress')
+                    
+                    # Verify each team exists and is valid
+                    for team in teams:
+                        try:
+                            # Verify team still exists in this lobby
+                            if team.participating_lobbies.filter(id=lobby.id).exists():
+                                valid_teams.append(team)
+                        except Exception as e:
+                            logging.error(f"Error validating team {team.id} in lobby {lobby.id}: {str(e)}")
+                except Exception as e:
+                    logging.error(f"Error getting teams for lobby {lobby.id}: {str(e)}")
+                    continue  # Skip to next lobby if we hit an error
                 
-                for team in teams:
+                for team in valid_teams:
                     try:
                         # Get team's progress in the race
-                        progress = TeamRaceProgress.objects.get(team=team, race=lobby.race)
-                        total_points = progress.total_points
-                    except TeamRaceProgress.DoesNotExist:
-                        # If no progress exists, score is 0
-                        total_points = 0
-                    
-                    teams_data.append({
-                        'id': team.id,
-                        'name': team.name,
-                        'score': total_points,
-                        'lobby_id': str(lobby.id),
-                        'lobby_name': lobby.race.name if lobby.race else 'Unknown Race'
-                    })
+                        progress = TeamRaceProgress.objects.filter(team=team, race=lobby.race).first()
+                        if progress:
+                            total_points = progress.total_points
+                        else:
+                            # If no progress exists, score is 0
+                            total_points = 0
+                        
+                        teams_data.append({
+                            'id': team.id,
+                            'name': team.name,
+                            'score': total_points,
+                            'lobby_id': str(lobby.id),
+                            'lobby_name': lobby.race.name if lobby.race else 'Unknown Race'
+                        })
+                    except Exception as e:
+                        logging.error(f"Error processing team {team.id} for leaderboard: {str(e)}")
             
             # Sort by score
             teams_data.sort(key=lambda x: x['score'], reverse=True)
             
+            logging.info(f"Generated leaderboard data with {len(teams_data)} teams")
             return teams_data
         except Exception as e:
             logging.error(f"Error getting leaderboard data: {str(e)}")

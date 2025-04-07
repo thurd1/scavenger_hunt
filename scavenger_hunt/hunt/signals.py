@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save, m2m_changed
+from django.db.models.signals import post_save, m2m_changed, post_delete
 from django.dispatch import receiver
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -6,6 +6,8 @@ import json
 import logging
 
 from .models import Team, TeamMember, Lobby, Race, TeamProgress, Question, Zone, TeamRaceProgress
+
+logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender=Team)
 def team_created(sender, instance, created, **kwargs):
@@ -312,3 +314,46 @@ def team_score_changed(sender, instance, created, **kwargs):
         logging.info(f"SIGNAL: Sent leaderboard update with {len(teams_data)} teams")
     except Exception as e:
         logging.error(f"ERROR in team_score_changed signal: {str(e)}", exc_info=True) 
+
+# Signal handler for when a lobby is deleted
+@receiver(post_delete, sender=Lobby)
+def cleanup_after_lobby_deletion(sender, instance, **kwargs):
+    """Clean up orphaned teams and related data when a lobby is deleted"""
+    try:
+        logger.info(f"Lobby {instance.id} was deleted. Running cleanup...")
+        
+        # Get channel layer for broadcasting updates
+        channel_layer = get_channel_layer()
+        
+        # Send update to leaderboard to refresh data
+        try:
+            async_to_sync(channel_layer.group_send)(
+                "leaderboard",
+                {
+                    "type": "leaderboard_update",
+                    "teams": []  # Empty to trigger a refresh
+                }
+            )
+            logger.info("Sent leaderboard refresh signal")
+        except Exception as e:
+            logger.error(f"Error sending leaderboard update: {str(e)}")
+            
+        # Find orphaned teams (not associated with any lobby)
+        orphaned_teams = Team.objects.filter(participating_lobbies__isnull=True)
+        logger.info(f"Found {orphaned_teams.count()} orphaned teams to clean up")
+        
+        # Delete the orphaned teams
+        for team in orphaned_teams:
+            try:
+                # Clean up related objects first
+                TeamMember.objects.filter(team=team).delete()
+                TeamRaceProgress.objects.filter(team=team).delete()
+                
+                # Log and delete the team
+                logger.info(f"Deleting orphaned team: {team.id} ({team.name})")
+                team.delete()
+            except Exception as e:
+                logger.error(f"Error deleting orphaned team {team.id}: {str(e)}")
+                
+    except Exception as e:
+        logger.error(f"Error in cleanup_after_lobby_deletion: {str(e)}") 

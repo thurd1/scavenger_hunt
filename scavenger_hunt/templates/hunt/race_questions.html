@@ -734,6 +734,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Only NOW show navigation buttons - after successful photo upload
                 document.getElementById('navigation-buttons').style.display = 'block';
                 
+                // Force display of navigation buttons - add a direct console log for debugging
+                console.log('Photo uploaded successfully, showing navigation buttons');
+                const navButtons = document.getElementById('navigation-buttons');
+                navButtons.style.display = 'block';
+                
+                // Check that it's visible
+                setTimeout(() => {
+                    console.log('Navigation buttons display status:', navButtons.style.display);
+                    if (navButtons.style.display !== 'block') {
+                        navButtons.style.display = 'block';
+                    }
+                }, 500);
+                
                 // Disable upload button
                 if (uploadButton) {
                     uploadButton.disabled = true;

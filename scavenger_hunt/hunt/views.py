@@ -567,18 +567,48 @@ def delete_lobby(request, lobby_id):
     try:
         lobby = Lobby.objects.get(id=lobby_id)
         
-        # Store associated teams for deletion
-        teams_to_delete = list(lobby.teams.all())
+        # Get all teams that are only in this lobby and no other lobbies
+        teams_to_delete = []
+        for team in lobby.teams.all():
+            # Check if this team is part of any other lobbies
+            other_lobbies_count = team.participating_lobbies.exclude(id=lobby_id).count()
+            if other_lobbies_count == 0:
+                teams_to_delete.append(team)
+        
+        # Log deletion for debugging
+        logger.info(f"Deleting lobby {lobby.id} ({lobby.code}) and {len(teams_to_delete)} associated teams")
+        
+        # Remove all teams from this lobby
+        lobby.teams.clear()
         
         # Delete the lobby
+        lobby_name = lobby.name if hasattr(lobby, 'name') else lobby.code
         lobby.delete()
         
-        # Now delete all the teams that were in this lobby
+        # Now delete all the teams that were only in this lobby
         for team in teams_to_delete:
+            # Delete team progress and answers first to avoid foreign key issues
+            team.race_progress.all().delete()
+            team.question_answers.all().delete()
+            team.answers.all().delete()
+            team.members.all().delete()
             team.delete()
-            
+            logger.info(f"Deleted team {team.id} ({team.name})")
+        
+        # Send update to leaderboard to refresh data
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "leaderboard",
+            {
+                "type": "leaderboard_update",
+                "teams": []  # Empty to trigger a refresh
+            }
+        )
+        
+        messages.success(request, f'Lobby "{lobby_name}" and associated teams have been deleted.')
         return JsonResponse({'success': True})
     except Exception as e:
+        logger.error(f"Error deleting lobby: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)})
 
 @require_POST
