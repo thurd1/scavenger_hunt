@@ -25,13 +25,21 @@
                 <div class="card-body">
                     <h3>Race Status</h3>
                     {% if team.participating_lobbies.first.hunt_started %}
-                        <div class="alert alert-success">
-                            <h4>Race Started!</h4>
-                            <p>The race has begun! You will be redirected to the questions page.</p>
-                            <p>Redirecting in <span id="countdown">5</span> seconds...</p>
-                            <p>
-                                <a href="{% url 'race_questions' race_id=team.participating_lobbies.first.race.id %}" class="btn btn-success btn-lg">Go to Race Now</a>
-                            </p>
+                        <div class="race-status-area active" id="race-started-notification">
+                            <div class="race-started-content">
+                                <h2 class="race-title">Race Started!</h2>
+                                <p class="race-description">The race has begun! You will be redirected to the questions page.</p>
+                                <div class="countdown-container">
+                                    <div class="countdown-circle">
+                                        <div class="countdown-spinner"></div>
+                                        <span id="countdown" class="countdown-number">5</span>
+                                    </div>
+                                </div>
+                                <p id="race-countdown">Redirecting in 5 seconds...</p>
+                                <p class="mt-4">
+                                    <a href="{% url 'race_questions' race_id=team.participating_lobbies.first.race.id %}" class="btn btn-success btn-lg">Go to Race Now</a>
+                                </p>
+                            </div>
                         </div>
                     {% else %}
                         <div class="alert alert-warning">
@@ -130,11 +138,66 @@
     max-width: 800px;
     margin: 1rem auto;
     border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
 }
 
 .race-status-area.active {
-    background-color: rgba(144, 200, 60, 0.2);
+    background-color: rgba(40, 167, 69, 0.2);
     animation: pulse 2s infinite;
+}
+
+.race-title {
+    color: #90C83C;
+    margin-bottom: 1.5rem;
+    font-size: 2rem;
+}
+
+.race-description {
+    color: white;
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+}
+
+.countdown-container {
+    display: flex;
+    justify-content: center;
+    margin: 1.5rem 0;
+}
+
+.countdown-circle {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+
+.countdown-spinner {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 4px solid transparent;
+    border-top-color: #90C83C;
+    animation: spin 1s linear infinite;
+}
+
+.countdown-number {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #90C83C;
+    z-index: 1;
+}
+
+#race-countdown {
+    font-size: 1.2rem;
+    color: #ddd;
+    margin-top: 1rem;
 }
 
 .actions-section {
@@ -192,20 +255,24 @@
 <script>
 // Initialize the team view functionality
 document.addEventListener('DOMContentLoaded', function() {
-    // Start automatic countdown if race has started
+    // Get race information from the page
     const hasRaceStarted = {% if team.participating_lobbies.first.hunt_started %}true{% else %}false{% endif %};
     const raceId = {% if team.participating_lobbies.first.race.id %}{{ team.participating_lobbies.first.race.id }}{% else %}{% if race_id %}{{ race_id }}{% else %}0{% endif %}{% endif %};
     
+    // Start automatic countdown if race has started
     if (hasRaceStarted && raceId) {
         // Start countdown
         let countdownEl = document.getElementById('countdown');
-        if (countdownEl) {
+        let countdownMsgEl = document.getElementById('race-countdown');
+        
+        if (countdownEl && countdownMsgEl) {
             let seconds = 5;
             
             // Update countdown every second
             let countdownInterval = setInterval(function() {
                 seconds--;
                 countdownEl.textContent = seconds;
+                countdownMsgEl.textContent = `Redirecting in ${seconds} seconds...`;
                 
                 // When countdown reaches 0, redirect
                 if (seconds <= 0) {
@@ -231,8 +298,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Handle race started event
                 if (data.type === 'race_started') {
                     console.log('Race started! Redirecting...');
-                    // Redirect to race questions
-                    window.location.href = data.redirect_url || `/race/${raceId}/questions/`;
+                    
+                    // Show race started notification
+                    const notification = document.getElementById('race-started-notification');
+                    if (notification) {
+                        notification.style.display = 'block';
+                        notification.classList.add('active');
+                    }
+                    
+                    // Start countdown
+                    let countdownEl = document.getElementById('countdown');
+                    let countdownMsgEl = document.getElementById('race-countdown');
+                    
+                    if (countdownEl && countdownMsgEl) {
+                        let seconds = 5;
+                        
+                        // Update countdown every second
+                        let countdownInterval = setInterval(function() {
+                            seconds--;
+                            countdownEl.textContent = seconds;
+                            countdownMsgEl.textContent = `Redirecting in ${seconds} seconds...`;
+                            
+                            // When countdown reaches 0, redirect
+                            if (seconds <= 0) {
+                                clearInterval(countdownInterval);
+                                // Redirect to race questions
+                                window.location.href = data.redirect_url || `/race/${raceId}/questions/`;
+                            }
+                        }, 1000);
+                    } else {
+                        // Immediate redirect if no countdown element
+                        window.location.href = data.redirect_url || `/race/${raceId}/questions/`;
+                    }
                 }
             };
             

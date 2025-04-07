@@ -512,29 +512,32 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
         
     @database_sync_to_async
     def get_teams_data(self):
-        from .models import TeamRaceProgress, Team, Lobby
+        from .models import TeamRaceProgress, Team, Lobby, Race
         
         teams_data = []
         
-        # Get teams with race progress
-        team_race_progresses = TeamRaceProgress.objects.select_related('team', 'race').all()
+        # Get all teams that are in lobbies with races
+        teams = Team.objects.prefetch_related('participating_lobbies').all()
         
-        for progress in team_race_progresses:
-            team = progress.team
-            race = progress.race
+        for team in teams:
+            # Get the lobby for this team
+            lobby = team.participating_lobbies.first()
             
-            if team and race:
-                # Find the lobby for this team and race
-                lobby = Lobby.objects.filter(teams=team, race=race).first()
-                lobby_id = lobby.id if lobby else None
-                lobby_name = race.name if race else 'Unknown Race'
+            if lobby and lobby.race:
+                # Look for existing race progress
+                try:
+                    progress = TeamRaceProgress.objects.get(team=team, race=lobby.race)
+                    total_points = progress.total_points
+                except TeamRaceProgress.DoesNotExist:
+                    # If no progress exists, score is 0
+                    total_points = 0
                 
                 teams_data.append({
                     'id': team.id,
                     'name': team.name,
-                    'score': progress.total_points,
-                    'lobby_id': lobby_id,
-                    'lobby_name': lobby_name
+                    'score': total_points,
+                    'lobby_id': str(lobby.id),
+                    'lobby_name': lobby.race.name if lobby.race else 'Unknown Race'
                 })
         
         # Sort by score

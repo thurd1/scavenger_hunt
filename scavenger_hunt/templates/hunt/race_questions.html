@@ -51,40 +51,32 @@
                                     <div class="zone mb-5" id="zone-{{ zone.id }}">
                                         <h2 class="zone-title mb-4">Zone: {{ zone.name }}</h2>
                                         
-                                        {% for question in questions %}
-                                            <div class="question-card mb-5" id="question-{{ question.id }}">
-                                                <h3 class="question-title mb-4">Question {{ forloop.counter }}</h3>
-                                                <div class="question-text mb-5">{{ question.text }}</div>
-                                                
-                                                <div class="answer-form">
-                                                    <form id="answer-form-{{ question.id }}" class="mb-4">
-                                                        <div class="form-group mb-4">
-                                                            <label for="answer-{{ question.id }}" class="mb-2">Your Answer:</label>
-                                                            <input type="text" id="answer-{{ question.id }}" class="form-control" placeholder="Enter your answer">
-                                                        </div>
-                                                        <div class="attempts-info mb-4">
-                                                            Attempts: <span id="attempts-{{ question.id }}">0</span>/3
-                                                        </div>
-                                                        <div class="points-info mb-4">
-                                                            Points: <span id="points-{{ question.id }}">3</span> for first try, 2 for second, 1 for third
-                                                        </div>
-                                                        <button type="button" class="btn btn-success btn-lg mt-3 submit-answer" data-question-id="{{ question.id }}">Submit Answer</button>
-                                                    </form>
-                                                    
-                                                    <div id="feedback-{{ question.id }}" class="feedback mt-4 mb-5" style="display: none;"></div>
-                                                    
-                                                    <div id="photo-upload-{{ question.id }}" class="photo-upload mt-4" style="display: none;">
-                                                        <p class="mb-3">You've used all 3 attempts. Please upload a photo instead:</p>
-                                                        <form id="photo-form-{{ question.id }}" class="mb-4" enctype="multipart/form-data">
-                                                            <div class="form-group mb-4">
-                                                                <input type="file" id="photo-{{ question.id }}" name="photo" class="form-control-file mb-3">
+                                        <!-- Current question container -->
+                                        <div id="questionContainer" class="question-container mb-4">
+                                            {% if questions %}
+                                                {% for question in questions %}
+                                                    <div class="question-card" id="question-{{ forloop.counter0 }}" style="display: {% if forloop.first %}block{% else %}none{% endif %};">
+                                                        <h3 class="question-title">Question {{ forloop.counter }}</h3>
+                                                        <div class="question-text">{{ question.text }}</div>
+                                                        
+                                                        <form id="answer-form-{{ forloop.counter0 }}" onsubmit="submitAnswer({{ forloop.counter0 }}); return false;" class="answer-form mt-4">
+                                                            <div class="form-group">
+                                                                <label for="answer-{{ forloop.counter0 }}">Your Answer:</label>
+                                                                <input type="text" id="answer-{{ forloop.counter0 }}" name="answer" class="form-control" required>
                                                             </div>
-                                                            <button type="button" class="btn btn-success btn-lg mt-3 upload-photo" data-question-id="{{ question.id }}">Upload Photo</button>
+                                                            
+                                                            <div class="mt-3">
+                                                                <button type="submit" class="btn btn-success">Submit Answer</button>
+                                                            </div>
+                                                            
+                                                            <div class="answer-feedback mt-3" id="feedback-{{ forloop.counter0 }}" style="display: none;"></div>
                                                         </form>
                                                     </div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
+                                                {% endfor %}
+                                            {% else %}
+                                                <div class="alert alert-warning">No questions available.</div>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 {% endwith %}
                             {% endfor %}
@@ -262,8 +254,8 @@
 
 <script>
 // Pre-process Django template variables to JavaScript variables
-const currentQuestionIndexFromServer = {{ current_question_index|default:0 }};
-const totalPointsFromServer = {{ total_points|default:0 }};
+const currentQuestionIndexFromServer = {% if current_question_index %}{{ current_question_index }}{% else %}0{% endif %};
+const totalPointsFromServer = {% if total_points %}{{ total_points }}{% else %}0{% endif %};
 
 // Store answers from server in a variable that JavaScript can process
 const answersFromServer = {
@@ -390,9 +382,28 @@ document.addEventListener('DOMContentLoaded', function() {
         if (document.querySelectorAll('.feedback.correct').length > 0) {
             document.getElementById('navigation-buttons').style.display = 'block';
         }
+
+        // Add event listeners to answer forms for Enter key submission
+        document.querySelectorAll('form[id^="answer-form-"]').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const questionId = this.id.split('-')[2];
+                const answerInput = document.getElementById(`answer-${questionId}`);
+                submitAnswer(questionId, answerInput.value);
+            });
+        });
+
+        // Add event listeners to submit buttons
+        document.querySelectorAll('.submit-answer').forEach(button => {
+            button.addEventListener('click', function() {
+                const questionId = this.getAttribute('data-question-id');
+                const answerInput = document.getElementById(`answer-${questionId}`);
+                submitAnswer(questionId, answerInput.value);
+            });
+        });
         
-        // Submit answer function
-        const submitAnswer = function(questionId, answer) {
+        // Function to handle answer submission
+        function submitAnswer(questionId, answer) {
             // Get the team code from the page
             const teamCode = '{{ team.code }}';
             
@@ -400,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`Team code: ${teamCode}`);
             
             // Check if this question was already answered correctly
-            if (questionData[questionId].answered) {
+            if (questionData[questionId] && questionData[questionId].answered) {
                 const feedbackElement = document.getElementById(`feedback-${questionId}`);
                 feedbackElement.className = 'feedback correct';
                 feedbackElement.style.display = 'block';
@@ -409,7 +420,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Check if max attempts reached
-            if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
+            if (questionData[questionId] && questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
                 showPhotoUpload(questionId);
                 return;
             }
@@ -496,7 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error checking answer:', error);
                 alert('Error checking answer. Please try again.');
             });
-        };
+        }
         
         // Save current question index to server
         const saveCurrentQuestionIndex = function(index) {
@@ -542,15 +553,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
             submitButton.disabled = true;
         };
-        
-        // Add event listeners to submit buttons
-        document.querySelectorAll('.submit-answer').forEach(button => {
-            button.addEventListener('click', function() {
-                const questionId = this.getAttribute('data-question-id');
-                const answerInput = document.getElementById(`answer-${questionId}`);
-                submitAnswer(questionId, answerInput.value);
-            });
-        });
         
         // Add event listeners to upload photo buttons
         document.querySelectorAll('.upload-photo').forEach(button => {
