@@ -51,7 +51,7 @@
             </div>
         {% endif %}
 
-        <a href="{% url 'team_list' %}" class="btn btn-primary">Back to Teams</a>
+        <a href="{% url 'join_team' %}" class="btn btn-primary">Back to Teams</a>
     </div>
 </div>
 
@@ -261,15 +261,22 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Get race information from the page
     const hasRaceStarted = {% if team.participating_lobbies.first.hunt_started %}true{% else %}false{% endif %};
-    const raceId = {% if team.participating_lobbies.first.race.id %}{{ team.participating_lobbies.first.race.id }}{% else %}{% if race_id %}{{ race_id }}{% else %}0{% endif %}{% endif %};
+    const raceId = {% if team.participating_lobbies.first.race.id %}{{ team.participating_lobbies.first.race.id }}{% else %}null{% endif %};
     
     // Start automatic countdown if race has started
     if (hasRaceStarted && raceId) {
+        console.log("Race already started, showing notification");
         // Show race started notification
         const notification = document.getElementById('race-started-notification');
         if (notification) {
             notification.style.display = 'block';
             notification.classList.add('active');
+            
+            // Make sure the spinner is visible
+            const spinner = document.querySelector('.countdown-spinner');
+            if (spinner) {
+                spinner.style.display = 'block';
+            }
         }
         
         // Start countdown

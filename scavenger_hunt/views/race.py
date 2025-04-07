@@ -36,6 +36,8 @@ def check_answer(request):
     team_code = request.data.get('team_code')
     attempt_number = request.data.get('attempt_number', 1)
     
+    print(f"Processing answer: '{provided_answer}' for question {question_id} by team {team_code}")
+    
     # Get the team
     try:
         team = Team.objects.get(code=team_code)
@@ -47,6 +49,11 @@ def check_answer(request):
         question = Question.objects.get(id=question_id)
     except Question.DoesNotExist:
         return Response({'error': 'Question not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Log the expected answers for debugging
+    correct_answers = [a.strip().lower() for a in question.answer.split('|')]
+    print(f"Correct answers for question {question_id}: {correct_answers}")
+    print(f"User provided: '{provided_answer}'")
     
     # Get or create answer object
     answer_obj, created = Answer.objects.get_or_create(
@@ -74,7 +81,6 @@ def check_answer(request):
     
     # Check if the answer is correct
     is_correct = False
-    correct_answers = [a.strip().lower() for a in question.answer.split('|')]
     
     for correct_answer in correct_answers:
         if provided_answer == correct_answer:

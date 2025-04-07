@@ -59,17 +59,25 @@
                                                         <h3 class="question-title">Question {{ forloop.counter }}</h3>
                                                         <div class="question-text">{{ question.text }}</div>
                                                         
-                                                        <form id="answer-form-{{ forloop.counter0 }}" class="answer-form mt-4" onsubmit="event.preventDefault(); const questionId='{{ forloop.counter0 }}'; const answer=document.getElementById('answer-{{ forloop.counter0 }}').value; if(answer) submitAnswer(questionId, answer); return false;">
+                                                        <form id="answer-form-{{ forloop.counter0 }}" class="answer-form mt-4">
                                                             <div class="form-group">
                                                                 <label for="answer-{{ forloop.counter0 }}">Your Answer:</label>
                                                                 <input type="text" id="answer-{{ forloop.counter0 }}" name="answer" class="form-control" required>
                                                             </div>
                                                             
                                                             <div class="mt-3">
-                                                                <button type="submit" class="btn btn-success submit-answer" data-question-id="{{ forloop.counter0 }}">Submit Answer</button>
+                                                                <button type="button" class="btn btn-success submit-answer" data-question-id="{{ forloop.counter0 }}">Submit Answer</button>
                                                             </div>
                                                             
                                                             <div class="answer-feedback mt-3" id="feedback-{{ forloop.counter0 }}" style="display: none;"></div>
+                                                            <div class="mt-2">
+                                                                <span class="attempts-info">Attempts: <span id="attempts-{{ forloop.counter0 }}">0</span></span>
+                                                            </div>
+                                                            <div class="photo-upload mt-4" id="photo-upload-{{ forloop.counter0 }}" style="display: none;">
+                                                                <h4>Maximum attempts reached. Upload a photo instead:</h4>
+                                                                <input type="file" id="photo-{{ forloop.counter0 }}" class="form-control mt-3">
+                                                                <button type="button" class="btn btn-primary mt-3 upload-photo" data-question-id="{{ forloop.counter0 }}">Upload Photo</button>
+                                                            </div>
                                                         </form>
                                                     </div>
                                                 {% endfor %}
@@ -383,18 +391,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('navigation-buttons').style.display = 'block';
         }
 
-        // Add event listeners to answer forms for Enter key submission
-        document.querySelectorAll('form[id^="answer-form-"]').forEach(form => {
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                const questionId = this.id.split('-')[2];
-                const answerInput = document.getElementById(`answer-${questionId}`);
-                if (answerInput && answerInput.value) {
-                    submitAnswer(questionId, answerInput.value);
-                }
-            });
-        });
-
         // Add event listeners to submit buttons
         document.querySelectorAll('.submit-answer').forEach(button => {
             button.addEventListener('click', function() {
@@ -402,6 +398,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 const answerInput = document.getElementById(`answer-${questionId}`);
                 if (answerInput && answerInput.value) {
                     submitAnswer(questionId, answerInput.value);
+                }
+            });
+        });
+        
+        // Add event listeners to input fields to handle Enter key
+        document.querySelectorAll('input[id^="answer-"]').forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const questionId = this.id.split('-')[1];
+                    if (this.value) {
+                        submitAnswer(questionId, this.value);
+                    }
                 }
             });
         });
@@ -431,7 +440,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Increment attempts
             questionData[questionId].attempts++;
-            document.getElementById(`attempts-${questionId}`).textContent = questionData[questionId].attempts;
+            const attemptsElement = document.getElementById(`attempts-${questionId}`);
+            if (attemptsElement) {
+                attemptsElement.textContent = questionData[questionId].attempts;
+            }
             
             // Make API call to check answer
             fetch('/check-answer/', {
