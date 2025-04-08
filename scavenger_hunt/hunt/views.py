@@ -1863,7 +1863,7 @@ def race_questions(request, race_id):
     except TeamMember.DoesNotExist:
         # Create a team member entry
         team_member = TeamMember.objects.create(team=team, role=player_name)
-                print(f"Created new team member {player_name} for team {team.name}")
+        print(f"Created new team member {player_name} for team {team.name}")
     
     # Get zones and questions for this race
     zones = Zone.objects.filter(race=race).order_by('created_at')
@@ -2142,13 +2142,13 @@ def upload_photo_api(request):
                     )
                     logger.info(f"Sent leaderboard update for team {team.id} in race {race_id}")
                 except Exception as e:
-            logger.error(f"Error sending leaderboard update: {str(e)}")
+                    logger.error(f"Error sending leaderboard update: {str(e)}")
                     
                 # Also trigger an HTTP-based leaderboard update for redundancy
                 try:
                     trigger_leaderboard_update_internal(race_id)
                 except Exception as e:
-            logger.error(f"Error triggering HTTP leaderboard update: {str(e)}")
+                    logger.error(f"Error triggering HTTP leaderboard update: {str(e)}")
             except Exception as e:
                 logger.error(f"Error updating race progress: {str(e)}")
         
