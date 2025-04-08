@@ -188,6 +188,7 @@ class TeamAnswer(models.Model):
     points_awarded = models.IntegerField(default=0)
     requires_photo = models.BooleanField(default=False)
     photo = models.ImageField(upload_to='answer_photos/', null=True, blank=True)
+    photo_uploaded = models.BooleanField(default=False)  # Flag for tracking if a photo was uploaded
     
     class Meta:
         unique_together = ('team', 'question')

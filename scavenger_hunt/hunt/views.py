@@ -1867,8 +1867,7 @@ def upload_photo_api(request):
             defaults={
                 'completed': True,
                 'completion_time': timezone.now(),
-                'photo': photo,
-                'photo_uploaded': True
+                'photo': photo
             }
         )
         
