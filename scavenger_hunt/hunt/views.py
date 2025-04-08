@@ -1358,16 +1358,23 @@ def student_question(request, lobby_id, question_id):
                 'error': 'Race has not started yet. Please wait for the leader to start the race.'
             })
         
-        # Check if time limit is exceeded
-        time_elapsed = timezone.now() - lobby.start_time
-        if time_elapsed > timedelta(minutes=lobby.time_limit):
-            return render(request, 'hunt/error.html', {
-                'error': 'Race time limit has been exceeded.'
-            })
+        # Check if time limit is exceeded - time_limit is on the race object, not lobby
+        if lobby.race and lobby.start_time:
+            time_elapsed = timezone.now() - lobby.start_time
+            time_limit_minutes = lobby.race.time_limit_minutes if hasattr(lobby.race, 'time_limit_minutes') else 60  # Default to 60 minutes
+            if time_elapsed > timedelta(minutes=time_limit_minutes):
+                return render(request, 'hunt/error.html', {
+                    'error': 'Race time limit has been exceeded.'
+                })
         
         # Get the team for this player
         try:
-            team_member = TeamMember.objects.get(role=player_name, team__lobby=lobby)
+            team_member = TeamMember.objects.filter(role=player_name).first()
+            if not team_member:
+                return render(request, 'hunt/error.html', {
+                    'error': 'You are not a member of any team.'
+                })
+                
             team = team_member.team
             
             # Prepare the context
@@ -1376,14 +1383,14 @@ def student_question(request, lobby_id, question_id):
                 'question': question,
                 'player_name': player_name,
                 'team': team,
-                'requires_photo': question.requires_photo
+                'requires_photo': question.requires_photo if hasattr(question, 'requires_photo') else False
             }
             
             return render(request, 'hunt/student_question.html', context)
             
         except TeamMember.DoesNotExist:
             return render(request, 'hunt/error.html', {
-                'error': 'You are not a member of any team in this lobby.'
+                'error': 'You are not a member of any team.'
             })
             
     except Lobby.DoesNotExist:
