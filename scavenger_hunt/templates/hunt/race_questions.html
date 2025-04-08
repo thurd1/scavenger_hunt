@@ -195,6 +195,31 @@
     color: #dc3545;
 }
 
+.feedback.max-attempts {
+    background-color: rgba(255, 193, 7, 0.2);
+    border: 1px solid rgba(255, 193, 7, 0.4);
+    color: #ffc107;
+}
+
+input.max-attempts-reached {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+    border-color: rgba(220, 53, 69, 0.3) !important;
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.photo-upload {
+    background-color: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.photo-upload h4 {
+    color: #ffc107;
+    margin-bottom: 15px;
+}
+
 .stats {
     background: rgba(144, 200, 60, 0.1);
     border: 1px solid rgba(144, 200, 60, 0.3);
@@ -271,7 +296,8 @@ const answersFromServer = {
     "{{ question_id }}": {
         attempts: {{ answer_data.attempts }},
         points: {{ answer_data.points_awarded }},
-        answered: {{ answer_data.answered_correctly|yesno:"true,false" }}
+        answered: {{ answer_data.answered_correctly|yesno:"true,false" }},
+        photo_uploaded: {{ answer_data.photo_uploaded|yesno:"true,false" }}
     }{% if not forloop.last %},{% endif %}
 {% endfor %}
 };
@@ -313,14 +339,15 @@ document.addEventListener('DOMContentLoaded', function() {
             // Apply data from server if available
             if (answersFromServer[questionId]) {
                 const serverData = answersFromServer[questionId];
-                questionData[questionId].attempts = serverData.attempts;
-                questionData[questionId].points = serverData.points;
-                questionData[questionId].answered = serverData.answered;
+                questionData[questionId].attempts = serverData.attempts || 0;
+                questionData[questionId].points = serverData.points || 0;
+                questionData[questionId].answered = serverData.answered || false;
+                questionData[questionId].photoUploaded = serverData.photo_uploaded || false;
                 
                 // Update UI to match the state
                 const attemptsElement = document.getElementById(`attempts-${questionId}`);
                 if (attemptsElement) {
-                    attemptsElement.textContent = serverData.attempts;
+                    attemptsElement.textContent = serverData.attempts || 0;
                 }
                 
                 // If question was already answered correctly, show feedback and disable submission
@@ -339,8 +366,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
                 
-                // If max attempts reached, show photo upload
-                if (serverData.attempts >= 3 && !serverData.answered) {
+                // If photo was uploaded, mark it and show feedback
+                if (serverData.photo_uploaded) {
+                    questionData[questionId].photoUploaded = true;
+                    
+                    const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
+                    if (uploadButton) {
+                        uploadButton.disabled = true;
+                        uploadButton.textContent = "Photo Uploaded ✓";
+                    }
+                    
+                    const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                    if (feedbackElement) {
+                        feedbackElement.className = 'feedback correct';
+                        feedbackElement.style.display = 'block';
+                        feedbackElement.textContent = 'Photo uploaded successfully!';
+                    }
+                }
+                
+                // Always check if max attempts reached to properly handle page refresh
+                if (serverData.attempts >= 3 && !serverData.answered && !serverData.photo_uploaded) {
                     showPhotoUpload(questionId);
                 }
             }
@@ -643,12 +688,33 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show photo upload form
         const showPhotoUpload = function(questionId) {
             const photoUploadElement = document.getElementById(`photo-upload-${questionId}`);
+            if (!photoUploadElement) {
+                console.error(`Photo upload element not found for question ${questionId}`);
+                return;
+            }
+            
             photoUploadElement.style.display = 'block';
             
             // Disable answer submission
             const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
             if (submitButton) {
                 submitButton.disabled = true;
+            }
+            
+            // Set the question's input field as read-only to prevent further attempts
+            const answerInput = document.getElementById(`answer-${questionId}`);
+            if (answerInput) {
+                answerInput.readOnly = true;
+                answerInput.classList.add('max-attempts-reached');
+                answerInput.placeholder = 'Maximum attempts reached';
+            }
+            
+            // Add a clear notice about max attempts being reached
+            const feedbackElement = document.getElementById(`feedback-${questionId}`);
+            if (feedbackElement && !questionData[questionId].photoUploaded) {
+                feedbackElement.className = 'feedback max-attempts';
+                feedbackElement.style.display = 'block';
+                feedbackElement.textContent = 'Maximum attempts reached. Please upload a photo to continue.';
             }
             
             // IMPORTANT: Explicitly hide navigation buttons until photo is uploaded

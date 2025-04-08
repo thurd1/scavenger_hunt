@@ -1395,132 +1395,99 @@ def student_question(request, lobby_id, question_id):
             'error': 'Question not found.'
         })
 
+@csrf_exempt
 def check_answer(request):
-    """API to check if an answer is correct"""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             question_id = data.get('question_id')
             answer = data.get('answer')
             team_code = data.get('team_code')
-            attempt_number = data.get('attempt_number', 1)
             
             if not all([question_id, answer, team_code]):
-                return JsonResponse({'success': False, 'error': 'Missing required fields'})
+                return JsonResponse({'error': 'Missing required fields'}, status=400)
             
-            # Get the question and team
+            # Look up the question and team
             try:
                 question = Question.objects.get(id=question_id)
                 team = Team.objects.get(code=team_code)
-            except Question.DoesNotExist:
-                return JsonResponse({'success': False, 'error': 'Question not found'})
-            except Team.DoesNotExist:
-                return JsonResponse({'success': False, 'error': 'Team not found'})
-            
-            # First check if this question has already been answered correctly by this team
-            existing_answer = TeamAnswer.objects.filter(
-                team=team,
-                question=question,
-                answered_correctly=True
-            ).first()
-            
-            if existing_answer:
-                # Question already answered correctly, return the previous points without adding new ones
-                return JsonResponse({
-                    'success': True,
-                    'correct': True,
-                    'points': existing_answer.points_awarded,
-                    'already_answered': True,
-                    'message': 'You have already answered this question correctly'
-                })
-            
-            # Check if the answer is correct (case-insensitive comparison)
-            is_correct = answer.lower().strip() == question.answer.lower().strip()
-            
-            # Calculate points based on attempt number (3 for first, 2 for second, 1 for third)
-            points = max(4 - attempt_number, 0) if is_correct else 0
-            
-            # If correct, record the answer
-            if is_correct:
-                # Get or create the answer record
-                answer_record, created = TeamAnswer.objects.get_or_create(
-                    team=team,
-                    question=question,
-                    defaults={
-                        'answered_correctly': True,
-                        'attempts': attempt_number,
-                        'points_awarded': points
-                    }
-                )
                 
-                if not created:
-                    # Update existing record if not already correct
-                    if not answer_record.answered_correctly:
-                        answer_record.answered_correctly = True
-                        answer_record.attempts = attempt_number
-                        answer_record.points_awarded = points
-                        answer_record.save()
-                    else:
-                        # Already answered correctly, don't add points again
-                        points = answer_record.points_awarded
+                # Check if the question has already been answered correctly by this team
+                team_answer = TeamAnswer.objects.filter(team=team, question=question).first()
                 
-                # Update team's total score for this race (if applicable)
-                try:
-                    team_race_progress, created = TeamRaceProgress.objects.get_or_create(
-                        team=team,
-                        race=question.zone.race,
-                        defaults={'total_points': points}
-                    )
-                    
-                    if not created:
-                        # Only update points if this is the first time answering correctly
-                        if created or (answer_record and answer_record.answered_correctly and not answer_record.answered_at):
-                            team_race_progress.total_points += points
-                            team_race_progress.save()
-                    
-                    # Update team progress for this specific question
-                    team_progress, created = TeamProgress.objects.get_or_create(
+                if team_answer and team_answer.answered_correctly:
+                    # Question was already answered correctly
+                    return JsonResponse({
+                        'correct': True,
+                        'already_answered': True,
+                        'points': team_answer.points_awarded,
+                        'photo_uploaded': team_answer.photo_uploaded,
+                        'message': 'Already answered correctly'
+                    })
+                
+                # If not, create or update the team answer
+                if not team_answer:
+                    team_answer = TeamAnswer.objects.create(
                         team=team,
                         question=question,
-                        defaults={'completed': is_correct}
+                        answered_correctly=False,
+                        attempts=0,
+                        points_awarded=0,
+                        requires_photo=question.requires_photo
                     )
-                    
-                    # If the answer is correct, mark this question as completed
-                    if is_correct and not team_progress.completed:
-                        team_progress.completed = True
-                        team_progress.completion_time = timezone.now()
-                        team_progress.save()
-                        
-                except Exception as e:
-                    print(f"Error updating team race progress: {e}")
-            else:
-                # Record the failed attempt
-                answer_record, created = TeamAnswer.objects.get_or_create(
-                    team=team,
-                    question=question,
-                    defaults={
-                        'answered_correctly': False,
-                        'attempts': attempt_number
-                    }
-                )
                 
-                if not created and not answer_record.answered_correctly:
-                    # Update attempt count for existing record
-                    answer_record.attempts = attempt_number
-                    answer_record.save()
-            
-            return JsonResponse({
-                'success': True,
-                'correct': is_correct,
-                'points': points
-            })
-            
+                # Record this attempt
+                team_answer.attempts += 1
+                
+                # Check if the answer is correct
+                correct_answer = question.answer.lower().strip()
+                user_answer = answer.lower().strip()
+                
+                # Simple exact match for now
+                is_correct = user_answer == correct_answer
+                
+                # Calculate points based on attempts (can be customized)
+                points = 0
+                if is_correct:
+                    if team_answer.attempts == 1:
+                        points = 10  # Full points for first attempt
+                    elif team_answer.attempts == 2:
+                        points = 5   # Half points for second attempt
+                    else:
+                        points = 2   # Minimal points for third attempt or more
+                
+                # Update the team answer
+                team_answer.answered_correctly = is_correct
+                if is_correct:
+                    team_answer.points_awarded = points
+                team_answer.save()
+                
+                # Return the result
+                response_data = {
+                    'correct': is_correct,
+                    'attempts': team_answer.attempts,
+                    'max_attempts': 3,  # Hardcoded for now, could be a setting
+                    'points': points if is_correct else 0,
+                    'photo_uploaded': team_answer.photo_uploaded
+                }
+                
+                # If the answer is incorrect and max attempts reached, suggest photo upload
+                if not is_correct and team_answer.attempts >= 3:
+                    response_data['suggest_photo'] = True
+                
+                return JsonResponse(response_data)
+                
+            except Question.DoesNotExist:
+                return JsonResponse({'error': 'Question not found'}, status=404)
+            except Team.DoesNotExist:
+                return JsonResponse({'error': 'Team not found'}, status=404)
+                
         except json.JSONDecodeError:
-            return JsonResponse({'success': False, 'error': 'Invalid JSON'})
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
+            return JsonResponse({'error': str(e)}, status=500)
     
-    return JsonResponse({'success': False, 'error': 'Only POST method is allowed'})
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 def upload_photo(request, lobby_id, question_id):
     """Handle photo upload for a question"""
