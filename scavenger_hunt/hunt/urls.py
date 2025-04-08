@@ -60,6 +60,7 @@ urlpatterns = [
     # API endpoints
     path('api/get-lobby-by-code/', views.get_lobby_by_code, name='get_lobby_by_code'),
     path('race/<int:race_id>/status/', views.check_race_status, name='check_race_status'),
+    path('api/lobby/<int:lobby_id>/race-status/', views.check_lobby_race_status, name='check_lobby_race_status'),
     path('api/team/<int:team_id>/race/', views.get_team_race, name='get_team_race'),
     path('api/upload-photo/', views.upload_photo_api, name='upload_photo_api'),
     path('api/leaderboard-data/', views.leaderboard_data_api, name='leaderboard_data_api'),

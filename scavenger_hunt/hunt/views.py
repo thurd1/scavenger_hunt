@@ -1726,6 +1726,27 @@ def check_race_status(request, race_id):
         'race_id': race_id
     })
 
+def check_lobby_race_status(request, lobby_id):
+    """Check if a race has started for a specific lobby - used by team view pages"""
+    lobby = get_object_or_404(Lobby, id=lobby_id)
+    started = lobby.hunt_started
+    redirect_url = None
+    race_id = None
+    
+    if started and lobby.race:
+        race_id = lobby.race.id
+        redirect_url = reverse('student_question', kwargs={'lobby_id': lobby_id, 'question_id': 1})
+        
+    # Log the status check for debugging
+    logger.info(f"Lobby {lobby_id} race status check: started={started}, race_id={race_id}")
+    
+    return JsonResponse({
+        'started': started,
+        'redirect_url': redirect_url,
+        'race_id': race_id,
+        'lobby_id': lobby_id
+    })
+
 def get_team_race(request, team_id):
     """API endpoint to get race associated with a team"""
     try:
