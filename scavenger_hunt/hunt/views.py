@@ -87,7 +87,7 @@ def lobby_details(request, lobby_id):
         
         # Add a timestamp to prevent browser caching
         response = render(request, 'hunt/lobby_details.html', {
-            'lobby': lobby,
+        'lobby': lobby,
             'timestamp': timezone.now().timestamp(),
         })
         
@@ -271,8 +271,8 @@ def join_team(request, team_id=None):
                     request.session['team_member_id'] = team_member.id
                     request.session['team_role'] = player_name
                     request.session['team_id'] = team.id
-                    request.session.modified = True
-                    
+                request.session.modified = True
+            
                     # Log the join
                     logger.info(f"Player {player_name} joined team {team.name}")
                     
@@ -476,7 +476,7 @@ def register(request):
             user = form.save()
             login(request, user)
             return redirect('home')
-    else:
+        else:
         form = UserCreationForm()
     return render(request, 'hunt/register.html', {'form': form})
 
@@ -500,7 +500,7 @@ def leaderboard(request):
     """
     Display the leaderboard for all races.
     """
-    teams = []
+            teams = []
     
     # Debug logging
     logger.info("Leaderboard view accessed")
@@ -567,7 +567,7 @@ def leaderboard_data_api(request):
                     race=race,
                     team__in=lobby.teams.all()
                 ).select_related('team', 'race')
-            except Lobby.DoesNotExist:
+                except Lobby.DoesNotExist:
                 return JsonResponse({
                     'success': False,
                     'error': 'Lobby not found'
@@ -807,10 +807,10 @@ def delete_team(request, team_id):
         # Broadcast updates if needed
         if lobby_id:
             try:
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    f'lobby_{lobby_id}',
-                    {
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'lobby_{lobby_id}',
+                {
                         'type': 'team_left',
                         'team_id': team_id
                     }
@@ -943,7 +943,7 @@ def view_team(request, team_id):
                                 'team_name': team.name
                             }
                         )
-                except Exception as e:
+        except Exception as e:
                     logger.error(f"Error broadcasting team update: {str(e)}")
         except Exception as e:
             logger.error(f"Error creating team member: {e}")
@@ -1350,8 +1350,44 @@ def student_question(request, lobby_id, question_id):
         return redirect('join_game_session')
     
     try:
-        lobby = Lobby.objects.get(id=lobby_id)
-        current_question = Question.objects.get(id=question_id)
+        # First check if lobby exists
+        try:
+            lobby = Lobby.objects.get(id=lobby_id)
+        except Lobby.DoesNotExist:
+            logger.error(f"Lobby {lobby_id} not found in student_question view")
+            return render(request, 'hunt/error.html', {
+                'error': 'Lobby not found. Please check your URL or join a different lobby.'
+            })
+            
+        # Next check if race exists
+        if not lobby.race:
+            logger.error(f"Lobby {lobby_id} has no associated race")
+            return render(request, 'hunt/error.html', {
+                'error': 'This lobby has no active race. Please join a different lobby.'
+            })
+            
+        # Check if question exists
+        try:
+            current_question = Question.objects.get(id=question_id)
+        except Question.DoesNotExist:
+            logger.error(f"Question {question_id} not found in student_question view")
+            
+            # Try to find the first question for this race instead
+            try:
+                first_question = Question.objects.filter(zone__race=lobby.race).order_by('zone__created_at', 'id').first()
+                
+                if first_question:
+                    logger.info(f"Redirecting to first question {first_question.id} instead")
+                    return redirect('student_question', lobby_id=lobby_id, question_id=first_question.id)
+                else:
+                    return render(request, 'hunt/error.html', {
+                        'error': 'Question not found. This race may not have any questions set up yet.'
+                    })
+            except Exception as e:
+                logger.error(f"Error finding first question: {str(e)}")
+                return render(request, 'hunt/error.html', {
+                    'error': 'Question not found and unable to find any other questions for this race.'
+                })
         
         # Check if race has started
         if not lobby.hunt_started:
@@ -1378,101 +1414,33 @@ def student_question(request, lobby_id, question_id):
                 
             team = team_member.team
             
-            # Instead of rendering the student_question template, redirect to race_questions
-            # Only use the template-based redirect for browsers with JavaScript disabled
-            if request.GET.get('no_redirect'):
-                # Load context for the template if a user has specifically requested not to redirect
-                # This serves as a fallback for browsers with JavaScript disabled
+            # Skip the no_redirect check since we always want to redirect to race_questions
+            # for a more consistent experience
+            
+            # Redirect to the race_questions view with appropriate parameters
+            race_id = lobby.race.id if lobby.race else None
+            if race_id:
+                # Log the redirection for debugging
+                logger.info(f"Redirecting from student_question to race_questions: race_id={race_id}, team_code={team.code}, player_name={player_name}")
                 
-                # IMPORTANT CHANGE: Load ALL questions for this race, similar to race_questions.html
-                all_questions = []
-                questions_by_zone = {}
-                zones = []
-                next_question_id = None
-                
-                if lobby.race:
-                    # Get all zones for this race
-                    zones = Zone.objects.filter(race=lobby.race).order_by('created_at')
-                    
-                    # Get all questions organized by zone
-                    for zone in zones:
-                        zone_questions = Question.objects.filter(zone=zone).order_by('id')
-                        if zone_questions.exists():
-                            questions_by_zone[zone.id] = list(zone_questions)
-                            all_questions.extend(zone_questions)
-                    
-                    # Find current question index
-                    try:
-                        current_index = all_questions.index(current_question)
-                        question_number = current_index + 1
-                        total_questions = len(all_questions)
-                        
-                        # Calculate next question ID
-                        if current_index < len(all_questions) - 1:
-                            next_question_id = all_questions[current_index + 1].id
-                    except (ValueError, IndexError):
-                        question_number = 1
-                        total_questions = len(all_questions)
-                    
-                # Get existing answers for the team
-                team_answers = TeamAnswer.objects.filter(team=team, question__zone__race=lobby.race)
-                answers_by_question = {}
-                
-                for answer in team_answers:
-                    answers_by_question[str(answer.question_id)] = {
-                        'answered_correctly': answer.answered_correctly,
-                        'attempts': answer.attempts,
-                        'points_awarded': answer.points_awarded,
-                        'photo_uploaded': answer.photo_uploaded
-                    }
-                
-                # Prepare the context for the template
-                context = {
-                    'lobby': lobby,
-                    'question': current_question,
-                    'player_name': player_name,
-                    'team': team,
-                    'team_member': team_member,
-                    'requires_photo': current_question.requires_photo if hasattr(current_question, 'requires_photo') else False,
-                    
-                    # Add race_questions.html style context
-                    'race': lobby.race,
-                    'questions': all_questions,
-                    'zones': zones,
-                    'questions_by_zone': questions_by_zone,
-                    'current_question_index': question_number - 1,
-                    'question_number': question_number,
-                    'total_questions': total_questions,
-                    'next_question_id': next_question_id,
-                    'answers_by_question': answers_by_question
-                }
-                
-                # Add a direct link to switch to race_questions.html style
-                context['race_questions_url'] = f"/race/{lobby.race.id}/questions/?team_code={team.code}&player_name={player_name}"
-                
-                return render(request, 'hunt/student_question.html', context)
+                # Create the redirect URL with explicit parameters
+                redirect_url = f"/race/{race_id}/questions/?team_code={team.code}&player_name={player_name}"
+                return redirect(redirect_url)
             else:
-                # Redirect to the race_questions view with appropriate parameters
-                race_id = lobby.race.id if lobby.race else None
-                if race_id:
-                    redirect_url = f"/race/{race_id}/questions/?team_code={team.code}&player_name={player_name}"
-                    return redirect(redirect_url)
-                else:
-                    return render(request, 'hunt/error.html', {
-                        'error': 'No race found for this lobby.'
-                    })
-        except TeamMember.DoesNotExist:
+                return render(request, 'hunt/error.html', {
+                    'error': 'No race found for this lobby.'
+                })
+                
+        except Exception as e:
+            logger.error(f"Error finding team for player {player_name}: {str(e)}")
             return render(request, 'hunt/error.html', {
-                'error': 'You are not a member of any team.'
+                'error': 'Error finding your team. Please try joining again.'
             })
             
-    except Lobby.DoesNotExist:
+    except Exception as e:
+        logger.error(f"Error in student_question view: {str(e)}", exc_info=True)
         return render(request, 'hunt/error.html', {
-            'error': 'Lobby not found.'
-        })
-    except Question.DoesNotExist:
-        return render(request, 'hunt/error.html', {
-            'error': 'Question not found.'
+            'error': f'An unexpected error occurred: {str(e)}'
         })
 
 @csrf_exempt
@@ -1519,8 +1487,8 @@ def check_answer(request, lobby_id=None, question_id=None):
                 # If not, create or update the team answer
                 if not team_answer:
                     team_answer = TeamAnswer.objects.create(
-                        team=team,
-                        question=question,
+                    team=team,
+                    question=question,
                         answered_correctly=False,
                         attempts=0,
                         points_awarded=0,
@@ -1631,7 +1599,7 @@ def check_answer(request, lobby_id=None, question_id=None):
                 return JsonResponse({'error': 'Question not found'}, status=404)
             except Team.DoesNotExist:
                 return JsonResponse({'error': 'Team not found'}, status=404)
-                
+            
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:

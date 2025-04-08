@@ -87,7 +87,7 @@
         font-size: 2.5rem;
         font-weight: bold;
         margin-bottom: 20px;
-        text-align: center;
+    text-align: center;
         background: linear-gradient(90deg, var(--primary-light), var(--secondary-light));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -99,7 +99,7 @@
         background: var(--card-bg);
         border-radius: 15px;
         padding: 20px;
-        margin-bottom: 30px;
+    margin-bottom: 30px;
         text-align: center;
         position: relative;
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -162,12 +162,12 @@
         100% {
             transform: rotate(360deg);
         }
-    }
+}
 
-    .members-section {
+.members-section {
         background: var(--card-bg);
         border-radius: 15px;
-        padding: 20px;
+    padding: 20px;
         border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
@@ -175,30 +175,30 @@
         font-size: 1.5rem;
         margin-bottom: 20px;
         color: var(--primary-light);
-        text-align: center;
+    text-align: center;
         font-weight: bold;
-    }
+}
 
     .member-grid {
-        display: grid;
+    display: grid;
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 20px;
-    }
+    gap: 20px;
+}
 
-    .member-card {
+.member-card {
         background: rgba(30, 30, 45, 0.7);
         border-radius: 15px;
-        padding: 20px;
+    padding: 20px;
         text-align: center;
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
         border: 1px solid rgba(255, 255, 255, 0.05);
         transition: all 0.3s ease;
         position: relative;
         overflow: hidden;
-    }
+}
 
-    .member-card:hover {
-        transform: translateY(-5px);
+.member-card:hover {
+    transform: translateY(-5px);
         box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
     }
 
@@ -248,13 +248,13 @@
         color: white;
         padding: 12px 30px;
         border-radius: 50px;
-        text-decoration: none;
-        font-weight: bold;
+    text-decoration: none;
+    font-weight: bold;
         margin-top: 20px;
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
         transition: all 0.3s ease;
-        border: none;
-        cursor: pointer;
+    border: none;
+    cursor: pointer;
         position: relative;
         overflow: hidden;
         z-index: 1;
@@ -280,7 +280,7 @@
     .back-btn:hover {
         box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
         transform: translateY(-2px);
-    }
+}
 </style>
 {% endblock %}
 
@@ -329,7 +329,7 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
         // Show/hide the appropriate sections based on race status
         const raceNotStarted = document.querySelector('.race-status-not-started');
         const raceStarted = document.querySelector('.race-status-started');
@@ -472,6 +472,6 @@
         
         // Also check immediately
         checkRaceStatus();
-    });
+});
 </script>
 {% endblock %} 
