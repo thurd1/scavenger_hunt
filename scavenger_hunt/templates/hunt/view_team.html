@@ -362,7 +362,7 @@
                 
                 if (count <= 0) {
                     clearInterval(interval);
-                    window.location.href = "{% url 'race' lobby_id=lobby.id %}";
+                    window.location.href = "{% url 'student_question' lobby_id=lobby.id question_id=1 %}";
                 }
             }, 1000);
         }
