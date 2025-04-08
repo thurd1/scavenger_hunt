@@ -331,7 +331,7 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize WebSocket connection for race status updates
-        const lobbyId = {{ lobby.id }};
+        const lobbyId = "{{ lobby.id|escapejs }}";
         const raceStatusSocket = new WebSocket(
             'ws://' + window.location.host + '/ws/race/' + lobbyId + '/'
         );
