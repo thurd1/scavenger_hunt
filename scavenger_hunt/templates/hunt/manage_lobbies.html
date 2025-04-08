@@ -502,7 +502,7 @@ function startRace(lobbyId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showMessage('Race started successfully!', 'success');
+            showMessage('Race started successfully! Players are being redirected to the game.', 'success');
             
             // Try to broadcast the race started event manually as a fallback
             try {
@@ -514,16 +514,20 @@ function startRace(lobbyId) {
                     }
                 }).catch(e => console.log('Notification API call optional, continuing...'));
             } catch (e) {
-                console.log('Notification API error, continuing with redirect...');
+                console.log('Notification API error');
             }
             
-            // Automatically redirect to the race page after a short delay
-            setTimeout(() => {
-                window.location.href = data.redirect_url;
-            }, 1500);
-            
-            // Update UI
+            // Update UI without redirecting
             updateLobbyStatus(lobbyId, true);
+            
+            // Re-enable start buttons after a short delay
+            setTimeout(() => {
+                startButtons.forEach(btn => {
+                    btn.disabled = true; // Keep disabled since race is started
+                    btn.innerHTML = '<i class="fas fa-check"></i> Race Started';
+                    btn.classList.add('race-started');
+                });
+            }, 1500);
         } else {
             showMessage('Error starting race: ' + data.error, 'error');
             // Re-enable start buttons
