@@ -87,6 +87,31 @@
     </div>
 </div>
 
+<!-- DEBUG: Direct navigation buttons to all questions in the race -->
+<div class="container mt-4 debug-nav" style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px;">
+    <h4 style="color: #fff;">Direct Navigation (Debug)</h4>
+    <p>Current Question: {{ question.id }} ({{ question_number }} of {{ total_questions }})</p>
+    
+    <div class="d-flex flex-wrap gap-2">
+        <a href="/lobby/{{ lobby.id }}/" class="btn btn-sm btn-secondary">Back to Lobby</a>
+        
+        {% for q in questions %}
+        <a href="/studentQuestion/{{ lobby.id }}/{{ q.id }}/" 
+           class="btn btn-sm {% if q.id == question.id %}btn-primary{% else %}btn-outline-light{% endif %}">
+           Q{{ forloop.counter }}: ID {{ q.id }}
+        </a>
+        {% endfor %}
+        
+        {% if next_question_id %}
+        <a href="/studentQuestion/{{ lobby.id }}/{{ next_question_id }}/" class="btn btn-success">
+            Next Question (ID: {{ next_question_id }})
+        </a>
+        {% else %}
+        <span class="btn btn-warning disabled">No Next Question</span>
+        {% endif %}
+    </div>
+</div>
+
 <style>
 .container {
     max-width: 800px;
@@ -283,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle correct answer and navigation to next question
     function handleCorrectAnswer(data) {
-        // Display success message and handle redirection
+        // Display success message
         let messageElement = document.getElementById('answer-message');
         let loaderElement = document.getElementById('loading-spinner');
         
@@ -296,18 +321,26 @@ document.addEventListener('DOMContentLoaded', function() {
         loaderElement.style.display = 'block';
         
         // Log the data to help with debugging
-        console.log("Received data from server:", data);
+        console.log("SERVER RESPONSE:", data);
+        console.log("NEXT URL PROVIDED:", data.next_url);
         
-        // Directly use the next_url if available
+        // Create a direct link to the next question
+        let nextUrlElement = document.createElement('div');
+        nextUrlElement.className = "text-center mt-3";
+        
+        let nextUrlText = data.next_url ? 
+            `<p>Continue to next question in <span id="redirect-countdown">3</span> seconds...</p>` :
+            `<p>Could not find next question. Please use one of the navigation options below.</p>`;
+        
+        let nextUrlButtonHtml = data.next_url ? 
+            `<a href="${data.next_url}" class="btn btn-success">Go Now</a>` :
+            `<a href="/lobby/{{ lobby.id }}/" class="btn btn-primary">Return to Lobby</a>`;
+        
+        nextUrlElement.innerHTML = `${nextUrlText}${nextUrlButtonHtml}`;
+        messageElement.after(nextUrlElement);
+        
+        // Only do countdown and auto-redirect if we have a next_url
         if (data.next_url) {
-            // Create a direct link to the next question
-            let nextUrlElement = document.createElement('div');
-            nextUrlElement.innerHTML = `<div class="text-center mt-3">
-                <p>Going to next question in <span id="redirect-countdown">3</span> seconds...</p>
-                <a href="${data.next_url}" class="btn btn-success">Go Now</a>
-            </div>`;
-            messageElement.after(nextUrlElement);
-            
             // Countdown for redirect
             let countdown = 3;
             let countdownInterval = setInterval(function() {
@@ -318,27 +351,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 if (countdown <= 0) {
                     clearInterval(countdownInterval);
+                    console.log("REDIRECTING TO:", data.next_url);
+                    // Direct navigation without reverse() etc.
                     window.location.href = data.next_url;
                 }
             }, 1000);
-            
-            console.log("Redirecting to next question:", data.next_url);
-        } else {
-            // Fallback to a default URL if next_url is not provided
-            console.error("No next_url provided in the response. Unable to navigate to next question.");
-            
-            // Show error to user
-            let errorElement = document.createElement('div');
-            errorElement.className = "alert alert-warning mt-3";
-            errorElement.textContent = "Could not determine next question. Please go back to the lobby.";
-            messageElement.after(errorElement);
-            
-            // Add a back button
-            let backButton = document.createElement('a');
-            backButton.href = "/";
-            backButton.className = "btn btn-primary mt-3";
-            backButton.textContent = "Go Home";
-            errorElement.after(backButton);
         }
     }
     

@@ -1353,6 +1353,33 @@ def student_question(request, lobby_id, question_id):
         lobby = Lobby.objects.get(id=lobby_id)
         question = Question.objects.get(id=question_id)
         
+        # DEBUG: Print all questions in this race to help debug navigation
+        if lobby.race:
+            all_questions = Question.objects.filter(zone__race=lobby.race).order_by('zone__created_at', 'id')
+            question_ids = list(all_questions.values_list('id', flat=True))
+            
+            # Calculate question number and total
+            try:
+                question_number = question_ids.index(int(question_id)) + 1
+                total_questions = len(question_ids)
+            except (ValueError, IndexError):
+                question_number = 1
+                total_questions = len(question_ids)
+            
+            # Debug all questions 
+            logger.info(f"Lobby {lobby_id}, Race {lobby.race.id}, Questions: {question_ids}")
+            logger.info(f"Current Question ID: {question_id}, Index: {question_number-1}")
+            
+            # Find next question
+            try:
+                if question_number < total_questions:
+                    next_question_id = question_ids[question_number]
+                    logger.info(f"Next question will be: {next_question_id}")
+                else:
+                    logger.info("This is the last question")
+            except (IndexError, ValueError):
+                logger.error(f"Error finding next question for current ID {question_id}")
+        
         # Check if race has started
         if not lobby.hunt_started:
             return render(request, 'hunt/error.html', {
@@ -1378,13 +1405,39 @@ def student_question(request, lobby_id, question_id):
                 
             team = team_member.team
             
+            # Get all questions for debug navigation
+            all_questions = []
+            next_question_id = None
+            question_number = 1
+            total_questions = 1
+            
+            if lobby.race:
+                all_questions = list(Question.objects.filter(zone__race=lobby.race).order_by('zone__created_at', 'id'))
+                question_ids = [q.id for q in all_questions]
+                
+                # Calculate question number and total
+                try:
+                    question_number = question_ids.index(int(question_id)) + 1
+                    total_questions = len(question_ids)
+                    
+                    # Find next question ID if not the last question
+                    if question_number < total_questions:
+                        next_question_id = question_ids[question_number]
+                except (ValueError, IndexError):
+                    pass
+            
             # Prepare the context
             context = {
                 'lobby': lobby,
                 'question': question,
                 'player_name': player_name,
                 'team': team,
-                'requires_photo': question.requires_photo if hasattr(question, 'requires_photo') else False
+                'requires_photo': question.requires_photo if hasattr(question, 'requires_photo') else False,
+                # Add debug navigation context
+                'questions': all_questions,
+                'question_number': question_number,
+                'total_questions': total_questions,
+                'next_question_id': next_question_id
             }
             
             return render(request, 'hunt/student_question.html', context)
@@ -1537,14 +1590,12 @@ def check_answer(request, lobby_id=None, question_id=None):
                     
                     # Set the next_url
                     if next_q_id:
-                        response_data['next_url'] = reverse('student_question', kwargs={
-                            'lobby_id': lobby.id,
-                            'question_id': next_q_id
-                        })
-                        logger.info(f"Set next_url to: {response_data['next_url']}")
+                        # Use direct URL string instead of reverse() to avoid any issues
+                        response_data['next_url'] = f"/studentQuestion/{lobby.id}/{next_q_id}/"
+                        logger.info(f"Set direct next_url to: {response_data['next_url']}")
                     else:
-                        response_data['next_url'] = reverse('race_complete')
-                        logger.info(f"No next question found, set next_url to race_complete: {response_data['next_url']}")
+                        response_data['next_url'] = "/race-complete/"
+                        logger.info(f"No next question found, set direct path to: {response_data['next_url']}")
                 else:
                     reason = "Answer incorrect" if not is_correct else "Lobby not found"
                     logger.warning(f"Could not calculate next_url: {reason}")
@@ -1677,17 +1728,20 @@ def upload_photo(request, lobby_id, question_id):
                 current_index = question_ids.index(int(question_id))
                 if current_index < len(question_ids) - 1:
                     next_q_id = question_ids[current_index + 1]
-            except (ValueError, IndexError):
-                pass
+                    logger.info(f"Upload_photo: Found next question ID: {next_q_id}")
+                else:
+                    logger.info("Upload_photo: This is the last question")
+            except (ValueError, IndexError) as e:
+                logger.error(f"Upload_photo: Error finding question index: {str(e)}")
                 
             next_url = ""
             if next_q_id:
-                next_url = reverse('student_question', kwargs={
-                    'lobby_id': lobby_id,
-                    'question_id': next_q_id
-                })
+                # Use direct URL path instead of reverse
+                next_url = f"/studentQuestion/{lobby_id}/{next_q_id}/"
+                logger.info(f"Upload_photo: Setting direct next_url to: {next_url}")
             else:
-                next_url = reverse('race_complete')
+                next_url = "/race-complete/"
+                logger.info(f"Upload_photo: No next question, setting next_url to: {next_url}")
             
             return JsonResponse({
                 'success': True,
