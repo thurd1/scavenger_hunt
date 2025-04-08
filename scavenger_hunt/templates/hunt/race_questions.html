@@ -735,33 +735,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Mark photo as uploaded
                 questionData[questionId].photoUploaded = true;
                 
-                // Show navigation buttons after successful photo upload - using multiple methods
-                console.log('Photo uploaded successfully, showing navigation buttons');
-                
-                // Method 1: Using display property
+                // FIXED: Show and enable next button properly
+                // Get navigation buttons element
                 const navButtons = document.getElementById('navigation-buttons');
+                
+                // Just make it visible directly - no need to clone/replace
                 navButtons.style.display = 'block';
+                navButtons.style.visibility = 'visible';
+                navButtons.style.opacity = '1';
                 
-                // Method 2: Force a re-render by removing and re-adding to the DOM
-                const parent = navButtons.parentNode;
-                const navClone = navButtons.cloneNode(true);
-                parent.removeChild(navButtons);
-                parent.appendChild(navClone);
-                
-                // Method 3: Update visibility and opacity as well
-                navClone.style.visibility = 'visible';
-                navClone.style.opacity = '1';
-                
-                // Re-add the event listener for the next button
-                document.getElementById('next-question').addEventListener('click', function() {
-                    if (currentQuestionIndex < totalQuestions - 1) {
-                        questions[currentQuestionIndex].style.display = 'none';
-                        currentQuestionIndex++;
-                        questions[currentQuestionIndex].style.display = 'block';
-                        updateQuestionCounter();
-                        saveCurrentQuestionIndex(currentQuestionIndex);
+                // Manually check if the next button is working
+                const nextButton = document.getElementById('next-question');
+                if (nextButton) {
+                    console.log('Next button present. Ensuring it works...');
+                    
+                    // Force a click event to make debugging easier
+                    nextButton.classList.add('ready');
+                    
+                    // If the button doesn't already have a working event listener, 
+                    // ensure there's one (rather than trying to replace)
+                    if (!nextButton.classList.contains('initialized')) {
+                        nextButton.classList.add('initialized');
+                        nextButton.addEventListener('click', function() {
+                            console.log('Next button clicked, moving to next question');
+                            if (currentQuestionIndex < totalQuestions - 1) {
+                                questions[currentQuestionIndex].style.display = 'none';
+                                currentQuestionIndex++;
+                                questions[currentQuestionIndex].style.display = 'block';
+                                updateQuestionCounter();
+                                saveCurrentQuestionIndex(currentQuestionIndex);
+                                
+                                // Check if we should show or hide the nav buttons for the new question
+                                const newQuestionId = questions[currentQuestionIndex].id.split('-')[1];
+                                if (questionData[newQuestionId] && 
+                                    (questionData[newQuestionId].answered || 
+                                     questionData[newQuestionId].photoUploaded)) {
+                                    navButtons.style.display = 'block';
+                                } else {
+                                    navButtons.style.display = 'none';
+                                }
+                            }
+                        });
                     }
-                });
+                }
                 
                 // Disable upload button
                 if (uploadButton) {
