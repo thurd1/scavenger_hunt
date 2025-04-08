@@ -316,15 +316,15 @@
         
         <div class="member-grid">
         {% for member in team_members %}
-            <div class="member-card {% if member.user.id == request.user.id %}current-user{% endif %}">
-                <div class="member-name">{{ member.user.username }}</div>
+            <div class="member-card {% if member.role == player_name %}current-user{% endif %}">
+                <div class="member-name">{{ member.role }}</div>
             </div>
         {% endfor %}
         </div>
     </div>
 
     <div style="text-align: center; margin-top: 30px;">
-        <a href="{% url 'lobby_details' lobby_id=lobby.id %}" class="back-btn">Back to Teams</a>
+        <a href="{% url 'join_team' %}" class="back-btn">Back to Teams</a>
     </div>
 </div>
 

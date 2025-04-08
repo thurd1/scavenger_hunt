@@ -652,21 +652,28 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
             logging.error(f"Error processing message in LeaderboardConsumer: {str(e)}")
     
     async def leaderboard_update(self, event):
-        """
-        Receive update from leaderboard group and send to WebSocket.
-        """
-        try:
-            teams = event.get('teams', [])
-            
-            # Send message to WebSocket
-            await self.send(text_data=json.dumps({
-                'type': 'leaderboard_update',
-                'teams': teams
-            }))
-            
-            logging.info(f"Leaderboard update sent to client: {len(teams)} teams")
-        except Exception as e:
-            logging.error(f"Error sending leaderboard update: {str(e)}")
+        """Handle leaderboard update message"""
+        # Extract data from event
+        action = event.get('action', 'update')
+        
+        # Prepare data to send to WebSocket
+        data = {
+            'type': 'leaderboard_update',
+            'action': action
+        }
+        
+        # For full refresh, include the complete data
+        if action == 'full_refresh' and 'data' in event:
+            data['data'] = event['data']
+            data['race_id'] = event.get('race_id')
+        else:
+            # For single update, include the team details
+            data['team_id'] = event.get('team_id')
+            data['team_name'] = event.get('team_name')
+            data['race_id'] = event.get('race_id')
+        
+        # Send message to WebSocket (async)
+        await self.send(text_data=json.dumps(data))
     
     async def send_initial_leaderboard_data(self):
         """

@@ -897,6 +897,62 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }, 7000);
                 
+                // Automatic navigation after 10 seconds if user doesn't click the Next button
+                if (data.next_url) {
+                    // Show auto-navigation countdown message
+                    const autoNavMessage = document.createElement('div');
+                    autoNavMessage.style.position = 'fixed';
+                    autoNavMessage.style.bottom = '20px';
+                    autoNavMessage.style.left = '50%';
+                    autoNavMessage.style.transform = 'translateX(-50%)';
+                    autoNavMessage.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                    autoNavMessage.style.color = 'white';
+                    autoNavMessage.style.padding = '10px 20px';
+                    autoNavMessage.style.borderRadius = '5px';
+                    autoNavMessage.style.zIndex = '10001';
+                    autoNavMessage.innerHTML = 'Auto-navigating to next question in <span id="auto-nav-countdown">10</span> seconds...';
+                    document.body.appendChild(autoNavMessage);
+                    
+                    // Countdown timer for auto-navigation
+                    let autoNavCountdown = 10;
+                    const autoNavCountdownEl = document.getElementById('auto-nav-countdown');
+                    const autoNavInterval = setInterval(() => {
+                        autoNavCountdown--;
+                        if (autoNavCountdownEl) {
+                            autoNavCountdownEl.textContent = autoNavCountdown;
+                        }
+                        
+                        if (autoNavCountdown <= 0) {
+                            clearInterval(autoNavInterval);
+                            if (document.body.contains(autoNavMessage)) {
+                                document.body.removeChild(autoNavMessage);
+                            }
+                            
+                            // Navigate to the next question
+                            console.log("Auto-navigating to next question:", data.next_url);
+                            window.location.href = data.next_url;
+                        }
+                    }, 1000);
+                    
+                    // If user clicks the Next button, cancel auto-navigation
+                    const nextButton = document.getElementById('next-question');
+                    if (nextButton) {
+                        const originalOnClick = nextButton.onclick;
+                        nextButton.onclick = function(e) {
+                            // Cancel auto-navigation
+                            clearInterval(autoNavInterval);
+                            if (document.body.contains(autoNavMessage)) {
+                                document.body.removeChild(autoNavMessage);
+                            }
+                            
+                            // Call original click handler if it exists
+                            if (typeof originalOnClick === 'function') {
+                                return originalOnClick.call(this, e);
+                            }
+                        };
+                    }
+                }
+                
                 // Also update the existing display
                 const nextButton = document.getElementById('next-question');
                 if (nextButton) {

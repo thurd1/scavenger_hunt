@@ -7,7 +7,7 @@ from .forms import JoinLobbyForm, LobbyForm, TeamForm
 from django.http import HttpResponse
 from django.contrib.auth.forms import UserCreationForm
 from django.views.generic import DetailView
-from django.db.models import Count
+from django.db.models import Count, Sum
 from django.contrib import messages
 from django.urls import reverse
 from django.http import HttpResponseRedirect
@@ -1537,15 +1537,17 @@ def check_answer(request, lobby_id=None, question_id=None):
                 # Simple exact match for now
                 is_correct = user_answer == correct_answer
                 
-                # Calculate points based on attempts (can be customized)
+                # Calculate points based on attempts
                 points = 0
                 if is_correct:
                     if team_answer.attempts == 1:
-                        points = 10  # Full points for first attempt
+                        points = 3  # 3 points for first attempt
                     elif team_answer.attempts == 2:
-                        points = 5   # Half points for second attempt
+                        points = 2  # 2 points for second attempt
+                    elif team_answer.attempts == 3:
+                        points = 1  # 1 point for third attempt
                     else:
-                        points = 2   # Minimal points for third attempt or more
+                        points = 0  # 0 points for more than three attempts
                 
                 # Update the team answer
                 team_answer.answered_correctly = is_correct
@@ -2072,7 +2074,8 @@ def upload_photo_api(request):
                 'answered_correctly': False,
                 'attempts': 3,  # Assume they've used all attempts if they're uploading a photo
                 'requires_photo': True,
-                'photo_uploaded': True  # Mark that photo is uploaded
+                'photo_uploaded': True,  # Mark that photo is uploaded
+                'points_awarded': 0  # Explicitly set to 0 points for photo uploads
             }
         )
         
@@ -2080,6 +2083,7 @@ def upload_photo_api(request):
         photo = request.FILES['photo']
         team_answer.photo = photo
         team_answer.photo_uploaded = True  # Ensure this flag is set
+        team_answer.points_awarded = 0  # Always ensure 0 points for photo uploads
         team_answer.save()
         
         # Also update/create team progress
@@ -2122,11 +2126,35 @@ def upload_photo_api(request):
                     photo_completed.append(str(question.id))
                     race_progress.photo_questions_completed = photo_completed
                     race_progress.save()
+                    
+                # Send leaderboard update via WebSocket
+                try:
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        'leaderboard',
+                        {
+                            'type': 'leaderboard_update',
+                            'race_id': race_id,
+                            'team_id': team.id,
+                            'team_name': team.name,
+                            'action': 'update'
+                        }
+                    )
+                    logger.info(f"Sent leaderboard update for team {team.id} in race {race_id}")
+                except Exception as e:
+                    logger.error(f"Error sending leaderboard update: {str(e)}")
+                    
+                # Also trigger an HTTP-based leaderboard update for redundancy
+                try:
+                    trigger_leaderboard_update_internal(race_id)
+                except Exception as e:
+                    logger.error(f"Error triggering HTTP leaderboard update: {str(e)}")
             except Exception as e:
                 logger.error(f"Error updating race progress: {str(e)}")
         
         # Calculate next_url for navigation
         next_url = ""
+        next_question_url = ""
         
         # Get the lobby that matches this race
         try:
@@ -2145,16 +2173,24 @@ def upload_photo_api(request):
                     pass
                     
                 if next_q_id:
+                    # Create two URLs - one for student_question and one for race_questions
                     next_url = reverse('student_question', kwargs={
                         'lobby_id': lobby.id,
                         'question_id': next_q_id
                     })
+                    
+                    # Also create a direct URL to race_questions for the same team/player
+                    next_question_url = f"/race/{race.id}/questions/?team_code={team.code}"
+                    if player_name:
+                        next_question_url += f"&player_name={player_name}"
                 else:
                     next_url = reverse('race_complete')
+                    next_question_url = reverse('race_complete')
         except Exception as e:
             logger.error(f"Error calculating next URL: {str(e)}")
             # Fallback: if we can't determine next question, go to race complete
             next_url = reverse('race_complete')
+            next_question_url = reverse('race_complete')
         
         # Return success response with navigation info
         return JsonResponse({
@@ -2163,7 +2199,8 @@ def upload_photo_api(request):
             'show_next_button': True,  # Tell the client to show the next button
             'photo_uploaded': True,    # Confirm photo is recorded as uploaded
             'question_completed': True, # Mark question as completed for progress tracking
-            'next_url': next_url       # Add the next URL for navigation
+            'next_url': next_question_url,  # Use the race_questions URL as primary
+            'legacy_next_url': next_url     # Keep the student_question URL as backup
         })
         
     except Question.DoesNotExist:
@@ -2488,3 +2525,60 @@ def csrf_failure(request, reason=""):
     
     # Redirect to home page
     return redirect('home')
+
+# Helper function for internal leaderboard updates
+def trigger_leaderboard_update_internal(race_id=None):
+    """Internal function to trigger leaderboard updates without HTTP request"""
+    try:
+        # Get all active races if no race_id specified
+        if race_id:
+            races = Race.objects.filter(id=race_id, is_active=True)
+        else:
+            races = Race.objects.filter(is_active=True)
+        
+        for race in races:
+            # Get all teams in this race via lobbies
+            lobbies = Lobby.objects.filter(race=race)
+            teams = Team.objects.filter(participating_lobbies__in=lobbies).distinct()
+            
+            # Prepare leaderboard data
+            leaderboard_data = []
+            
+            for team in teams:
+                # Get team's score from TeamAnswer records
+                team_answers = TeamAnswer.objects.filter(
+                    team=team, 
+                    question__zone__race=race
+                )
+                
+                total_score = team_answers.aggregate(Sum('points_awarded'))['points_awarded__sum'] or 0
+                answered_count = team_answers.filter(answered_correctly=True).count()
+                photo_count = team_answers.filter(photo_uploaded=True).count()
+                
+                leaderboard_data.append({
+                    'team_id': team.id,
+                    'team_name': team.name,
+                    'score': total_score,
+                    'questions_answered': answered_count,
+                    'photos_uploaded': photo_count
+                })
+            
+            # Sort by score (descending)
+            leaderboard_data.sort(key=lambda x: x['score'], reverse=True)
+            
+            # Broadcast update via WebSocket
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'leaderboard',
+                {
+                    'type': 'leaderboard_update',
+                    'race_id': race.id,
+                    'data': leaderboard_data,
+                    'action': 'full_refresh'
+                }
+            )
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error in trigger_leaderboard_update_internal: {str(e)}")
+        return False
