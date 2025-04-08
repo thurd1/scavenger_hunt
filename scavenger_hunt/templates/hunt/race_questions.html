@@ -821,9 +821,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Mark button as ready
                     nextButton.classList.add('ready');
                     
-                    // If the button doesn't already have a working event listener, 
-                    // ensure there's one (rather than trying to replace)
-                    if (!nextButton.classList.contains('initialized')) {
+                    // If we have a next_url from the server
+                    if (data.next_url) {
+                        console.log(`Next button will navigate to: ${data.next_url}`);
+                        
+                        // Override the default next button behavior with a one-time handler
+                        nextButton.onclick = function() {
+                            // Redirect to the next_url provided by the server
+                            window.location.href = data.next_url;
+                            return false;
+                        };
+                    } else if (!nextButton.classList.contains('initialized')) {
+                        // Original behavior if no next_url provided
                         nextButton.classList.add('initialized');
                         nextButton.addEventListener('click', function() {
                             console.log('Next button clicked, moving to next question');
@@ -846,6 +855,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         });
                     }
+                    
+                    // Make sure the button is enabled
+                    nextButton.disabled = false;
                 } else {
                     console.error('Next button not found in the DOM!');
                 }

@@ -42,7 +42,8 @@
             </div>
             
             <div id="photo-upload-container" style="display: none;">
-                <form id="photoForm" enctype="multipart/form-data">
+                <form id="photoForm" action="{% url 'upload_photo_student' lobby_id=lobby.id question_id=question.id %}" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
                     <div class="form-group">
                         <label for="photo" class="answer-label">You've used all attempts. Upload a Photo</label>
                         <input type="file" id="photo" name="photo" class="form-control" accept="image/*" capture="camera">
@@ -52,7 +53,20 @@
                             <i class="fas fa-camera"></i> Submit Photo
                         </button>
                     </div>
+                    <div id="photo-message" class="alert" style="display: none; margin-top: 15px;"></div>
+                    <div id="photo-spinner" class="text-center mt-3" style="display: none;">
+                        <div class="spinner-border text-light" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
                 </form>
+                
+                <!-- Next button (initially hidden, shown after photo upload) -->
+                <div class="text-center mt-4">
+                    <button id="nextBtn" class="btn btn-success btn-lg" style="display: none;">
+                        <i class="fas fa-arrow-right"></i> Next Question
+                    </button>
+                </div>
             </div>
             
             <div id="result-message" class="mt-3"></div>
@@ -262,35 +276,45 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Handle correct answer and navigation to next question
-    function handleCorrectAnswer(nextUrl) {
-        const pointsEarned = 4 - attempts; // Calculate points based on attempts
+    function handleCorrectAnswer(data) {
+        // Display success message and handle redirection
+        let messageElement = document.getElementById('answer-message');
+        let loaderElement = document.getElementById('loading-spinner');
         
-        resultMessage.textContent = `Correct! You earned ${pointsEarned > 0 ? pointsEarned : 0} points.`;
-        resultMessage.className = 'mt-3 success';
+        // Show success message
+        messageElement.textContent = "Correct! You earned " + data.points + " points.";
+        messageElement.className = "alert alert-success";
+        messageElement.style.display = 'block';
         
-        // Display the next question navigation
-        nextQuestionContainer.style.display = 'block';
-        answerContainer.style.display = 'none';
+        // Show loading spinner
+        loaderElement.style.display = 'block';
         
-        // Set up countdown to auto-navigate
-        let countdown = 10;
-        countdownEl.textContent = countdown;
-        
-        countdownTimer = setInterval(() => {
-            countdown--;
-            countdownEl.textContent = countdown;
-            
-            if (countdown <= 0) {
-                clearInterval(countdownTimer);
-                window.location.href = nextUrl;
-            }
-        }, 1000);
-        
-        // Add event listener for immediate navigation
-        nextQuestionBtn.addEventListener('click', function() {
-            clearInterval(countdownTimer);
-            window.location.href = nextUrl;
-        });
+        // Check if data contains a valid next_url
+        if (data.next_url && data.next_url.startsWith('/race/') && data.next_url.includes('/question/')) {
+            // Redirect to next question after a short delay
+            setTimeout(function() {
+                window.location.href = data.next_url;
+            }, 1500);
+        } else if (data.next_url && data.next_url.includes('/complete/')) {
+            // Redirect to completion page after a short delay
+            setTimeout(function() {
+                window.location.href = data.next_url;
+            }, 1500);
+        } else {
+            // Fallback to a default URL if next_url is not provided or invalid
+            setTimeout(function() {
+                // Get the current race ID from the URL
+                const urlParts = window.location.pathname.split('/');
+                const raceIndex = urlParts.indexOf('race');
+                if (raceIndex !== -1 && urlParts.length > raceIndex + 1) {
+                    const raceId = urlParts[raceIndex + 1];
+                    window.location.href = `/race/${raceId}/`;
+                } else {
+                    // If all else fails, go to the lobby listing
+                    window.location.href = '/lobbies/';
+                }
+            }, 1500);
+        }
     }
     
     // Handle the answer submission
@@ -321,7 +345,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.correct) {
                     // Handle correct answer
-                    handleCorrectAnswer(data.next_url || `/race/{{ race.id }}/question/${data.next_question_id}/`);
+                    handleCorrectAnswer(data);
                 } else {
                     // Handle incorrect answer
                     resultMessage.textContent = `Incorrect answer. ${maxAttempts - attempts} attempts remaining.`;
@@ -350,42 +374,79 @@ document.addEventListener('DOMContentLoaded', function() {
         photoForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            const photoInput = document.getElementById('photo');
-            if (!photoInput.files || !photoInput.files[0]) {
-                resultMessage.textContent = 'Please select a photo to upload';
-                resultMessage.className = 'mt-3 error';
-                return;
-            }
+            let formData = new FormData(this);
+            let messageElement = document.getElementById('photo-message');
+            let spinnerElement = document.getElementById('photo-spinner');
             
-            const formData = new FormData();
-            formData.append('photo', photoInput.files[0]);
-            formData.append('question_id', '{{ question.id }}');
-            formData.append('team_code', '{{ team.code }}');
+            // Show spinner
+            spinnerElement.style.display = 'block';
+            messageElement.textContent = 'Uploading photo...';
+            messageElement.className = 'alert alert-info';
+            messageElement.style.display = 'block';
             
-            fetch('/upload-photo/', {
+            fetch(this.action, {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: formData
+                body: formData,
+                credentials: 'same-origin'
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
+                spinnerElement.style.display = 'none';
+                
                 if (data.success) {
-                    resultMessage.textContent = 'Photo submitted successfully!';
-                    resultMessage.className = 'mt-3 success';
+                    // Change to success message
+                    messageElement.textContent = 'Photo submitted successfully!';
+                    messageElement.className = 'alert alert-success';
                     
-                    // Handle navigation to next question 
-                    handleCorrectAnswer(data.next_url || `/race/{{ race.id }}/question/${data.next_question_id}/`);
+                    // Show the Next button
+                    document.getElementById('nextBtn').style.display = 'block';
+                    
+                    // If we have next_url data, prepare for navigation
+                    if (data.next_url || data.next_question_id) {
+                        handleCorrectAnswer(data);
+                    }
+                    else {
+                        // If no next_url, make the Next button navigate to default URL
+                        const nextBtn = document.getElementById('nextBtn');
+                        if (nextBtn) {
+                            // Set an explicit click handler for the button
+                            nextBtn.addEventListener('click', function() {
+                                // Get the current race ID from the URL
+                                const urlParts = window.location.pathname.split('/');
+                                const raceIndex = urlParts.indexOf('race');
+                                if (raceIndex !== -1 && urlParts.length > raceIndex + 1) {
+                                    const raceId = urlParts[raceIndex + 1];
+                                    window.location.href = `/race/${raceId}/`;
+                                } else {
+                                    // If all else fails, go to the lobby listing
+                                    window.location.href = '/lobbies/';
+                                }
+                            });
+                            
+                            // Make the button visible and prominent
+                            nextBtn.style.display = 'block';
+                            nextBtn.classList.add('btn-lg');
+                            
+                            // Add a clear message about what to do next
+                            messageElement.textContent = 'Photo submitted successfully! Click Next to continue.';
+                        }
+                    }
                 } else {
-                    resultMessage.textContent = data.error || 'An error occurred';
-                    resultMessage.className = 'mt-3 error';
+                    // Show error message
+                    messageElement.textContent = data.error || 'Error submitting photo.';
+                    messageElement.className = 'alert alert-danger';
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                resultMessage.textContent = 'An error occurred. Please try again.';
-                resultMessage.className = 'mt-3 error';
+                spinnerElement.style.display = 'none';
+                messageElement.textContent = 'Error uploading photo. Please try again.';
+                messageElement.className = 'alert alert-danger';
             });
         });
     }
@@ -406,5 +467,31 @@ document.addEventListener('DOMContentLoaded', function() {
         return cookieValue;
     }
 });
+
+// Initialize the Next button if it exists
+const nextBtn = document.getElementById('nextBtn');
+if (nextBtn) {
+    nextBtn.addEventListener('click', function() {
+        // First check for data-next-url attribute
+        if (this.getAttribute('data-next-url')) {
+            window.location.href = this.getAttribute('data-next-url');
+            return;
+        }
+        
+        // Otherwise, try to determine the next URL from the current path
+        const urlParts = window.location.pathname.split('/');
+        const lobbyIndex = urlParts.indexOf('lobby');
+        
+        if (lobbyIndex !== -1 && urlParts.length > lobbyIndex + 1) {
+            const lobbyId = urlParts[lobbyIndex + 1];
+            
+            // Try to go back to the lobby
+            window.location.href = `/lobby/${lobbyId}/`;
+        } else {
+            // If we can't determine a good next URL, go to the lobby listing
+            window.location.href = '/lobbies/';
+        }
+    });
+}
 </script>
 {% endblock %}

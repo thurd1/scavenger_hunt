@@ -1470,7 +1470,10 @@ def check_answer(request):
                     team_answer.points_awarded = points
                 team_answer.save()
                 
-                # Return the result
+                # Find the lobby this team is in
+                lobby = team.participating_lobbies.first()
+                
+                # Prepare response data
                 response_data = {
                     'correct': is_correct,
                     'attempts': team_answer.attempts,
@@ -1944,13 +1947,45 @@ def upload_photo_api(request):
             except Exception as e:
                 logger.error(f"Error updating race progress: {str(e)}")
         
+        # Calculate next_url for navigation
+        next_url = ""
+        
+        # Get the lobby that matches this race
+        try:
+            lobby = team.participating_lobbies.filter(race=race).first()
+            if lobby:
+                # Get next question if any
+                questions = Question.objects.filter(zone__race=race).order_by('zone__created_at')
+                question_ids = list(questions.values_list('id', flat=True))
+                
+                next_q_id = None
+                try:
+                    current_index = question_ids.index(int(question_id))
+                    if current_index < len(question_ids) - 1:
+                        next_q_id = question_ids[current_index + 1]
+                except (ValueError, IndexError):
+                    pass
+                    
+                if next_q_id:
+                    next_url = reverse('student_question', kwargs={
+                        'lobby_id': lobby.id,
+                        'question_id': next_q_id
+                    })
+                else:
+                    next_url = reverse('race_complete')
+        except Exception as e:
+            logger.error(f"Error calculating next URL: {str(e)}")
+            # Fallback: if we can't determine next question, go to race complete
+            next_url = reverse('race_complete')
+        
         # Return success response with navigation info
         return JsonResponse({
             'success': True,
             'message': 'Photo uploaded successfully!',
             'show_next_button': True,  # Tell the client to show the next button
             'photo_uploaded': True,    # Confirm photo is recorded as uploaded
-            'question_completed': True # Mark question as completed for progress tracking
+            'question_completed': True, # Mark question as completed for progress tracking
+            'next_url': next_url       # Add the next URL for navigation
         })
         
     except Question.DoesNotExist:
