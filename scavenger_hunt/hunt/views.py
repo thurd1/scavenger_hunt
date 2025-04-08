@@ -228,90 +228,123 @@ class LobbyDetailsView(DetailView):
     context_object_name = 'lobby'
 
 def join_team(request, team_id=None):
-    # Make sure player name is in session
-    if 'player_name' not in request.session or not request.session['player_name']:
-        # Debug log for troubleshooting
-        print("Session data:", dict(request.session))
-        
-        # Get player name from POST if available
-        if request.method == 'POST' and 'player_name' in request.POST:
-            request.session['player_name'] = request.POST.get('player_name')
-            request.session.modified = True
-        else:
-            # We won't set a default name here
-            # Let's send the user back to set their name properly
-            return redirect('join_game_session')
+    # This function can be called in multiple ways:
+    # 1. Without team_id - for choosing a team from a list
+    # 2. With team_id - for joining a specific team
+
+    # Check if we have a player name in the session
+    player_name = request.session.get('player_name')
     
-    # If a team_id was provided and this is a POST request, handle joining the team
+    # If no player name, try to get it from POST data
+    if not player_name and request.method == 'POST':
+        player_name = request.POST.get('player_name')
+        if player_name:
+            request.session['player_name'] = player_name
+            request.session.modified = True
+            logger.info(f"Saved player name to session: {player_name}")
+
+    # Handle joining a specific team
     if team_id and request.method == 'POST':
         try:
-            team = Team.objects.get(id=team_id)
-            player_name = request.session['player_name']
-            role = request.POST.get('role')
-            
-            # Use the provided role or fall back to player_name
-            member_role = role if role else player_name
-            
-            # Create team member if doesn't exist
-            if not TeamMember.objects.filter(team=team, role=member_role).exists():
-                team_member = TeamMember.objects.create(
-                    team=team,
-                    role=member_role
-                )
+            team = get_object_or_404(Team, id=team_id)
+            logger.info(f"Attempting to join team: {team.name}")
+
+            # If player has a name but no team, create the team member
+            if player_name:
+                # Check if player already has a membership in any team
+                existing_team_memberships = TeamMember.objects.filter(role=player_name)
                 
-                # Save team member ID in session
-                request.session['team_member_id'] = team_member.id
-                request.session['team_role'] = member_role
-                request.session.modified = True
+                # Delete any existing memberships to prevent one player in multiple teams
+                if existing_team_memberships.exists():
+                    logger.info(f"Removing player {player_name} from {existing_team_memberships.count()} other teams")
+                    existing_team_memberships.delete()
                 
-            # Redirect to team view page
-            return redirect('view_team', team_id=team.id)
-        except Team.DoesNotExist:
-            # Team not found, continue to show join team page
-            pass
-    
-    # Check if we have a lobby code in the session
+                # Check if this player is already in this team
+                if not TeamMember.objects.filter(team=team, role=player_name).exists():
+                    # Add player to team
+                    team_member = TeamMember.objects.create(
+                        team=team,
+                        role=player_name
+                    )
+                    
+                    # Update session
+                    request.session['team_member_id'] = team_member.id
+                    request.session['team_role'] = player_name
+                    request.session['team_id'] = team.id
+                    request.session.modified = True
+                    
+                    # Log the join
+                    logger.info(f"Player {player_name} joined team {team.name}")
+                    
+                    # Broadcast the update
+                    try:
+                        channel_layer = get_channel_layer()
+                        
+                        # Send update to team channel
+                        async_to_sync(channel_layer.group_send)(
+                            f'team_{team.id}',
+                            {
+                                'type': 'team_member_joined',
+                                'member': player_name
+                            }
+                        )
+                        
+                        # Also send to any connected lobbies
+                        for lobby in team.participating_lobbies.all():
+                            async_to_sync(channel_layer.group_send)(
+                                f'lobby_{lobby.id}',
+                                {
+                                    'type': 'team_member_joined',
+                                    'member': {
+                                        'role': player_name,
+                                    },
+                                    'team_id': team.id,
+                                    'team_name': team.name
+                                }
+                            )
+                    except Exception as e:
+                        logger.error(f"Error broadcasting team update: {str(e)}")
+                else:
+                    # Player is already in this team, just update session
+                    team_member = TeamMember.objects.get(team=team, role=player_name)
+                    request.session['team_member_id'] = team_member.id
+                    request.session['team_role'] = player_name
+                    request.session['team_id'] = team.id
+                    request.session.modified = True
+                    logger.info(f"Player {player_name} was already in team {team.name}, updated session")
+                
+                # Redirect to the team page
+                return redirect('view_team', team_id=team.id)
+            else:
+                # If no player name, redirect to team selection with a message
+                messages.error(request, 'Please enter your name to join a team.')
+                return redirect('join_team')
+        except Exception as e:
+            logger.error(f"Error joining team: {str(e)}")
+            messages.error(request, f"Error joining team: {str(e)}")
+            return redirect('join_team')
+
+    # If not joining a specific team, show the team selection page
+    teams = []
     lobby_code = request.session.get('lobby_code')
     
-    # Log for debugging
-    print(f"Looking for teams in lobby with code: {lobby_code}")
-    
+    # If we have a lobby code, get all teams for that lobby
     if lobby_code:
-        # Get teams only for this lobby code
         try:
-            lobby = Lobby.objects.get(code=lobby_code)
-            
-            # Get all teams in this lobby
-            teams = list(lobby.teams.all())
-            print(f"Found {len(teams)} teams in lobby")
-            
-            # For each team, attach the members directly
-            for team in teams:
-                # Get members for this team
-                members = list(TeamMember.objects.filter(team=team).only('role', 'team'))
-                
-                # Attach members list directly to the team object
-                team.member_list = members
-                
-                # Add a method to count members
-                team.member_count = len(members)
-            
-        except Lobby.DoesNotExist:
-            print(f"Lobby with code {lobby_code} not found")
-            teams = []
-            lobby = None
-    else:
-        # If no lobby code in session, don't show any teams
-        print("No lobby code in session, not showing any teams")
-        teams = []
-        lobby = None
+            lobby = Lobby.objects.filter(code=lobby_code).first()
+            if lobby:
+                teams = lobby.teams.all()
+                logger.info(f"Found {teams.count()} teams for lobby {lobby_code}")
+        except Exception as e:
+            logger.error(f"Error finding teams for lobby {lobby_code}: {str(e)}")
     
-    return render(request, 'hunt/join_team.html', {
+    context = {
         'teams': teams,
-        'player_name': request.session['player_name'],
         'lobby_code': lobby_code,
-        'lobby': lobby
-    })
+        'player_name': player_name,
+    }
+    
+    return render(request, 'hunt/join_team.html', context)
 
 def generate_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -831,6 +864,23 @@ def view_team(request, team_id):
     joined_team = False
     team_member_id = request.session.get('team_member_id')
     team_role = request.session.get('team_role')
+    player_name = request.session.get('player_name')
+    
+    # Debug logging
+    logger.info(f"view_team: Team {team.name}, Player {player_name}, Role {team_role}")
+    logger.info(f"Team members: {[m.role for m in members]}")
+    
+    # Clear any stale team membership from other teams if joining this team
+    if player_name and not joined_team:
+        # Find if player has membership in other teams
+        other_memberships = TeamMember.objects.filter(
+            role=player_name
+        ).exclude(team=team)
+        
+        if other_memberships.exists():
+            # Delete memberships in other teams
+            logger.info(f"Removing player {player_name} from {other_memberships.count()} other teams")
+            other_memberships.delete()
     
     if team_role:
         # Check if there's a team member with this role in this team
@@ -844,20 +894,59 @@ def view_team(request, team_id):
                 break
     
     # If the player has a name in the session but isn't in the team yet, add them
-    player_name = request.session.get('player_name')
-    if player_name and len(members) == 0:
+    if player_name and not joined_team:
         # Create a new team member
         try:
             # Check if this name is already used
             if not TeamMember.objects.filter(team=team, role=player_name).exists():
+                # Create the new team member
                 new_member = TeamMember.objects.create(
                     team=team,
                     role=player_name
                 )
-                print(f"Created new team member: {player_name} for team {team.name}")
+                
+                # Update session to track membership
+                request.session['team_member_id'] = new_member.id
+                request.session['team_role'] = player_name
+                request.session['team_id'] = team.id
+                request.session.modified = True
+                
+                # Add to local list for rendering
                 members.append(new_member)
+                joined_team = True
+                
+                logger.info(f"Created new team member: {player_name} for team {team.name}")
+                
+                # Broadcast the update to any connected clients
+                try:
+                    channel_layer = get_channel_layer()
+                    
+                    # Send update to team channel
+                    async_to_sync(channel_layer.group_send)(
+                        f'team_{team.id}',
+                        {
+                            'type': 'team_member_joined',
+                            'member': player_name
+                        }
+                    )
+                    
+                    # Also send to any connected lobbies
+                    for lobby in team.participating_lobbies.all():
+                        async_to_sync(channel_layer.group_send)(
+                            f'lobby_{lobby.id}',
+                            {
+                                'type': 'team_member_joined',
+                                'member': {
+                                    'role': player_name,
+                                },
+                                'team_id': team.id,
+                                'team_name': team.name
+                            }
+                        )
+                except Exception as e:
+                    logger.error(f"Error broadcasting team update: {str(e)}")
         except Exception as e:
-            print(f"Error creating team member: {e}")
+            logger.error(f"Error creating team member: {e}")
     
     # Try to find a lobby with a race
     lobby = None
@@ -880,18 +969,20 @@ def view_team(request, team_id):
         race_id = race_id_in_page
         try:
             race = Race.objects.get(id=race_id_in_page)
-            print(f"Found race from URL parameter: {race.id}")
+            logger.info(f"Found race from URL parameter: {race.id}")
         except Race.DoesNotExist:
             pass
     
+    # Make sure we store the team ID in session
+    request.session['team_id'] = team.id
+    request.session.modified = True
+    
+    # Re-fetch members to ensure list is up to date
+    members = list(team.members.all())
+    
     # Debug logging
-    print(f"View team: {team.name}, Team ID: {team.id}")
-    print(f"Members: {[m.role for m in members]}")
-    print(f"Current player: {player_name}, Joined team: {joined_team}")
-    print(f"Lobby: {lobby.name if lobby else 'None'}")
-    print(f"Lobby Code: {lobby_code if lobby_code else 'None'}")
-    print(f"Race: {race.id if race else 'None'}")
-    print(f"Race ID: {race_id}")
+    logger.info(f"Final state: Team {team.name}, Members: {len(members)}")
+    logger.info(f"Lobby: {lobby.name if lobby else 'None'}, Race: {race.id if race else 'None'}")
     
     context = {
         'team': team,
@@ -1758,13 +1849,15 @@ def upload_photo_api(request):
             defaults={
                 'answered_correctly': False,
                 'attempts': 3,  # Assume they've used all attempts if they're uploading a photo
-                'requires_photo': True
+                'requires_photo': True,
+                'photo_uploaded': True  # Mark that photo is uploaded
             }
         )
         
         # Update the team answer with the photo
         photo = request.FILES['photo']
         team_answer.photo = photo
+        team_answer.photo_uploaded = True  # Ensure this flag is set
         team_answer.save()
         
         # Also update/create team progress
@@ -1774,7 +1867,8 @@ def upload_photo_api(request):
             defaults={
                 'completed': True,
                 'completion_time': timezone.now(),
-                'photo': photo
+                'photo': photo,
+                'photo_uploaded': True
             }
         )
         
@@ -1782,17 +1876,47 @@ def upload_photo_api(request):
             team_progress.completed = True
             team_progress.completion_time = timezone.now()
             team_progress.photo = photo
+            team_progress.photo_uploaded = True
             team_progress.save()
         
-        # Return success response
+        # Get the race ID from question for progress tracking
+        race = None
+        race_id = None
+        
+        # If question is in a zone, get the race from the zone
+        if hasattr(question, 'zone') and question.zone:
+            race = question.zone.race
+            race_id = race.id
+        
+        # If race found, update team race progress
+        if race_id:
+            try:
+                race_progress = TeamRaceProgress.objects.get(team=team, race=race)
+                if not hasattr(race_progress, 'photo_questions_completed'):
+                    race_progress.photo_questions_completed = []
+                
+                # Add this question ID to completed photo questions if not already there
+                photo_completed = race_progress.photo_questions_completed or []
+                if str(question.id) not in photo_completed:
+                    photo_completed.append(str(question.id))
+                    race_progress.photo_questions_completed = photo_completed
+                    race_progress.save()
+            except Exception as e:
+                logger.error(f"Error updating race progress: {str(e)}")
+        
+        # Return success response with navigation info
         return JsonResponse({
             'success': True,
             'message': 'Photo uploaded successfully!',
+            'show_next_button': True,  # Tell the client to show the next button
+            'photo_uploaded': True,    # Confirm photo is recorded as uploaded
+            'question_completed': True # Mark question as completed for progress tracking
         })
         
     except Question.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Question not found'}, status=404)
     except Exception as e:
+        logger.error(f"Error uploading photo: {str(e)}", exc_info=True)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @csrf_exempt

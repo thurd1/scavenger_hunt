@@ -20,6 +20,24 @@
     </div>
 </div>
 
+<!-- Race Started Notification -->
+<div id="race-started-notification" style="display: none;">
+    <div class="race-started-content">
+        <h2 class="race-title">Race Started!</h2>
+        <p class="race-description">The race has begun! You will be redirected to the questions page.</p>
+        <div class="countdown-container">
+            <div class="countdown-circle">
+                <div class="countdown-spinner"></div>
+                <span id="countdown" class="countdown-number">5</span>
+            </div>
+        </div>
+        <p id="race-countdown">Redirecting in 5 seconds...</p>
+        <p class="mt-4">
+            <a id="go-to-race-btn" href="#" class="btn btn-success btn-lg">Go to Race Now</a>
+        </p>
+    </div>
+</div>
+
 <div class="container">
     <div class="dashboard-box">
         <h1>{{ lobby.name|default:"Lobby Details" }}</h1>
@@ -62,7 +80,7 @@
                         </div>
                         <div class="team-actions">
                             <a href="{% url 'view_team' team.id %}" class="btn btn-view">View Team</a>
-                            <button class="btn btn-delete" onclick="deleteTeam({{ team.id }})">Delete Team</button>
+                            <button class="btn btn-delete" onclick="confirmDeleteTeam({{ team.id }})">Delete Team</button>
                         </div>
                     </div>
                 {% endfor %}
@@ -297,6 +315,84 @@
         font-weight: bold;
         transition: opacity 0.3s;
     }
+    
+    /* Race Started Notification Styles */
+    #race-started-notification {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.9);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .race-started-content {
+        background-color: rgba(40, 43, 48, 0.95);
+        border: 2px solid #90C83C;
+        border-radius: 15px;
+        max-width: 500px;
+        width: 90%;
+        padding: 40px 30px;
+        text-align: center;
+        box-shadow: 0 0 30px rgba(144, 200, 60, 0.4);
+    }
+    
+    .race-title {
+        color: #90C83C;
+        margin-bottom: 20px;
+        font-size: 2.5rem;
+        text-shadow: 0 0 10px rgba(144, 200, 60, 0.5);
+    }
+    
+    .race-description {
+        color: white;
+        font-size: 1.2rem;
+        margin-bottom: 30px;
+    }
+    
+    .countdown-container {
+        display: flex;
+        justify-content: center;
+        margin: 30px 0;
+    }
+    
+    .countdown-circle {
+        position: relative;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 20px rgba(144, 200, 60, 0.3);
+    }
+    
+    .countdown-spinner {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        border: 4px solid rgba(144, 200, 60, 0.2);
+        border-top-color: #90C83C;
+        animation: spin 1s linear infinite;
+    }
+    
+    .countdown-number {
+        color: white;
+        font-size: 3rem;
+        font-weight: bold;
+        z-index: 1;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
 </style>
 
 {% endblock %}
@@ -411,6 +507,53 @@
         });
     }
     
+    // Function to show race started notification and redirect
+    function startCountdownAndRedirect(raceId, redirectUrl) {
+        // Show race started notification
+        const notification = document.getElementById('race-started-notification');
+        if (notification) {
+            notification.style.display = 'flex'; // Use flex to center content
+            
+            // Update the "Go to Race Now" button link
+            const raceButton = document.getElementById('go-to-race-btn');
+            if (raceButton && redirectUrl) {
+                raceButton.href = redirectUrl;
+            } else if (raceButton && raceId) {
+                raceButton.href = `/race/${raceId}/questions/`;
+            }
+            
+            // Start countdown
+            let countdownEl = document.getElementById('countdown');
+            let countdownMsgEl = document.getElementById('race-countdown');
+            
+            if (countdownEl && countdownMsgEl) {
+                let seconds = 5;
+                
+                // Update countdown every second
+                let countdownInterval = setInterval(function() {
+                    seconds--;
+                    countdownEl.textContent = seconds;
+                    countdownMsgEl.textContent = `Redirecting in ${seconds} seconds...`;
+                    
+                    // When countdown reaches 0, redirect
+                    if (seconds <= 0) {
+                        clearInterval(countdownInterval);
+                        console.log("Countdown complete, redirecting to:", redirectUrl || `/race/${raceId}/questions/`);
+                        window.location.href = redirectUrl || `/race/${raceId}/questions/`;
+                    }
+                }, 1000);
+            } else {
+                // If we can't find the countdown elements, just redirect after 2 seconds
+                setTimeout(() => {
+                    window.location.href = redirectUrl || `/race/${raceId}/questions/`;
+                }, 2000);
+            }
+        } else {
+            // If notification element not found, just redirect immediately
+            window.location.href = redirectUrl || `/race/${raceId}/questions/`;
+        }
+    }
+    
     // Close the modal when clicking outside
     window.onclick = function(event) {
         const modal = document.getElementById('deleteConfirmModal');
@@ -494,6 +637,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Set the lobby ID for the WebSocket connection
         window.lobbyId = '{{ lobby.id }}';
+        window.raceId = '{{ lobby.race.id }}';
         
         // Add a visual indicator for real-time updates
         const statusIndicator = document.createElement('div');
@@ -538,6 +682,14 @@
                         // Force refresh on team updates
                         refreshTeamData(true);
                         updateStatusIndicator('Team update received!');
+                    } else if (data.type === 'race_started') {
+                        console.log('Race started! Showing notification...');
+                        
+                        // Show the race started notification and redirect
+                        startCountdownAndRedirect(
+                            window.raceId || data.race_id, 
+                            data.redirect_url
+                        );
                     }
                 } catch (error) {
                     console.error('Error parsing WebSocket message:', error);
@@ -590,6 +742,25 @@
         setInterval(() => {
             refreshTeamData(true);
         }, 20000);
+        
+        // Check if race already started (in case we missed the WebSocket event)
+        if ('{{ lobby.hunt_started }}' === 'True') {
+            console.log('Race already started according to page data!');
+            startCountdownAndRedirect(window.raceId);
+        } else {
+            // Set up periodic checks for race status
+            setInterval(() => {
+                fetch(`/lobby/{{ lobby.id }}/status/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.hunt_started) {
+                            console.log('Race started according to status check!');
+                            startCountdownAndRedirect(data.race_id, data.redirect_url);
+                        }
+                    })
+                    .catch(error => console.error('Error checking race status:', error));
+            }, 5000);
+        }
     });
 </script>
 {% endblock %}

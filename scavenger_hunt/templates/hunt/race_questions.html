@@ -735,21 +735,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Mark photo as uploaded
                 questionData[questionId].photoUploaded = true;
                 
-                // FIXED: Show and enable next button properly
-                // Get navigation buttons element
+                // Always show the next button after a successful photo upload
+                // regardless of what the server returns
                 const navButtons = document.getElementById('navigation-buttons');
                 
-                // Just make it visible directly - no need to clone/replace
+                // Make navigation buttons visible
                 navButtons.style.display = 'block';
                 navButtons.style.visibility = 'visible';
                 navButtons.style.opacity = '1';
                 
-                // Manually check if the next button is working
+                // Log for debugging
+                console.log('Photo uploaded successfully. Showing navigation buttons.');
+                
+                // Check for next button and ensure it works
                 const nextButton = document.getElementById('next-question');
                 if (nextButton) {
-                    console.log('Next button present. Ensuring it works...');
+                    console.log('Next button found. Ensuring it works...');
                     
-                    // Force a click event to make debugging easier
+                    // Mark button as ready
                     nextButton.classList.add('ready');
                     
                     // If the button doesn't already have a working event listener, 
@@ -777,6 +780,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         });
                     }
+                } else {
+                    console.error('Next button not found in the DOM!');
                 }
                 
                 // Disable upload button
