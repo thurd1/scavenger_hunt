@@ -87,7 +87,7 @@ def lobby_details(request, lobby_id):
         
         # Add a timestamp to prevent browser caching
         response = render(request, 'hunt/lobby_details.html', {
-        'lobby': lobby,
+            'lobby': lobby,
             'timestamp': timezone.now().timestamp(),
         })
         
@@ -272,7 +272,7 @@ def join_team(request, team_id=None):
                     request.session['team_role'] = player_name
                     request.session['team_id'] = team.id
                     request.session.modified = True
-            
+                    
                     # Log the join
                     logger.info(f"Player {player_name} joined team {team.name}")
                     
@@ -943,8 +943,8 @@ def view_team(request, team_id):
                                 'team_name': team.name
                             }
                         )
-        except Exception as e:
-            logger.error(f"Error broadcasting team update: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Error broadcasting team update: {str(e)}")
         except Exception as e:
             logger.error(f"Error creating team member: {e}")
     
@@ -1361,7 +1361,7 @@ def student_question(request, lobby_id, question_id):
         
         # Check if time limit is exceeded - time_limit is on the race object, not lobby
         if lobby.race and lobby.start_time:
-                        time_elapsed = timezone.now() - lobby.start_time
+            time_elapsed = timezone.now() - lobby.start_time
             time_limit_minutes = lobby.race.time_limit_minutes if hasattr(lobby.race, 'time_limit_minutes') else 60  # Default to 60 minutes
             if time_elapsed > timedelta(minutes=time_limit_minutes):
                 return render(request, 'hunt/error.html', {
@@ -1427,11 +1427,11 @@ def student_question(request, lobby_id, question_id):
                     }
                 
                 # Prepare the context for the template
-            context = {
-                'lobby': lobby,
+                context = {
+                    'lobby': lobby,
                     'question': current_question,
-                'player_name': player_name,
-                'team': team,
+                    'player_name': player_name,
+                    'team': team,
                     'team_member': team_member,
                     'requires_photo': current_question.requires_photo if hasattr(current_question, 'requires_photo') else False,
                     
@@ -1519,8 +1519,8 @@ def check_answer(request, lobby_id=None, question_id=None):
                 # If not, create or update the team answer
                 if not team_answer:
                     team_answer = TeamAnswer.objects.create(
-                    team=team,
-                    question=question,
+                        team=team,
+                        question=question,
                         answered_correctly=False,
                         attempts=0,
                         points_awarded=0,
@@ -1631,7 +1631,7 @@ def check_answer(request, lobby_id=None, question_id=None):
                 return JsonResponse({'error': 'Question not found'}, status=404)
             except Team.DoesNotExist:
                 return JsonResponse({'error': 'Team not found'}, status=404)
-            
+                
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
