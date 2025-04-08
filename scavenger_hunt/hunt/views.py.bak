@@ -807,10 +807,10 @@ def delete_team(request, team_id):
         # Broadcast updates if needed
         if lobby_id:
             try:
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    f'lobby_{lobby_id}',
-                    {
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'lobby_{lobby_id}',
+                {
                         'type': 'team_left',
                         'team_id': team_id
                     }
@@ -944,7 +944,7 @@ def view_team(request, team_id):
                             }
                         )
         except Exception as e:
-            logger.error(f"Error broadcasting team update: {str(e)}")
+                    logger.error(f"Error broadcasting team update: {str(e)}")
         except Exception as e:
             logger.error(f"Error creating team member: {e}")
     
@@ -1361,12 +1361,12 @@ def student_question(request, lobby_id, question_id):
         
         # Check if time limit is exceeded - time_limit is on the race object, not lobby
         if lobby.race and lobby.start_time:
-                        time_elapsed = timezone.now() - lobby.start_time
+        time_elapsed = timezone.now() - lobby.start_time
             time_limit_minutes = lobby.race.time_limit_minutes if hasattr(lobby.race, 'time_limit_minutes') else 60  # Default to 60 minutes
             if time_elapsed > timedelta(minutes=time_limit_minutes):
-                return render(request, 'hunt/error.html', {
-                    'error': 'Race time limit has been exceeded.'
-                })
+            return render(request, 'hunt/error.html', {
+                'error': 'Race time limit has been exceeded.'
+            })
         
         # Get the team for this player
         try:
@@ -1834,7 +1834,7 @@ def race_questions(request, race_id):
         team_id = request.session.get('team_id')
         if team_id:
             try:
-                team = Team.objects.get(id=team_id)
+            team = Team.objects.get(id=team_id)
             except Team.DoesNotExist:
                 pass
     
@@ -1858,11 +1858,11 @@ def race_questions(request, race_id):
         })
     
     # Find or create team member
-    try:
-        team_member = TeamMember.objects.get(team=team, role=player_name)
-    except TeamMember.DoesNotExist:
+            try:
+                team_member = TeamMember.objects.get(team=team, role=player_name)
+            except TeamMember.DoesNotExist:
         # Create a team member entry
-        team_member = TeamMember.objects.create(team=team, role=player_name)
+                team_member = TeamMember.objects.create(team=team, role=player_name)
                 print(f"Created new team member {player_name} for team {team.name}")
     
     # Get zones and questions for this race
@@ -2142,13 +2142,13 @@ def upload_photo_api(request):
                     )
                     logger.info(f"Sent leaderboard update for team {team.id} in race {race_id}")
                 except Exception as e:
-            logger.error(f"Error sending leaderboard update: {str(e)}")
+                    logger.error(f"Error sending leaderboard update: {str(e)}")
                     
                 # Also trigger an HTTP-based leaderboard update for redundancy
                 try:
                     trigger_leaderboard_update_internal(race_id)
                 except Exception as e:
-            logger.error(f"Error triggering HTTP leaderboard update: {str(e)}")
+                    logger.error(f"Error triggering HTTP leaderboard update: {str(e)}")
             except Exception as e:
                 logger.error(f"Error updating race progress: {str(e)}")
         
