@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Session Expired{% endblock %}
+
+{% block content %}
+<div class="container py-5 text-center">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="dashboard-box p-5">
+                <h1 class="text-danger mb-4">
+                    <i class="fas fa-exclamation-triangle"></i> Session Expired
+                </h1>
+                
+                <p class="lead">Your session has expired or there was a security issue with your request.</p>
+                
+                <p class="mb-4">This can happen if:</p>
+                <ul class="list-unstyled mb-5">
+                    <li class="mb-2">Your browser has been inactive for too long</li>
+                    <li class="mb-2">You logged in on another tab or device</li>
+                    <li class="mb-2">You used the browser's back button after logging in</li>
+                </ul>
+                
+                <div class="mt-5">
+                    <a href="{% url 'home' %}" class="btn btn-success btn-lg">
+                        <i class="fas fa-home"></i> Return to Home Page
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dashboard-box {
+        background-color: rgba(33, 37, 41, 0.9);
+        border-radius: 15px;
+        border: 2px solid rgba(144, 200, 60, 0.3);
+    }
+</style>
+{% endblock %} 

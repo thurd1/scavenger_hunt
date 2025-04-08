@@ -2188,3 +2188,16 @@ def trigger_leaderboard_update(request):
             'success': False,
             'error': str(e)
         })
+
+def csrf_failure(request, reason=""):
+    """
+    Custom view for CSRF verification failures that redirects to home 
+    instead of showing the default Django error page.
+    """
+    from django.contrib import messages
+    
+    # Add an error message that will be displayed on the home page
+    messages.error(request, "Your session has expired or there was a security issue. Please try again.")
+    
+    # Redirect to home page
+    return redirect('home')

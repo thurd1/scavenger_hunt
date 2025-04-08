@@ -107,3 +107,6 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# Custom error views
+CSRF_FAILURE_VIEW = 'hunt.views.csrf_failure'
