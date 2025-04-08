@@ -1515,8 +1515,12 @@ def check_answer(request, lobby_id=None, question_id=None):
                             'lobby_id': lobby.id,
                             'question_id': next_q_id
                         })
+                        logger.info(f"Next URL set to: {response_data['next_url']} for question {question_id} -> {next_q_id}")
                     else:
                         response_data['next_url'] = reverse('race_complete')
+                        logger.info(f"No next question found for {question_id}, redirecting to race_complete")
+                else:
+                    logger.warning(f"Could not calculate next_url: is_correct={is_correct}, lobby exists={lobby is not None}")
                 
                 # If the answer is incorrect and max attempts reached, suggest photo upload
                 if not is_correct and team_answer.attempts >= 3:

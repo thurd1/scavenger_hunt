@@ -295,29 +295,31 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show loading spinner
         loaderElement.style.display = 'block';
         
+        // Log the data to help with debugging
+        console.log("Received data from server:", data);
+        
         // Check if data contains a valid next_url
-        if (data.next_url && data.next_url.startsWith('/race/') && data.next_url.includes('/question/')) {
-            // Redirect to next question after a short delay
-            setTimeout(function() {
-                window.location.href = data.next_url;
-            }, 1500);
-        } else if (data.next_url && data.next_url.includes('/complete/')) {
-            // Redirect to completion page after a short delay
+        if (data.next_url) {
+            console.log("Redirecting to next_url:", data.next_url);
+            // Redirect to the provided URL after a short delay
             setTimeout(function() {
                 window.location.href = data.next_url;
             }, 1500);
         } else {
-            // Fallback to a default URL if next_url is not provided or invalid
+            // Fallback to a default URL if next_url is not provided
+            console.log("No next_url provided, using fallback navigation");
             setTimeout(function() {
-                // Get the current race ID from the URL
+                // Get the current lobby ID from the URL
                 const urlParts = window.location.pathname.split('/');
-                const raceIndex = urlParts.indexOf('race');
-                if (raceIndex !== -1 && urlParts.length > raceIndex + 1) {
-                    const raceId = urlParts[raceIndex + 1];
-                    window.location.href = `/race/${raceId}/`;
+                const studentQuestionIndex = urlParts.indexOf('studentQuestion');
+                if (studentQuestionIndex !== -1 && urlParts.length > studentQuestionIndex + 1) {
+                    const lobbyId = urlParts[studentQuestionIndex + 1];
+                    console.log("Navigating to lobby page:", lobbyId);
+                    window.location.href = `/lobby/${lobbyId}/`;
                 } else {
-                    // If all else fails, go to the lobby listing
-                    window.location.href = '/lobbies/';
+                    // If all else fails, go to the home page
+                    console.log("Could not determine lobby ID, going to home page");
+                    window.location.href = '/';
                 }
             }, 1500);
         }
@@ -429,13 +431,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             nextBtn.addEventListener('click', function() {
                                 // Get the current race ID from the URL
                                 const urlParts = window.location.pathname.split('/');
-                                const raceIndex = urlParts.indexOf('race');
-                                if (raceIndex !== -1 && urlParts.length > raceIndex + 1) {
-                                    const raceId = urlParts[raceIndex + 1];
-                                    window.location.href = `/race/${raceId}/`;
+                                const lobbyIndex = urlParts.indexOf('studentQuestion');
+                                if (lobbyIndex !== -1 && urlParts.length > lobbyIndex + 1) {
+                                    const lobbyId = urlParts[lobbyIndex + 1];
+                                    window.location.href = `/lobby/${lobbyId}/`;
                                 } else {
-                                    // If all else fails, go to the lobby listing
-                                    window.location.href = '/lobbies/';
+                                    // If all else fails, go to the home page
+                                    window.location.href = '/';
                                 }
                             });
                             
