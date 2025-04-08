@@ -276,12 +276,35 @@ input.max-attempts-reached {
     text-align: center;
     margin-top: 40px;
     margin-bottom: 30px;
+    display: none; /* Initially hidden */
+    z-index: 1000; /* Ensure it's above other elements */
+    position: relative; /* For proper z-index stacking */
 }
 
 #next-question {
     padding: 15px 40px;
     font-size: 1.2rem;
     min-width: 200px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+#next-question.ready {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.7);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 10px 0 rgba(144, 200, 60, 0.5);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.7);
+    }
 }
 </style>
 
@@ -805,7 +828,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 // regardless of what the server returns
                 const navButtons = document.getElementById('navigation-buttons');
                 
-                // Make navigation buttons visible
+                // Create a special notice about the next button
+                const nextButtonNotice = document.createElement('div');
+                nextButtonNotice.className = 'next-button-notice';
+                nextButtonNotice.innerHTML = '<strong>↓ You can now click "Next Question" to continue ↓</strong>';
+                nextButtonNotice.style.textAlign = 'center';
+                nextButtonNotice.style.color = '#90C83C';
+                nextButtonNotice.style.fontWeight = 'bold';
+                nextButtonNotice.style.marginBottom = '15px';
+                nextButtonNotice.style.fontSize = '1.2rem';
+                nextButtonNotice.style.padding = '10px';
+                nextButtonNotice.style.backgroundColor = 'rgba(144, 200, 60, 0.2)';
+                nextButtonNotice.style.borderRadius = '5px';
+                nextButtonNotice.style.animation = 'fadeIn 0.5s';
+                
+                // Insert the notice before navigation buttons
+                navButtons.parentNode.insertBefore(nextButtonNotice, navButtons);
+                
+                // Make navigation buttons visible with enhanced visibility
                 navButtons.style.display = 'block';
                 navButtons.style.visibility = 'visible';
                 navButtons.style.opacity = '1';
@@ -818,8 +858,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (nextButton) {
                     console.log('Next button found. Ensuring it works...');
                     
-                    // Mark button as ready
+                    // Mark button as ready and make it stand out
                     nextButton.classList.add('ready');
+                    nextButton.style.backgroundColor = '#90C83C';
+                    nextButton.style.color = 'white';
+                    nextButton.style.fontSize = '1.3rem';
                     
                     // If we have a next_url from the server
                     if (data.next_url) {
