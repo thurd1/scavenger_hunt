@@ -298,30 +298,47 @@ document.addEventListener('DOMContentLoaded', function() {
         // Log the data to help with debugging
         console.log("Received data from server:", data);
         
-        // Check if data contains a valid next_url
+        // Directly use the next_url if available
         if (data.next_url) {
-            console.log("Redirecting to next_url:", data.next_url);
-            // Redirect to the provided URL after a short delay
-            setTimeout(function() {
-                window.location.href = data.next_url;
-            }, 1500);
+            // Create a direct link to the next question
+            let nextUrlElement = document.createElement('div');
+            nextUrlElement.innerHTML = `<div class="text-center mt-3">
+                <p>Going to next question in <span id="redirect-countdown">3</span> seconds...</p>
+                <a href="${data.next_url}" class="btn btn-success">Go Now</a>
+            </div>`;
+            messageElement.after(nextUrlElement);
+            
+            // Countdown for redirect
+            let countdown = 3;
+            let countdownInterval = setInterval(function() {
+                countdown--;
+                let countdownElement = document.getElementById('redirect-countdown');
+                if (countdownElement) {
+                    countdownElement.textContent = countdown;
+                }
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    window.location.href = data.next_url;
+                }
+            }, 1000);
+            
+            console.log("Redirecting to next question:", data.next_url);
         } else {
             // Fallback to a default URL if next_url is not provided
-            console.log("No next_url provided, using fallback navigation");
-            setTimeout(function() {
-                // Get the current lobby ID from the URL
-                const urlParts = window.location.pathname.split('/');
-                const studentQuestionIndex = urlParts.indexOf('studentQuestion');
-                if (studentQuestionIndex !== -1 && urlParts.length > studentQuestionIndex + 1) {
-                    const lobbyId = urlParts[studentQuestionIndex + 1];
-                    console.log("Navigating to lobby page:", lobbyId);
-                    window.location.href = `/lobby/${lobbyId}/`;
-                } else {
-                    // If all else fails, go to the home page
-                    console.log("Could not determine lobby ID, going to home page");
-                    window.location.href = '/';
-                }
-            }, 1500);
+            console.error("No next_url provided in the response. Unable to navigate to next question.");
+            
+            // Show error to user
+            let errorElement = document.createElement('div');
+            errorElement.className = "alert alert-warning mt-3";
+            errorElement.textContent = "Could not determine next question. Please go back to the lobby.";
+            messageElement.after(errorElement);
+            
+            // Add a back button
+            let backButton = document.createElement('a');
+            backButton.href = "/";
+            backButton.className = "btn btn-primary mt-3";
+            backButton.textContent = "Go Home";
+            errorElement.after(backButton);
         }
     }
     
@@ -357,6 +374,10 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(data => {
                 if (data.correct) {
+                    // Debug output 
+                    console.log('Answer correct! Response data:', data);
+                    console.log('next_url in response:', data.next_url);
+                    
                     // Handle correct answer
                     handleCorrectAnswer(data);
                 } else {

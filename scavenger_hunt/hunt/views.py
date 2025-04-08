@@ -1497,17 +1497,43 @@ def check_answer(request, lobby_id=None, question_id=None):
                 if is_correct and lobby:
                     # Get all questions for this race
                     race = lobby.race
-                    questions = Question.objects.filter(zone__race=race).order_by('zone__created_at')
+                    
+                    # DEBUG: Log information about the current question and race
+                    logger.info(f"Calculating next question after question_id={question_id} in race_id={race.id if race else 'None'}")
+                    
+                    # Get all questions for this race, ordered by zone creation time then question ID
+                    questions = Question.objects.filter(zone__race=race).order_by('zone__created_at', 'id')
                     question_ids = list(questions.values_list('id', flat=True))
+                    
+                    # Log the full list of question IDs for debugging
+                    logger.info(f"All question IDs in order: {question_ids}")
                     
                     # Find the next question if any
                     next_q_id = None
                     try:
                         current_index = question_ids.index(int(question_id))
+                        logger.info(f"Current question index: {current_index} of {len(question_ids)-1}")
+                        
                         if current_index < len(question_ids) - 1:
                             next_q_id = question_ids[current_index + 1]
-                    except (ValueError, IndexError):
-                        pass
+                            logger.info(f"Next question ID determined: {next_q_id}")
+                        else:
+                            logger.info("This appears to be the last question")
+                    except (ValueError, IndexError) as e:
+                        logger.error(f"Error finding question index: {str(e)}")
+                        # Try a different approach - find questions with higher ID
+                        try:
+                            # Find questions with higher ID in same race
+                            next_questions = Question.objects.filter(
+                                zone__race=race,
+                                id__gt=int(question_id)
+                            ).order_by('zone__created_at', 'id')
+                            
+                            if next_questions.exists():
+                                next_q_id = next_questions.first().id
+                                logger.info(f"Found next question by ID: {next_q_id}")
+                        except Exception as e2:
+                            logger.error(f"Alternative approach also failed: {str(e2)}")
                     
                     # Set the next_url
                     if next_q_id:
@@ -1515,12 +1541,13 @@ def check_answer(request, lobby_id=None, question_id=None):
                             'lobby_id': lobby.id,
                             'question_id': next_q_id
                         })
-                        logger.info(f"Next URL set to: {response_data['next_url']} for question {question_id} -> {next_q_id}")
+                        logger.info(f"Set next_url to: {response_data['next_url']}")
                     else:
                         response_data['next_url'] = reverse('race_complete')
-                        logger.info(f"No next question found for {question_id}, redirecting to race_complete")
+                        logger.info(f"No next question found, set next_url to race_complete: {response_data['next_url']}")
                 else:
-                    logger.warning(f"Could not calculate next_url: is_correct={is_correct}, lobby exists={lobby is not None}")
+                    reason = "Answer incorrect" if not is_correct else "Lobby not found"
+                    logger.warning(f"Could not calculate next_url: {reason}")
                 
                 # If the answer is incorrect and max attempts reached, suggest photo upload
                 if not is_correct and team_answer.attempts >= 3:
