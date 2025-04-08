@@ -1378,78 +1378,89 @@ def student_question(request, lobby_id, question_id):
                 
             team = team_member.team
             
-            # IMPORTANT CHANGE: Load ALL questions for this race, similar to race_questions.html
-            all_questions = []
-            questions_by_zone = {}
-            zones = []
-            next_question_id = None
-            
-            if lobby.race:
-                # Get all zones for this race
-                zones = Zone.objects.filter(race=lobby.race).order_by('created_at')
+            # Instead of rendering the student_question template, redirect to race_questions
+            # Only use the template-based redirect for browsers with JavaScript disabled
+            if request.GET.get('no_redirect'):
+                # Load context for the template if a user has specifically requested not to redirect
+                # This serves as a fallback for browsers with JavaScript disabled
                 
-                # Get all questions organized by zone
-                for zone in zones:
-                    zone_questions = Question.objects.filter(zone=zone).order_by('id')
-                    if zone_questions.exists():
-                        questions_by_zone[zone.id] = list(zone_questions)
-                        all_questions.extend(zone_questions)
+                # IMPORTANT CHANGE: Load ALL questions for this race, similar to race_questions.html
+                all_questions = []
+                questions_by_zone = {}
+                zones = []
+                next_question_id = None
                 
-                # Find current question index
-                try:
-                    current_index = all_questions.index(current_question)
-                    question_number = current_index + 1
-                    total_questions = len(all_questions)
+                if lobby.race:
+                    # Get all zones for this race
+                    zones = Zone.objects.filter(race=lobby.race).order_by('created_at')
                     
-                    # Calculate next question ID
-                    if current_index < len(all_questions) - 1:
-                        next_question_id = all_questions[current_index + 1].id
-                except (ValueError, IndexError):
-                    question_number = 1
-                    total_questions = len(all_questions)
-            
-            # Get existing answers for the team
-            team_answers = TeamAnswer.objects.filter(team=team, question__zone__race=lobby.race)
-            answers_by_question = {}
-            
-            for answer in team_answers:
-                answers_by_question[str(answer.question_id)] = {
-                    'answered_correctly': answer.answered_correctly,
-                    'attempts': answer.attempts,
-                    'points_awarded': answer.points_awarded,
-                    'photo_uploaded': answer.photo_uploaded
-                }
-            
-            # Check if we should redirect to race_questions page instead
-            if request.GET.get('use_race_page'):
-                return redirect('race_questions', race_id=lobby.race.id)
-            
-            # Prepare the context
-            context = {
-                'lobby': lobby,
-                'question': current_question,
-                'player_name': player_name,
-                'team': team,
-                'team_member': team_member,
-                'requires_photo': current_question.requires_photo if hasattr(current_question, 'requires_photo') else False,
+                    # Get all questions organized by zone
+                    for zone in zones:
+                        zone_questions = Question.objects.filter(zone=zone).order_by('id')
+                        if zone_questions.exists():
+                            questions_by_zone[zone.id] = list(zone_questions)
+                            all_questions.extend(zone_questions)
+                    
+                    # Find current question index
+                    try:
+                        current_index = all_questions.index(current_question)
+                        question_number = current_index + 1
+                        total_questions = len(all_questions)
+                        
+                        # Calculate next question ID
+                        if current_index < len(all_questions) - 1:
+                            next_question_id = all_questions[current_index + 1].id
+                    except (ValueError, IndexError):
+                        question_number = 1
+                        total_questions = len(all_questions)
+                    
+                # Get existing answers for the team
+                team_answers = TeamAnswer.objects.filter(team=team, question__zone__race=lobby.race)
+                answers_by_question = {}
                 
-                # Add race_questions.html style context
-                'race': lobby.race,
-                'questions': all_questions,
-                'zones': zones,
-                'questions_by_zone': questions_by_zone,
-                'current_question_index': question_number - 1,
-                'question_number': question_number,
-                'total_questions': total_questions,
-                'next_question_id': next_question_id,
-                'answers_by_question': answers_by_question
-            }
-            
-            # Add a direct link to switch to race_questions.html style
-            context['race_questions_url'] = f"/race/{lobby.race.id}/questions/?team_code={team.code}&player_name={player_name}"
-            
-            return render(request, 'hunt/student_question.html', context)
-            
+                for answer in team_answers:
+                    answers_by_question[str(answer.question_id)] = {
+                        'answered_correctly': answer.answered_correctly,
+                        'attempts': answer.attempts,
+                        'points_awarded': answer.points_awarded,
+                        'photo_uploaded': answer.photo_uploaded
+                    }
+                
+                # Prepare the context for the template
+                context = {
+                    'lobby': lobby,
+                    'question': current_question,
+                    'player_name': player_name,
+                    'team': team,
+                    'team_member': team_member,
+                    'requires_photo': current_question.requires_photo if hasattr(current_question, 'requires_photo') else False,
+                    
+                    # Add race_questions.html style context
+                    'race': lobby.race,
+                    'questions': all_questions,
+                    'zones': zones,
+                    'questions_by_zone': questions_by_zone,
+                    'current_question_index': question_number - 1,
+                    'question_number': question_number,
+                    'total_questions': total_questions,
+                    'next_question_id': next_question_id,
+                    'answers_by_question': answers_by_question
+                }
+                
+                # Add a direct link to switch to race_questions.html style
+                context['race_questions_url'] = f"/race/{lobby.race.id}/questions/?team_code={team.code}&player_name={player_name}"
+                
+                return render(request, 'hunt/student_question.html', context)
+            else:
+                # Redirect to the race_questions view with appropriate parameters
+                race_id = lobby.race.id if lobby.race else None
+                if race_id:
+                    redirect_url = f"/race/{race_id}/questions/?team_code={team.code}&player_name={player_name}"
+                    return redirect(redirect_url)
+                else:
+                    return render(request, 'hunt/error.html', {
+                        'error': 'No race found for this lobby.'
+                    })
         except TeamMember.DoesNotExist:
             return render(request, 'hunt/error.html', {
                 'error': 'You are not a member of any team.'
@@ -1939,10 +1950,29 @@ def check_lobby_race_status(request, lobby_id):
     
     if started and lobby.race:
         race_id = lobby.race.id
-        redirect_url = reverse('student_question', kwargs={'lobby_id': lobby_id, 'question_id': 1})
+        
+        # Get the player name from the session
+        player_name = request.session.get('player_name')
+        
+        # Get the team for this player
+        team_code = None
+        try:
+            if player_name:
+                team_member = TeamMember.objects.filter(role=player_name).first()
+                if team_member and team_member.team:
+                    team_code = team_member.team.code
+        except Exception as e:
+            logger.error(f"Error getting team code in check_lobby_race_status: {str(e)}")
+        
+        # If we have all the information, direct to race_questions instead of student_question
+        if team_code and player_name:
+            redirect_url = f"/race/{race_id}/questions/?team_code={team_code}&player_name={player_name}"
+        else:
+            # Fall back to the old URL if we don't have team information
+            redirect_url = reverse('student_question', kwargs={'lobby_id': lobby_id, 'question_id': 1})
         
     # Log the status check for debugging
-    logger.info(f"Lobby {lobby_id} race status check: started={started}, race_id={race_id}")
+    logger.info(f"Lobby {lobby_id} race status check: started={started}, race_id={race_id}, redirect_url={redirect_url}")
     
     return JsonResponse({
         'started': started,
