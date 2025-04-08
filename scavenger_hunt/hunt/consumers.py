@@ -497,7 +497,25 @@ class RaceConsumer(AsyncWebsocketConsumer):
         await self.accept()
         
         # Log for debugging
-        print(f"WebSocket CONNECTED: Race {self.race_id}")
+        logger.info(f"WebSocket CONNECTED: Race {self.race_id}, channel: {self.channel_name}")
+        
+        # Check if race is already started and notify client immediately
+        try:
+            from hunt.models import Race, Lobby
+            race = await database_sync_to_async(Race.objects.get)(id=self.race_id)
+            lobbies = await database_sync_to_async(lambda: list(Lobby.objects.filter(race=race, hunt_started=True)))()
+            
+            if lobbies:
+                logger.info(f"Race {self.race_id} already started - sending immediate notification")
+                redirect_url = f'/lobby/{lobbies[0].id}/question/1/'
+                await self.send(text_data=json.dumps({
+                    'type': 'race_started',
+                    'race_id': self.race_id,
+                    'redirect_url': redirect_url,
+                    'message': 'Race has started! Redirecting to questions page.'
+                }))
+        except Exception as e:
+            logger.error(f"Error checking race status on connect: {str(e)}")
     
     async def disconnect(self, close_code):
         # Leave the race group
@@ -505,12 +523,30 @@ class RaceConsumer(AsyncWebsocketConsumer):
             self.race_group_name,
             self.channel_name
         )
-        print(f"WebSocket DISCONNECTED: Race {self.race_id}")
+        logger.info(f"WebSocket DISCONNECTED: Race {self.race_id}")
 
     async def receive(self, text_data):
-        # We don't expect to receive messages from clients
-        # This is mainly for broadcasting from server to clients
-        pass
+        # Process messages from clients
+        try:
+            data = json.loads(text_data)
+            action = data.get('action')
+            
+            if action == 'check_status':
+                # Check if race is already started
+                from hunt.models import Race, Lobby
+                race = await database_sync_to_async(Race.objects.get)(id=self.race_id)
+                lobbies = await database_sync_to_async(lambda: list(Lobby.objects.filter(race=race, hunt_started=True)))()
+                
+                if lobbies:
+                    redirect_url = f'/lobby/{lobbies[0].id}/question/1/'
+                    await self.send(text_data=json.dumps({
+                        'type': 'race_started',
+                        'race_id': self.race_id,
+                        'redirect_url': redirect_url,
+                        'message': 'Race has started! Redirecting to questions page.'
+                    }))
+        except Exception as e:
+            logger.error(f"Error in race consumer receive: {str(e)}")
 
     async def race_started(self, event):
         """
@@ -523,7 +559,7 @@ class RaceConsumer(AsyncWebsocketConsumer):
             message = event.get('message', 'Race has started! Redirecting to questions page.')
             
             # Log the event for debugging
-            logger.info(f"RaceConsumer: Sending race_started event to client for race {race_id}")
+            logger.info(f"RaceConsumer: Sending race_started event to client for race {race_id} on channel {self.channel_name}")
             
             # Send the event to the WebSocket client
             await self.send(text_data=json.dumps({
@@ -536,9 +572,6 @@ class RaceConsumer(AsyncWebsocketConsumer):
             # Send it a second time after a brief delay to ensure delivery
             await asyncio.sleep(1)
             
-            # Log the second attempt
-            logger.info(f"RaceConsumer: Sending second race_started event to client for race {race_id}")
-            
             # Send again
             await self.send(text_data=json.dumps({
                 'type': 'race_started',
@@ -546,6 +579,17 @@ class RaceConsumer(AsyncWebsocketConsumer):
                 'redirect_url': redirect_url,
                 'message': message
             }))
+            
+            # And a third time after another delay
+            await asyncio.sleep(2)
+            await self.send(text_data=json.dumps({
+                'type': 'race_started',
+                'race_id': race_id,
+                'redirect_url': redirect_url,
+                'message': message
+            }))
+            
+            logger.info(f"Successfully sent all race_started events to client for race {race_id}")
         except Exception as e:
             logger.error(f"Error in RaceConsumer.race_started: {str(e)}")
 

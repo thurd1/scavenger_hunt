@@ -330,31 +330,95 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Show/hide the appropriate sections based on race status
+        const raceNotStarted = document.querySelector('.race-status-not-started');
+        const raceStarted = document.querySelector('.race-status-started');
+        
+        // Initially hide the race started section
+        if (raceStarted) {
+            raceStarted.style.display = 'none';
+        }
+        
         // Initialize WebSocket connection for race status updates
         const lobbyId = "{{ lobby.id|escapejs }}";
-        const raceStatusSocket = new WebSocket(
-            'ws://' + window.location.host + '/ws/race/' + lobbyId + '/'
-        );
-
-        raceStatusSocket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            if (data.type === 'race_started') {
-                handleRaceStart();
+        const teamId = "{{ team.id|escapejs }}";
+        let raceStatusSocket = null;
+        let reconnectAttempts = 0;
+        let checkInterval = null;
+        let hasRedirected = false;
+        
+        function connectWebSocket() {
+            if (raceStatusSocket) {
+                raceStatusSocket.close();
             }
-        };
+            
+            raceStatusSocket = new WebSocket(
+                'ws://' + window.location.host + '/ws/race/' + lobbyId + '/'
+            );
 
-        raceStatusSocket.onclose = function(e) {
-            console.log('Race status socket closed unexpectedly');
-            // Start checking race status via HTTP as fallback
-            checkRaceStatus();
-        };
+            raceStatusSocket.onopen = function(e) {
+                console.log('WebSocket connection established');
+                // Immediately check status in case we missed the race_started event
+                raceStatusSocket.send(JSON.stringify({
+                    'action': 'check_status'
+                }));
+                
+                // Also use polling as backup
+                if (!checkInterval) {
+                    checkInterval = setInterval(checkRaceStatus, 3000);
+                }
+            };
+            
+            raceStatusSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                console.log('WebSocket message received:', data);
+                if (data.type === 'race_started') {
+                    // Stop race status polling if it's running
+                    if (checkInterval) {
+                        clearInterval(checkInterval);
+                        checkInterval = null;
+                    }
+                    handleRaceStart();
+                }
+            };
+
+            raceStatusSocket.onclose = function(e) {
+                console.log('Race status socket closed:', e);
+                
+                // Reconnect logic with backoff
+                if (reconnectAttempts < 3 && !hasRedirected) {
+                    const timeout = Math.pow(2, reconnectAttempts) * 1000;
+                    console.log(`Reconnecting in ${timeout/1000} seconds...`);
+                    setTimeout(connectWebSocket, timeout);
+                    reconnectAttempts++;
+                } else {
+                    // If we've tried reconnecting too many times, rely only on polling
+                    if (!checkInterval && !hasRedirected) {
+                        console.log('Switching to polling only');
+                        checkInterval = setInterval(checkRaceStatus, 3000);
+                    }
+                }
+            };
+
+            raceStatusSocket.onerror = function(e) {
+                console.error('WebSocket error:', e);
+            };
+        }
 
         function handleRaceStart() {
-            document.querySelector('.race-status-not-started').style.display = 'none';
-            document.querySelector('.race-status-started').style.display = 'block';
+            if (hasRedirected) return;
+            
+            console.log('Race has started! Preparing for redirect...');
+            
+            // Update UI to show countdown
+            if (raceNotStarted) raceNotStarted.style.display = 'none';
+            if (raceStarted) raceStarted.style.display = 'block';
             
             let count = 5;
             const countdownElement = document.getElementById('countdown');
+            if (!countdownElement) return;
+            
+            countdownElement.textContent = count;
             
             const interval = setInterval(function() {
                 count--;
@@ -362,27 +426,52 @@
                 
                 if (count <= 0) {
                     clearInterval(interval);
+                    hasRedirected = true;
+                    
+                    // Close WebSocket before redirecting
+                    if (raceStatusSocket && raceStatusSocket.readyState === WebSocket.OPEN) {
+                        raceStatusSocket.close();
+                    }
+                    
+                    // Stop any polling
+                    if (checkInterval) {
+                        clearInterval(checkInterval);
+                        checkInterval = null;
+                    }
+                    
+                    // Redirect to the first question
                     window.location.href = "{% url 'student_question' lobby_id=lobby.id question_id=1 %}";
                 }
             }, 1000);
         }
 
         function checkRaceStatus() {
-            fetch('/api/lobby/{{ lobby.id }}/race-status/')
+            if (hasRedirected) return;
+            
+            console.log('Polling for race status...');
+            fetch('/api/lobby/' + lobbyId + '/race-status/')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.race_started) {
+                    console.log('Race status response:', data);
+                    if (data.started) {
+                        // Stop polling
+                        if (checkInterval) {
+                            clearInterval(checkInterval);
+                            checkInterval = null;
+                        }
                         handleRaceStart();
-                    } else {
-                        // If race not started, check again in 5 seconds
-                        setTimeout(checkRaceStatus, 5000);
                     }
                 })
                 .catch(error => {
                     console.error('Error checking race status:', error);
-                    setTimeout(checkRaceStatus, 5000);
                 });
         }
+        
+        // Start the WebSocket connection
+        connectWebSocket();
+        
+        // Also check immediately
+        checkRaceStatus();
     });
 </script>
 {% endblock %} 
