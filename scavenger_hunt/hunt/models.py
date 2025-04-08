@@ -205,6 +205,7 @@ class TeamRaceProgress(models.Model):
     current_question_index = models.IntegerField(default=0)
     total_points = models.IntegerField(default=0)
     last_updated = models.DateTimeField(auto_now=True)
+    photo_questions_completed = models.JSONField(null=True, blank=True)
     
     class Meta:
         unique_together = ('team', 'race')
