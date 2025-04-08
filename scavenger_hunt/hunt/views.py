@@ -987,6 +987,7 @@ def view_team(request, team_id):
     context = {
         'team': team,
         'members': members,
+        'team_members': members,  # Add this line to match the template's variable name
         'lobby': lobby,
         'lobby_code': lobby_code,
         'race': race,
@@ -1514,13 +1515,14 @@ def upload_photo(request, lobby_id, question_id):
         if not lobby.hunt_started:
             return JsonResponse({'error': 'Race has not started yet'}, status=400)
         
-        # Check if the question requires a photo
-        if not question.requires_photo:
-            return JsonResponse({'error': 'This question does not require a photo'}, status=400)
+        # Don't enforce photo requirement validation anymore
+        # if not question.requires_photo:
+        #     return JsonResponse({'error': 'This question does not require a photo'}, status=400)
         
-        # Check if time limit is exceeded
+        # Check if time limit is exceeded - use race's time limit if available or default to 60
+        time_limit_minutes = lobby.race.time_limit_minutes if hasattr(lobby.race, 'time_limit_minutes') else 60
         time_elapsed = timezone.now() - lobby.start_time
-        if time_elapsed > timedelta(minutes=lobby.time_limit):
+        if time_elapsed > timedelta(minutes=time_limit_minutes):
             return JsonResponse({'error': 'Race time limit exceeded'}, status=400)
         
         # Check if a photo was uploaded
@@ -1529,16 +1531,43 @@ def upload_photo(request, lobby_id, question_id):
         
         photo = request.FILES['photo']
         
-        # Find the team for this player
+        # Find the team for this player - more lenient search
         try:
-            team_member = TeamMember.objects.get(role=player_name, team__lobby=lobby)
+            team_member = TeamMember.objects.filter(role=player_name).first()
+            if not team_member:
+                return JsonResponse({'error': 'Player not found in any team'}, status=400)
+                
             team = team_member.team
             
-            # Save the photo
-            team_progress, created = TeamProgress.objects.get_or_create(team=team, question=question)
+            # Save photo to TeamAnswer
+            team_answer, created = TeamAnswer.objects.get_or_create(
+                team=team,
+                question=question,
+                defaults={
+                    'answered_correctly': False,
+                    'attempts': 3,  # Max attempts used
+                    'requires_photo': True,
+                    'photo_uploaded': True
+                }
+            )
+            
+            # Update the answer record
+            team_answer.photo = photo
+            team_answer.photo_uploaded = True  # This is critical!
+            team_answer.save()
+            
+            # Also save to team progress for compatibility
+            team_progress, created = TeamProgress.objects.get_or_create(
+                team=team, 
+                question=question,
+                defaults={
+                    'completed': True,
+                    'completion_time': timezone.now()
+                }
+            )
+            
             team_progress.photo = photo
-            team_progress.completed = True
-            team_progress.completion_time = timezone.now()
+            team_progress.photo_uploaded = True
             team_progress.save()
             
             # Send WebSocket update
@@ -1569,17 +1598,34 @@ def upload_photo(request, lobby_id, question_id):
                 }
             )
             
-            # Check if all questions are completed
-            total_questions = Question.objects.filter(race=lobby.race).count()
-            completed_questions = TeamProgress.objects.filter(team=team, completed=True).count()
+            # Get next question if any
+            questions = Question.objects.filter(zone__race=lobby.race).order_by('zone__created_at')
+            question_ids = list(questions.values_list('id', flat=True))
             
-            all_completed = total_questions <= completed_questions
+            next_q_id = None
+            try:
+                current_index = question_ids.index(int(question_id))
+                if current_index < len(question_ids) - 1:
+                    next_q_id = question_ids[current_index + 1]
+            except (ValueError, IndexError):
+                pass
+                
+            next_url = ""
+            if next_q_id:
+                next_url = reverse('student_question', kwargs={
+                    'lobby_id': lobby_id,
+                    'question_id': next_q_id
+                })
+            else:
+                next_url = reverse('race_complete')
             
             return JsonResponse({
                 'success': True,
                 'message': 'Photo uploaded successfully!',
-                'all_completed': all_completed,
-                'next_url': reverse('race_complete') if all_completed else ''
+                'show_next_button': True,  # Always show next button
+                'photo_uploaded': True,    # Confirm photo is recorded
+                'question_completed': True,# Mark as completed
+                'next_url': next_url
             })
             
         except TeamMember.DoesNotExist:
