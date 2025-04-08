@@ -42,7 +42,7 @@
             </div>
             
             <div id="photo-upload-container" style="display: none;">
-                <form id="photoForm" action="{% url 'upload_photo_student' lobby_id=lobby.id question_id=question.id %}" method="post" enctype="multipart/form-data">
+                <form id="photoForm" action="/lobby/{{ lobby.id }}/question/{{ question.id }}/upload/" method="post" enctype="multipart/form-data">
                     {% csrf_token %}
                     <div class="form-group">
                         <label for="photo" class="answer-label">You've used all attempts. Upload a Photo</label>
