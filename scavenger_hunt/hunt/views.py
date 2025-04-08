@@ -1404,11 +1404,13 @@ def student_question(request, lobby_id, question_id):
         })
 
 @csrf_exempt
-def check_answer(request):
+def check_answer(request, lobby_id=None, question_id=None):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            question_id = data.get('question_id')
+            
+            # Get question_id either from URL or from POST data
+            question_id = question_id or data.get('question_id')
             answer = data.get('answer')
             team_code = data.get('team_code')
             
@@ -1419,6 +1421,15 @@ def check_answer(request):
             try:
                 question = Question.objects.get(id=question_id)
                 team = Team.objects.get(code=team_code)
+                
+                # If lobby_id is provided in URL, ensure the team is part of the lobby
+                if lobby_id:
+                    try:
+                        lobby = Lobby.objects.get(id=lobby_id)
+                        if not team.participating_lobbies.filter(id=lobby_id).exists():
+                            return JsonResponse({'error': 'Team is not part of this lobby'}, status=403)
+                    except Lobby.DoesNotExist:
+                        return JsonResponse({'error': 'Lobby not found'}, status=404)
                 
                 # Check if the question has already been answered correctly by this team
                 team_answer = TeamAnswer.objects.filter(team=team, question=question).first()
@@ -1481,6 +1492,31 @@ def check_answer(request):
                     'points': points if is_correct else 0,
                     'photo_uploaded': team_answer.photo_uploaded
                 }
+                
+                # If the answer is correct, calculate next_url
+                if is_correct and lobby:
+                    # Get all questions for this race
+                    race = lobby.race
+                    questions = Question.objects.filter(zone__race=race).order_by('zone__created_at')
+                    question_ids = list(questions.values_list('id', flat=True))
+                    
+                    # Find the next question if any
+                    next_q_id = None
+                    try:
+                        current_index = question_ids.index(int(question_id))
+                        if current_index < len(question_ids) - 1:
+                            next_q_id = question_ids[current_index + 1]
+                    except (ValueError, IndexError):
+                        pass
+                    
+                    # Set the next_url
+                    if next_q_id:
+                        response_data['next_url'] = reverse('student_question', kwargs={
+                            'lobby_id': lobby.id,
+                            'question_id': next_q_id
+                        })
+                    else:
+                        response_data['next_url'] = reverse('race_complete')
                 
                 # If the answer is incorrect and max attempts reached, suggest photo upload
                 if not is_correct and team_answer.attempts >= 3:
