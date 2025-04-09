@@ -577,7 +577,7 @@ def leaderboard_data_api(request):
                 teams.append({
                     'id': team.id,
                     'name': team.name,
-                    'code': team.code,  # Add code to help identify specific teams
+                    'code': team.code,
                     'score': team_progress.total_points,
                     'lobby_id': lobby_id,
                     'lobby_name': lobby_name
@@ -591,8 +591,7 @@ def leaderboard_data_api(request):
             'success': True,
             'teams': teams
         })
-            
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Error in leaderboard_data_api: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
@@ -792,11 +791,11 @@ def delete_team(request, team_id):
         
         # Broadcast updates if needed
         if lobby_id:
-        try:
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f'lobby_{lobby_id}',
-                {
+            try:
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f'lobby_{lobby_id}',
+                    {
                         'type': 'team_left',
                         'team_id': team_id
                     }
@@ -929,10 +928,10 @@ def view_team(request, team_id):
                                 'team_name': team.name
                             }
                         )
-        except Exception as e:
+                except Exception as e:
                     logger.error(f"Error broadcasting team update: {str(e)}")
         except Exception as e:
-            logger.error(f"Error creating team member: {e}")
+            logger.error(f"Error broadcasting team update or creating team member: {str(e)}")
     
     # Try to find a lobby with a race
     lobby = None
@@ -1350,7 +1349,7 @@ def student_question(request, lobby_id, question_id):
             time_limit_minutes = lobby.race.time_limit_minutes if hasattr(lobby.race, 'time_limit_minutes') else 60  # Default to 60 minutes
             if time_elapsed > timedelta(minutes=time_limit_minutes):
                 return render(request, 'hunt/error.html', {
-                'error': 'Race time limit has been exceeded.'
+                    'error': 'Race time limit has been exceeded.'
                 })
         
         # Try to get the requested question
@@ -1458,11 +1457,11 @@ def student_question(request, lobby_id, question_id):
                     }
                 
                 # Prepare the context for the template
-            context = {
-                'lobby': lobby,
+                context = {
+                    'lobby': lobby,
                     'question': current_question,
-                'player_name': player_name,
-                'team': team,
+                    'player_name': player_name,
+                    'team': team,
                     'team_member': team_member,
                     'requires_photo': current_question.requires_photo if hasattr(current_question, 'requires_photo') else False,
                     
@@ -1505,7 +1504,7 @@ def student_question(request, lobby_id, question_id):
         return render(request, 'hunt/error.html', {
             'error': 'Question not found.'
         })
-
+    
 @csrf_exempt
 def check_answer(request, lobby_id=None, question_id=None):
     if request.method == 'POST':
@@ -1550,8 +1549,8 @@ def check_answer(request, lobby_id=None, question_id=None):
                 # If not, create or update the team answer
                 if not team_answer:
                     team_answer = TeamAnswer.objects.create(
-                    team=team,
-                    question=question,
+                        team=team,
+                        question=question,
                         answered_correctly=False,
                         attempts=0,
                         points_awarded=0,
@@ -1760,7 +1759,7 @@ def check_answer(request, lobby_id=None, question_id=None):
             return JsonResponse({'error': str(e)}, status=500)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-
+    
 def upload_photo(request, lobby_id, question_id):
     """Handle photo upload for a question"""
     if request.method != 'POST':
@@ -1980,12 +1979,12 @@ def race_questions(request, race_id):
         })
     
     # Find or create team member
-            try:
-                team_member = TeamMember.objects.get(team=team, role=player_name)
-            except TeamMember.DoesNotExist:
+    try:
+        team_member = TeamMember.objects.get(team=team, role=player_name)
+    except TeamMember.DoesNotExist:
         # Create a team member entry
-                team_member = TeamMember.objects.create(team=team, role=player_name)
-                print(f"Created new team member {player_name} for team {team.name}")
+        team_member = TeamMember.objects.create(team=team, role=player_name)
+        print(f"Created new team member {player_name} for team {team.name}")
     
     # Get zones and questions for this race
     zones = Zone.objects.filter(race=race).order_by('created_at')
@@ -2088,7 +2087,7 @@ def check_lobby_race_status(request, lobby_id):
         except Exception as e:
             logger.error(f"Error getting team code in check_lobby_race_status: {str(e)}")
         
-        # If we have all the information, direct to race_questions instead of student_question
+        # If we have all the information, direct to race_questions instead of using hardcoded ID 1
         if team_code and player_name:
             redirect_url = f"/race/{race_id}/questions/?team_code={team_code}&player_name={player_name}"
         else:
@@ -2261,7 +2260,6 @@ def upload_photo_api(request):
                 if not hasattr(race_progress, 'photo_questions_completed'):
                     race_progress.photo_questions_completed = []
                 
-                # Add this question ID to completed photo questions if not already there
                 photo_completed = race_progress.photo_questions_completed or []
                 if str(question.id) not in photo_completed:
                     photo_completed.append(str(question.id))
@@ -2635,7 +2633,7 @@ def trigger_leaderboard_update(request):
                 teams.append({
                     'id': team.id,
                     'name': team_name,  # Use the validated name
-                    'team_name': team_name,  # Add backup field for the client-side fix
+                    'team_name': team_name,  # Backup field for the client-side fix
                     'score': team_progress.total_points,
                     'lobby_id': lobby_id,
                     'lobby_name': lobby_name
