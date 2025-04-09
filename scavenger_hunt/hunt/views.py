@@ -26,6 +26,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
 import time
 import uuid
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -2714,3 +2715,37 @@ def trigger_leaderboard_update_internal(race_id=None):
     except Exception as e:
         logger.error(f"Error in trigger_leaderboard_update_internal: {str(e)}")
         return False
+
+def lobby_status(request, lobby_id):
+    """API endpoint to check lobby status and generate a hash for team data"""
+    try:
+        lobby = get_object_or_404(Lobby, id=lobby_id)
+        
+        # Generate a hash value for team data
+        team_count = lobby.teams.count()
+        team_data = []
+        
+        for team in lobby.teams.all():
+            team_info = {
+                'id': team.id,
+                'members_count': team.members.count(),
+                'member_ids': list(team.members.values_list('id', flat=True))
+            }
+            team_data.append(team_info)
+        
+        # Create a simple hash for comparison
+        import json
+        
+        # Convert to string and create hash
+        team_str = json.dumps(team_data, sort_keys=True)
+        teams_hash = hashlib.md5(team_str.encode()).hexdigest()
+        
+        return JsonResponse({
+            'hunt_started': lobby.hunt_started,
+            'race_id': lobby.race.id if lobby.race else None,
+            'redirect_url': f'/race/{lobby.race.id}/questions/' if lobby.race else None,
+            'teams_count': team_count,
+            'teams_hash': teams_hash
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
