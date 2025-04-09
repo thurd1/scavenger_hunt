@@ -4,9 +4,9 @@
 {% block title %}Lobby: {{ lobby.name }}{% endblock %}
 
 {% block extra_head %}
-    <!-- Add missing JavaScript files -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Use latest jQuery and Bootstrap directly from CDN -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
 {% endblock %}
 
 {% block welcome_text %}
@@ -405,11 +405,11 @@
 
 {% block extra_js %}
 <script>
-    // Global variable to store the team ID to delete
+    // Global variables
     let teamIdToDelete = null;
-    let lastUpdateTime = 0;
+    let lastUpdateTime = Date.now();
     let wsConnected = false;
-    let pollingEnabled = true;
+    let socket = null;
     
     // Get CSRF token from cookies
     function getCookie(name) {
@@ -427,6 +427,7 @@
         return cookieValue;
     }
     
+    // Modal functions
     function showModal() {
         document.getElementById('deleteConfirmModal').style.display = 'block';
     }
@@ -447,6 +448,7 @@
         closeModal();
     }
     
+    // Delete team functionality
     function deleteTeam(teamId) {
         fetch(`/team/${teamId}/delete/`, {
             method: 'POST',
@@ -469,455 +471,151 @@
         })
         .then(data => {
             if (data && data.status === 'success') {
-                // Remove the team card from the DOM
-                const teamElement = document.querySelector(`[data-team-id="${teamId}"]`);
-                if (teamElement && teamElement.parentElement) {
-                    teamElement.parentElement.removeChild(teamElement);
-                    
-                    // Force an immediate refresh to show updated state
-                    refreshTeamData(true);
-                } else {
-                    // If we can't find the team element, just reload the page
-                    location.reload();
-                }
+                location.reload();
             } else {
-                // If we get here with no data or failed status, just reload
                 location.reload();
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            // Just reload the page instead of showing alert
             location.reload();
         });
     }
     
-    function deleteLobby(lobbyId) {
-        fetch(`/lobby/${lobbyId}/delete/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        })
-        .then(response => {
-            if (response.ok || response.redirected) {
-                window.location.href = '{% url "manage_lobbies" %}';
-            } else {
-                throw new Error('Failed to delete lobby');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error deleting lobby: ' + error.message);
-        });
-    }
-    
-    // Function to show race started notification and redirect
-    function startCountdownAndRedirect(raceId, redirectUrl) {
-        // Show race started notification
-        const notification = document.getElementById('race-started-notification');
-        if (notification) {
-            notification.style.display = 'flex'; // Use flex to center content
-            
-            // Update the "Go to Race Now" button link
-            const raceButton = document.getElementById('go-to-race-btn');
-            if (raceButton && redirectUrl) {
-                raceButton.href = redirectUrl;
-            } else if (raceButton && raceId) {
-                raceButton.href = `/race/${raceId}/questions/`;
-            }
-            
-            // Start countdown
-            let countdownEl = document.getElementById('countdown');
-            let countdownMsgEl = document.getElementById('race-countdown');
-            
-            if (countdownEl && countdownMsgEl) {
-                let seconds = 5;
-                
-                // Update countdown every second
-                let countdownInterval = setInterval(function() {
-                    seconds--;
-                    countdownEl.textContent = seconds;
-                    countdownMsgEl.textContent = `Redirecting in ${seconds} seconds...`;
-                    
-                    // When countdown reaches 0, redirect
-                    if (seconds <= 0) {
-                        clearInterval(countdownInterval);
-                        console.log("Countdown complete, redirecting to:", redirectUrl || `/race/${raceId}/questions/`);
-                        window.location.href = redirectUrl || `/race/${raceId}/questions/`;
-                    }
-                }, 1000);
-            } else {
-                // If we can't find the countdown elements, just redirect after 2 seconds
-                setTimeout(() => {
-                    window.location.href = redirectUrl || `/race/${raceId}/questions/`;
-                }, 2000);
-            }
-        } else {
-            // If notification element not found, just redirect immediately
-            window.location.href = redirectUrl || `/race/${raceId}/questions/`;
-        }
-    }
-    
-    // Close the modal when clicking outside
-    window.onclick = function(event) {
-        const modal = document.getElementById('deleteConfirmModal');
-        if (event.target === modal) {
-            closeModal();
-        }
-    }
-    
-    // Function to refresh team data using fetch
-    function refreshTeamData(force = false) {
-        // Skip if WebSocket is connected and we haven't forced a refresh
-        if (wsConnected && !force && !pollingEnabled) {
-            return;
-        }
-        
-        // Throttle updates to at most once per second unless forced
-        const now = Date.now();
-        if (!force && now - lastUpdateTime < 1000) {
-            return;
-        }
-        
-        lastUpdateTime = now;
-        
-        // Add a timestamp to prevent caching
-        const cacheBuster = Date.now();
-        const refreshUrl = window.location.href.split('?')[0] + '?refresh=' + cacheBuster;
-        
-        fetch(refreshUrl)
-            .then(response => response.text())
-            .then(html => {
-                // Create a temporary DOM element to parse the HTML
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Get the teams section
-                const newTeamsSection = doc.querySelector('.teams-grid') || doc.querySelector('.no-teams');
-                const currentTeamsSection = document.querySelector('.teams-grid') || document.querySelector('.no-teams');
-                
-                if (!newTeamsSection || !currentTeamsSection) {
-                    console.warn('Teams section not found in either the current page or fetched HTML');
-                    return;
-                }
-                
-                // Compare the HTML content to detect changes
-                if (newTeamsSection.innerHTML !== currentTeamsSection.innerHTML) {
-                    console.log('Teams section changed, updating UI');
-                    
-                    // Update the teams section with new content
-                    currentTeamsSection.innerHTML = newTeamsSection.innerHTML;
-                    
-                    // Reattach event listeners to new elements
-                    attachEventListeners();
-                    
-                    // Highlight the section briefly to indicate update
-                    currentTeamsSection.style.transition = 'background-color 0.5s';
-                    currentTeamsSection.style.backgroundColor = 'rgba(144, 200, 60, 0.2)';
-                    setTimeout(() => {
-                        currentTeamsSection.style.backgroundColor = '';
-                    }, 500);
-                    
-                    // Update status indicator
-                    updateStatusIndicator('Teams updated!');
-                    
-                    // Display a notification about the update
-                    showTemporaryNotification('Team data has been updated!', 'info');
-                }
-                
-                // Also check for team count changes in the header
-                const newTeamCount = doc.querySelector('.team-count');
-                const currentTeamCount = document.querySelector('.team-count');
-                
-                if (newTeamCount && currentTeamCount && newTeamCount.innerText !== currentTeamCount.innerText) {
-                    currentTeamCount.innerText = newTeamCount.innerText;
-                    updateStatusIndicator('Team count updated!');
-                }
-            })
-            .catch(error => {
-                console.error('Error refreshing team data:', error);
-                updateStatusIndicator('Error refreshing', true);
-            });
-    }
-    
-    // Function to reattach event listeners to dynamically added content
-    function attachEventListeners() {
-        // Reattach delete button handlers
-        document.querySelectorAll('.btn-delete').forEach(button => {
-            if (button.getAttribute('data-has-listener') !== 'true') {
-                const teamId = button.getAttribute('data-team-id');
-                if (teamId) {
-                    button.addEventListener('click', function() {
-                        confirmDeleteTeam(teamId);
-                    });
-                    button.setAttribute('data-has-listener', 'true');
-                }
-            }
-        });
-    }
-    
-    // Function to update the status indicator
-    function updateStatusIndicator(message, isError = false) {
-        const statusIndicator = document.getElementById('status-indicator');
-        if (!statusIndicator) return;
-        
-        statusIndicator.innerHTML = `<span style="display:inline-block;width:8px;height:8px;background:${isError ? '#dc3545' : '#90C83C'};border-radius:50%;margin-right:5px;"></span> ${message}`;
-        
-        if (!isError) {
-            // Reset the indicator after 1 second
-            setTimeout(() => {
-                if (wsConnected) {
-                    statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#90C83C;border-radius:50%;margin-right:5px;"></span> Connected via WebSocket';
-                } else {
-                    statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#ffc107;border-radius:50%;margin-right:5px;"></span> Polling for updates...';
-                }
-            }, 1000);
-        }
-    }
-    
-    // Function to show temporary notification
-    function showTemporaryNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `temp-notification notification-${type}`;
-        notification.innerHTML = message;
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.padding = '10px 15px';
-        notification.style.borderRadius = '5px';
-        notification.style.zIndex = '10000';
-        notification.style.maxWidth = '300px';
-        notification.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-        notification.style.transition = 'opacity 0.5s ease-in-out';
-        
-        // Set colors based on type
-        if (type === 'success') {
-            notification.style.backgroundColor = 'rgba(40, 167, 69, 0.9)';
-            notification.style.color = 'white';
-        } else if (type === 'error') {
-            notification.style.backgroundColor = 'rgba(220, 53, 69, 0.9)';
-            notification.style.color = 'white';
-        } else if (type === 'warning') {
-            notification.style.backgroundColor = 'rgba(255, 193, 7, 0.9)';
-            notification.style.color = 'black';
-        } else {
-            notification.style.backgroundColor = 'rgba(23, 162, 184, 0.9)';
-            notification.style.color = 'white';
-        }
-        
-        document.body.appendChild(notification);
-        
-        // Fade out and remove after 4 seconds
-        setTimeout(() => {
-            notification.style.opacity = '0';
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 500);
-        }, 4000);
-    }
-    
-    // Initialize WebSocket when the DOM is loaded
-    document.addEventListener('DOMContentLoaded', function() {
-        // Set the lobby ID for the WebSocket connection
-        window.lobbyId = '{{ lobby.id }}';
-        window.raceId = '{{ lobby.race.id }}';
-        
-        // Add a visual indicator for real-time updates
-        const statusIndicator = document.createElement('div');
-        statusIndicator.id = 'status-indicator';
-        statusIndicator.style.position = 'fixed';
-        statusIndicator.style.bottom = '10px';
-        statusIndicator.style.right = '10px';
-        statusIndicator.style.padding = '8px 12px';
-        statusIndicator.style.background = 'rgba(33, 37, 41, 0.8)';
-        statusIndicator.style.color = '#90C83C';
-        statusIndicator.style.borderRadius = '4px';
-        statusIndicator.style.fontSize = '12px';
-        statusIndicator.style.zIndex = '9999';
-        statusIndicator.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-        statusIndicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#ffc107;border-radius:50%;margin-right:5px;"></span> Initializing connection...';
-        document.body.appendChild(statusIndicator);
-        
-        // WebSocket variables
-        let socket = null;
-        let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
-        let reconnectTimeout = null;
-        
-        // Function to connect WebSocket
-        function connectWebSocket() {
-            try {
-                const lobbyId = '{{ lobby.id }}';
-                const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-                socket = new WebSocket(`${wsScheme}://${window.location.host}/ws/lobby/${lobbyId}/`);
-                
-                socket.onopen = function() {
-                    console.log(`WebSocket connected for lobby ${lobbyId}`);
-                    wsConnected = true;
-                    reconnectAttempts = 0; // Reset reconnect attempts on successful connection
-                    updateStatusIndicator('Connected via WebSocket');
-                    
-                    // Send a ping to the server
-                    socket.send(JSON.stringify({
-                        'action': 'ping',
-                        'lobby_id': lobbyId
-                    }));
-                    
-                    // Force a refresh when connection is established
-                    refreshTeamData(true);
-                    
-                    // Continue polling as a fallback, but slow it down
-                    pollingEnabled = true;
-                };
-                
-                socket.onmessage = function(e) {
-                    try {
-                        const data = JSON.parse(e.data);
-                        console.log(`WebSocket message received:`, data);
-                        
-                        if (data.type === 'connection_established') {
-                            updateStatusIndicator('WebSocket connected!');
-                        } else if (data.type === 'team_joined') {
-                            // Force refresh on team updates
-                            refreshTeamData(true);
-                            updateStatusIndicator('New team joined!');
-                            // Optionally show a temporary notification
-                            showTemporaryNotification(`Team ${data.team_name} has joined the lobby!`, 'success');
-                        } else if (data.type === 'team_left') {
-                            refreshTeamData(true);
-                            updateStatusIndicator('Team left!');
-                            showTemporaryNotification(`Team ${data.team_name} has left the lobby.`, 'info');
-                        } else if (data.type === 'team_member_joined') {
-                            refreshTeamData(true);
-                            updateStatusIndicator('New team member joined!');
-                            showTemporaryNotification(`A new member joined team ${data.team_name}.`, 'success');
-                        } else if (data.type === 'team_member_left') {
-                            refreshTeamData(true);
-                            updateStatusIndicator('Team member left!');
-                            showTemporaryNotification(`A member left team ${data.team_name}.`, 'info');
-                        } else if (data.type === 'lobby_updated') {
-                            refreshTeamData(true);
-                            updateStatusIndicator('Lobby updated!');
-                        } else if (data.type === 'race_started') {
-                            console.log('Race started! Showing notification...');
-                            
-                            // Show the race started notification and redirect
-                            startCountdownAndRedirect(
-                                window.raceId || data.race_id, 
-                                data.redirect_url
-                            );
-                        } else if (data.type === 'pong') {
-                            // Server responded to our ping
-                            console.log('Server pong received - connection alive');
-                            updateStatusIndicator('Connection active');
-                        }
-                    } catch (error) {
-                        console.error('Error parsing WebSocket message:', error);
-                    }
-                };
-                
-                socket.onclose = function(event) {
-                    console.log(`WebSocket disconnected for lobby ${lobbyId}, code: ${event.code}, reason: ${event.reason}`);
-                    wsConnected = false;
-                    updateStatusIndicator('WebSocket disconnected, using polling', true);
-                    
-                    // Try to reconnect if not closed normally
-                    if (event.code !== 1000) {
-                        attemptReconnect();
-                    }
-                    
-                    // Fallback to more frequent polling
-                    pollingEnabled = true;
-                };
-                
-                socket.onerror = function(error) {
-                    console.error(`WebSocket error:`, error);
-                    wsConnected = false;
-                    updateStatusIndicator('WebSocket error, using polling', true);
-                    
-                    // Fallback to more frequent polling
-                    pollingEnabled = true;
-                };
-            } catch (error) {
-                console.error('Error setting up WebSocket:', error);
-                updateStatusIndicator('Could not connect WebSocket, using polling', true);
-                
-                // Fallback to polling only
-                wsConnected = false;
-                pollingEnabled = true;
-                
-                attemptReconnect();
-            }
-        }
-        
-        // Function to attempt reconnection
-        function attemptReconnect() {
-            // Clear any existing reconnect timeout
-            if (reconnectTimeout) {
-                clearTimeout(reconnectTimeout);
-            }
-            
-            if (reconnectAttempts < maxReconnectAttempts) {
-                reconnectAttempts++;
-                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff: 2s, 4s, 8s, 16s, 30s
-                
-                updateStatusIndicator(`Connection lost. Reconnecting in ${delay/1000}s... (${reconnectAttempts}/${maxReconnectAttempts})`, true);
-                
-                reconnectTimeout = setTimeout(() => {
-                    updateStatusIndicator(`Attempting to reconnect... (${reconnectAttempts}/${maxReconnectAttempts})`, true);
-                    connectWebSocket();
-                }, delay);
-            } else {
-                updateStatusIndicator('Max reconnection attempts reached. Using polling only.', true);
-                pollingEnabled = true;
-            }
-        }
-        
-        // Start WebSocket connection
-        connectWebSocket();
-        
-        // Set up heartbeat to keep connection alive
-        const heartbeatInterval = setInterval(() => {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    'action': 'ping',
-                    'lobby_id': '{{ lobby.id }}'
-                }));
-            }
-        }, 30000); // Send ping every 30 seconds
-        
-        // Initial refresh immediately
-        refreshTeamData(true);
-        
-        // Set up multiple polling intervals for better reliability
-        // Fast polling every 1.5 seconds when using polling as primary method
-        setInterval(() => {
-            if (pollingEnabled) {
-                refreshTeamData();
-            }
-        }, 1500);
-        
-        // Slow background polling every 5 seconds as a backup
-        setInterval(() => {
-            refreshTeamData();
-        }, 5000);
-        
-        // Force refresh every 20 seconds regardless of WebSocket state
-        setInterval(() => {
-            refreshTeamData(true);
-        }, 20000);
-        
-        // Cleanup when leaving the page
-        window.addEventListener('beforeunload', function() {
+    // WebSocket handling
+    function connectWebSocket() {
+        try {
+            // Clean up any existing connection
             if (socket) {
                 socket.close();
             }
-            clearInterval(heartbeatInterval);
-        });
+            
+            const lobbyId = '{{ lobby.id }}';
+            const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const wsUrl = `${wsScheme}://${window.location.host}/ws/lobby/${lobbyId}/`;
+            
+            console.log(`Connecting to WebSocket at ${wsUrl}`);
+            socket = new WebSocket(wsUrl);
+            
+            socket.onopen = function() {
+                console.log(`WebSocket connection established for lobby ${lobbyId}`);
+                wsConnected = true;
+                
+                // Show connection status
+                const statusDiv = document.createElement('div');
+                statusDiv.id = 'ws-status';
+                statusDiv.style.position = 'fixed';
+                statusDiv.style.bottom = '10px';
+                statusDiv.style.right = '10px';
+                statusDiv.style.background = 'rgba(40, 167, 69, 0.8)';
+                statusDiv.style.color = 'white';
+                statusDiv.style.padding = '5px 10px';
+                statusDiv.style.borderRadius = '4px';
+                statusDiv.style.fontSize = '12px';
+                statusDiv.style.zIndex = '9999';
+                statusDiv.innerHTML = 'WebSocket Connected';
+                document.body.appendChild(statusDiv);
+            };
+            
+            socket.onmessage = function(event) {
+                console.log('WebSocket message received:', event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Show notification about the event
+                    const notification = document.createElement('div');
+                    notification.style.position = 'fixed';
+                    notification.style.top = '20px';
+                    notification.style.right = '20px';
+                    notification.style.background = 'rgba(40, 167, 69, 0.8)';
+                    notification.style.color = 'white';
+                    notification.style.padding = '10px 15px';
+                    notification.style.borderRadius = '5px';
+                    notification.style.zIndex = '10000';
+                    notification.style.maxWidth = '300px';
+                    notification.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+                    
+                    // Handle different event types
+                    if (data.type === 'team_joined') {
+                        notification.innerHTML = `Team ${data.team_name} has joined the lobby!`;
+                        document.body.appendChild(notification);
+                        // Force reload after 1 second
+                        setTimeout(() => location.reload(), 1000);
+                    }
+                    else if (data.type === 'team_left') {
+                        notification.innerHTML = `Team ${data.team_name} has left the lobby.`;
+                        document.body.appendChild(notification);
+                        // Force reload after 1 second
+                        setTimeout(() => location.reload(), 1000);
+                    }
+                    else if (data.type === 'team_member_joined') {
+                        notification.innerHTML = `A new member joined team ${data.team_name}.`;
+                        document.body.appendChild(notification);
+                        // Force reload after 1 second
+                        setTimeout(() => location.reload(), 1000);
+                    }
+                    else if (data.type === 'team_member_left') {
+                        notification.innerHTML = `A member left team ${data.team_name}.`;
+                        document.body.appendChild(notification);
+                        // Force reload after 1 second
+                        setTimeout(() => location.reload(), 1000);
+                    }
+                    else if (data.type === 'race_started') {
+                        window.location.href = data.redirect_url;
+                    }
+                    
+                    // Remove notification after 4 seconds if not already reloaded
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 4000);
+                    
+                } catch (error) {
+                    console.error('Error processing WebSocket message:', error);
+                }
+            };
+            
+            socket.onclose = function(event) {
+                console.log(`WebSocket connection closed: ${event.code} - ${event.reason}`);
+                wsConnected = false;
+                
+                // Update connection status
+                const statusDiv = document.getElementById('ws-status');
+                if (statusDiv) {
+                    statusDiv.style.background = 'rgba(220, 53, 69, 0.8)';
+                    statusDiv.innerHTML = 'WebSocket Disconnected - Reconnecting...';
+                }
+                
+                // Try to reconnect after a delay
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                
+                // Update connection status
+                const statusDiv = document.getElementById('ws-status');
+                if (statusDiv) {
+                    statusDiv.style.background = 'rgba(220, 53, 69, 0.8)';
+                    statusDiv.innerHTML = 'WebSocket Error - Check Console';
+                }
+            };
+            
+        } catch (error) {
+            console.error('Error setting up WebSocket:', error);
+        }
+    }
+    
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Connect to WebSocket
+        connectWebSocket();
+        
+        // Also set up a fallback reload every 10 seconds to ensure fresh data
+        setInterval(() => {
+            location.reload();
+        }, 10000);
     });
 </script>
 {% endblock %}
