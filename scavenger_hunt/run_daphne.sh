@@ -14,5 +14,5 @@ echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
 # Run Daphne with the proper host and port
-echo "Starting Daphne server..."
-python -m daphne -b 0.0.0.0 -p 8000 scavenger_hunt.asgi:application 
+echo "Starting Daphne server on 0.0.0.0:8001..."
+python -m daphne -b 0.0.0.0 -p 8001 scavenger_hunt.asgi:application 

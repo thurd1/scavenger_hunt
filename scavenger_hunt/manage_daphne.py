@@ -5,7 +5,7 @@ import subprocess
 
 # Configuration
 HOST = "0.0.0.0"  # Listen on all interfaces
-PORT = 8000       # Default port
+PORT = 8001       # Use port 8001 as requested
 
 if __name__ == "__main__":
     print("Starting Daphne server...")
@@ -18,9 +18,13 @@ if __name__ == "__main__":
     # This approach avoids all the import and app registry issues
     cmd = [
         sys.executable, 
-        "-m", "daphne", 
+        "-m", "daphne",
+        "-b", HOST,    # Bind to all interfaces
+        "-p", str(PORT),  # Use port 8001
         "scavenger_hunt.asgi:application"
     ]
+    
+    print(f"Starting Daphne on {HOST}:{PORT}")
     
     # Execute the command
     subprocess.run(cmd) 
