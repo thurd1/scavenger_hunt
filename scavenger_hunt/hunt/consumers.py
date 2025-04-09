@@ -382,7 +382,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         
         # Send message to WebSocket with team data
         try:
-        await self.send(text_data=json.dumps({
+            await self.send(text_data=json.dumps({
                 'type': 'team_joined',
                 'team': event['team']
             }))
@@ -408,7 +408,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         
         # Send message to WebSocket with member data
         try:
-        await self.send(text_data=json.dumps({
+            await self.send(text_data=json.dumps({
                 'type': 'team_member_joined',
                 'member': event['member'],
                 'team_id': event['team_id'],
@@ -477,7 +477,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             logger.info(f"Successfully sent race_started event to client")
         except Exception as e:
             logger.error(f"Error sending race_started event: {str(e)}")
-
+            
 class RaceConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer for race updates.
