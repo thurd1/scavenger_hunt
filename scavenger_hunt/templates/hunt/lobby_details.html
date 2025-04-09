@@ -57,6 +57,29 @@
         .team-update-notification.visible {
             opacity: 1;
         }
+        
+        /* Team card animation */
+        @keyframes highlightTeam {
+            0% { 
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.7);
+                background-color: rgba(144, 200, 60, 0.3);
+            }
+            50% { 
+                transform: scale(1.05);
+                box-shadow: 0 0 20px 10px rgba(144, 200, 60, 0.5);
+                background-color: rgba(144, 200, 60, 0.2);
+            }
+            100% { 
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(144, 200, 60, 0);
+                background-color: transparent;
+            }
+        }
+        
+        .animated-team-card {
+            animation: highlightTeam 2s ease-in-out;
+        }
 
         /* Connection status indicator */
         #connection-status {
@@ -274,13 +297,22 @@
                 try {
                     const data = JSON.parse(event.data);
                     
-                    // Handle team updates
+                    // Handle team update or team joined events
                     if (data.type === 'team_update' || data.type === 'team_joined') {
-                        console.log('Team update event received via WebSocket');
-                        showNotification('Team update received!', 'info');
+                        console.log('Team update event received via WebSocket:', data);
+                        
+                        if (data.type === 'team_joined' && data.team) {
+                            // Handle team joined event by updating the DOM directly
+                            addTeamToDOM(data.team);
+                            showNotification(`Team "${data.team.name}" joined the lobby!`, 'success');
+                        } else {
+                            // For other updates, reload the page
+                            showNotification('Team update received - reloading page...', 'info');
+                            setTimeout(reloadPage, 1000);
+                        }
+                        
                         // Reset the force reload counter
                         forceReloadCounter = 0;
-                        reloadPage();
                     }
                     
                     // Handle race start
@@ -479,6 +511,102 @@
         setTimeout(() => {
             notification.classList.remove('visible');
         }, 3000);
+    }
+    
+    // Add a team to the DOM
+    function addTeamToDOM(team) {
+        // Find the teams grid
+        const teamsGrid = document.querySelector('.teams-grid');
+        const noTeamsMessage = document.querySelector('.no-teams');
+        
+        // If there's no teams grid but there is a no-teams message, replace it with a grid
+        if (!teamsGrid && noTeamsMessage) {
+            const newTeamsGrid = document.createElement('div');
+            newTeamsGrid.className = 'teams-grid';
+            noTeamsMessage.parentNode.replaceChild(newTeamsGrid, noTeamsMessage);
+            teamsGrid = newTeamsGrid;
+        }
+        
+        // If we still don't have a teams grid, log an error and return
+        if (!teamsGrid) {
+            console.error('Cannot find teams grid element');
+            return;
+        }
+        
+        // Check if team already exists
+        if (document.querySelector(`.team-card[data-team-id="${team.id}"]`)) {
+            console.log(`Team ${team.id} already in the DOM`);
+            
+            // Update team count 
+            const teamCountElement = document.querySelector('.team-count');
+            if (teamCountElement) {
+                const currentCount = parseInt(teamCountElement.textContent, 10);
+                // Only update if we have a valid count
+                if (!isNaN(currentCount)) {
+                    teamCountElement.textContent = currentCount;
+                }
+            }
+            
+            return;
+        }
+        
+        // Create team card
+        const teamCard = document.createElement('div');
+        teamCard.className = 'team-card';
+        teamCard.setAttribute('data-team-id', team.id);
+        
+        // Format members list
+        let membersHTML = '';
+        if (team.members && team.members.length > 0) {
+            membersHTML = team.members.map(member => `<li>${member.role}</li>`).join('');
+        } else {
+            membersHTML = '<li class="no-members">No members</li>';
+        }
+        
+        teamCard.innerHTML = `
+            <div class="team-header">
+                <h3>${team.name}</h3>
+                <span class="team-code">Code: ${team.code}</span>
+            </div>
+            <div class="team-body">
+                <p><strong>Members:</strong> ${team.members ? team.members.length : 0}</p>
+                <ul class="members-list">
+                    ${membersHTML}
+                </ul>
+            </div>
+            <div class="team-actions">
+                <a href="{% url 'view_team' team_id=0 %}".replace('0', team.id) class="btn btn-view">View Team</a>
+                <button class="btn btn-delete" data-team-id="${team.id}" onclick="confirmDeleteTeam('${team.id}')">Delete Team</button>
+            </div>
+        `;
+        
+        // Add to the grid
+        teamsGrid.appendChild(teamCard);
+        
+        // Update team count in the lobby info
+        const teamCountElement = document.querySelector('.team-count');
+        if (teamCountElement) {
+            const currentCount = parseInt(teamCountElement.textContent, 10);
+            if (!isNaN(currentCount)) {
+                teamCountElement.textContent = currentCount + 1;
+            }
+        }
+        
+        // Update the page hash to prevent unnecessary reloads
+        const pageHashElem = document.getElementById('page-data-hash');
+        if (pageHashElem) {
+            const currentHash = pageHashElem.innerText;
+            const teamPart = `-${team.id}-${team.members ? team.members.length : 0}-`;
+            if (!currentHash.includes(teamPart)) {
+                pageHashElem.innerText = currentHash + teamPart;
+                currentHash = pageHashElem.innerText;
+            }
+        }
+        
+        // Add animation class with a slight delay to ensure it animates
+        setTimeout(() => {
+            teamCard.classList.add('animated-team-card');
+        }, 10);
     }
     
     // Reload the page with cache busting
