@@ -67,13 +67,7 @@
                 </script>
                 {% endif %}
             {% else %}
-                <div class="no-lobby-message">
-                    <p>You need to join a lobby first before creating a team in a lobby.</p>
-                    <div class="button-group">
-                        <a href="{% url 'join_game_session' %}" class="btn btn-success">Join a Lobby</a>
-                        <a href="{% url 'create_standalone_team' %}" class="btn btn-primary">Create Team Without Lobby</a>
-                    </div>
-                </div>
+                <a href="{% url 'create_standalone_team' %}" class="create-team-btn">Create Team</a>
             {% endif %}
         </div>
 
