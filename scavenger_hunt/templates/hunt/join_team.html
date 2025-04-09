@@ -50,7 +50,7 @@
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
             
             {% if lobby_code %}
-                <a href="/lobby/{{ lobby.id }}/create-team/" class="create-team-btn" id="createTeamBtn">Create Team</a>
+                <a href="{% url 'create_team_for_lobby' lobby_id=lobby.id %}" class="create-team-btn" id="createTeamBtn">Create Team</a>
                 
                 {% if not lobby.id %}
                 <script>
@@ -60,16 +60,19 @@
                             .then(response => response.json())
                             .then(data => {
                                 if(data.success && data.lobby_id) {
-                                    document.getElementById('createTeamBtn').href = `/lobby/${data.lobby_id}/create-team/`;
+                                    document.getElementById('createTeamBtn').href = `{% url 'create_team_for_lobby' lobby_id=0 %}`.replace('0', data.lobby_id);
                                 }
                             });
                     });
                 </script>
-        {% endif %}
+                {% endif %}
             {% else %}
                 <div class="no-lobby-message">
-                    <p>You need to join a lobby first before creating a team.</p>
-                    <a href="{% url 'join_game_session' %}" class="btn btn-success">Join a Lobby</a>
+                    <p>You need to join a lobby first before creating a team in a lobby.</p>
+                    <div class="button-group">
+                        <a href="{% url 'join_game_session' %}" class="btn btn-success">Join a Lobby</a>
+                        <a href="{% url 'create_standalone_team' %}" class="btn btn-primary">Create Team Without Lobby</a>
+                    </div>
                 </div>
             {% endif %}
         </div>
@@ -136,6 +139,13 @@
 .no-lobby-message p {
     color: #ffffff;
     margin-bottom: 1rem;
+}
+
+.no-lobby-message .button-group {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1.5rem;
 }
 
 .existing-teams-section {
