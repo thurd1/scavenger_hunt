@@ -14,5 +14,5 @@ echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
 # Run Django development server
-echo "Starting Django development server..."
-python manage.py runserver 0.0.0.0:8000 
+echo "Starting Django development server on 0.0.0.0:8001..."
+python manage.py runserver 0.0.0.0:8001 
