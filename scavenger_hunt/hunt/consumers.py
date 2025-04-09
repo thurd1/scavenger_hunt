@@ -1,17 +1,16 @@
 import json
-import logging
-import asyncio
-import datetime
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from .models import Team, TeamMember, Lobby, TeamRaceProgress
+import logging
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from asgiref.sync import sync_to_async
 from django.utils import timezone
+import asyncio
+from datetime import datetime
 from django.db.models import Sum, Count
 
-# Set up logging
 logger = logging.getLogger(__name__)
 
 class TeamConsumer(AsyncWebsocketConsumer):
@@ -329,30 +328,21 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         # Handle messages from clients
         try:
-            text_data_json = json.loads(text_data)
-            logger.info(f"LobbyConsumer received message: {text_data_json}")
+            data = json.loads(text_data)
+            logger.info(f"Received message in lobby {self.lobby_id}: {data}")
             
-            # Get message type
-            action = text_data_json.get('action', '')
-            
-            if action == 'get_lobby_data':
-                # Send current lobby state
-                lobby_data = await self.get_lobby_data()
+            if data.get('action') == 'get_teams':
+                # Client requesting fresh team data
+                lobby = await self.get_lobby_data()
                 await self.send(text_data=json.dumps({
                     'type': 'lobby_data',
-                    'data': lobby_data
-                }))
-            elif action == 'ping':
-                # Respond to ping with a pong to keep connection alive
-                await self.send(text_data=json.dumps({
-                    'type': 'pong',
-                    'timestamp': datetime.datetime.now().isoformat()
+                    'lobby': lobby
                 }))
                 
         except json.JSONDecodeError:
-            logger.error(f"Invalid JSON received: {text_data}")
+            logger.error(f"Invalid JSON received in lobby {self.lobby_id}")
         except Exception as e:
-            logger.error(f"Error in LobbyConsumer.receive: {str(e)}")
+            logger.error(f"Error processing message in lobby {self.lobby_id}: {str(e)}")
 
     @database_sync_to_async
     def get_lobby_data(self):

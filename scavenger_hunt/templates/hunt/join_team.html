@@ -65,9 +65,12 @@
                             });
                     });
                 </script>
-                {% endif %}
+        {% endif %}
             {% else %}
-                <a href="/lobby/2/create-team/" class="create-team-btn">Create Team</a>
+                <div class="no-lobby-message">
+                    <p>You need to join a lobby first before creating a team.</p>
+                    <a href="{% url 'join_game_session' %}" class="btn btn-success">Join a Lobby</a>
+                </div>
             {% endif %}
         </div>
 
@@ -133,13 +136,6 @@
 .no-lobby-message p {
     color: #ffffff;
     margin-bottom: 1rem;
-}
-
-.no-lobby-message .button-group {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    margin-top: 1.5rem;
 }
 
 .existing-teams-section {

@@ -307,7 +307,7 @@
             {% if team and lobby and lobby.race %}
             data-redirect-url="/race/{{ lobby.race.id }}/questions/?team_code={{ team.code }}&player_name={{ player_name }}"
             {% else %}
-            data-redirect-url="/race/1/questions/?team_code={{ team.code }}&player_name={{ player_name }}"
+            data-redirect-url="{% url 'student_question' lobby_id=lobby.id question_id=1 %}"
             {% endif %}
         >
             <p><strong>Race has started!</strong></p>
@@ -354,71 +354,61 @@ document.addEventListener('DOMContentLoaded', function() {
         let hasRedirected = false;
         
         function connectWebSocket() {
-            // Only attempt to connect if we have a valid lobby ID
-            if (!lobbyId || lobbyId === "" || lobbyId === "None") {
-                console.log('No lobby ID available - skipping WebSocket connection');
-                // Use polling as fallback
-                if (!checkInterval) {
-                    checkInterval = setInterval(checkRaceStatus, 3000);
-                }
-                return;
-            }
-            
             if (raceStatusSocket) {
                 raceStatusSocket.close();
             }
             
-            // Construct proper WebSocket URL with lobby ID
-            const wsUrl = 'ws://' + window.location.host + '/ws/race/' + lobbyId + '/';
-            console.log('Connecting to WebSocket:', wsUrl);
-            
-            try {
-                raceStatusSocket = new WebSocket(wsUrl);
+            raceStatusSocket = new WebSocket(
+                'ws://' + window.location.host + '/ws/race/' + lobbyId + '/'
+            );
 
-                raceStatusSocket.onopen = function(e) {
-                    console.log('WebSocket connection established');
-                    // Immediately check status in case we missed the race_started event
-                    raceStatusSocket.send(JSON.stringify({
-                        'action': 'check_status'
-                    }));
-                    
-                    // Also use polling as backup
-                    if (!checkInterval) {
+            raceStatusSocket.onopen = function(e) {
+                console.log('WebSocket connection established');
+                // Immediately check status in case we missed the race_started event
+                raceStatusSocket.send(JSON.stringify({
+                    'action': 'check_status'
+                }));
+                
+                // Also use polling as backup
+                if (!checkInterval) {
+                    checkInterval = setInterval(checkRaceStatus, 3000);
+                }
+            };
+            
+            raceStatusSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                console.log('WebSocket message received:', data);
+                if (data.type === 'race_started') {
+                    // Stop race status polling if it's running
+                    if (checkInterval) {
+                        clearInterval(checkInterval);
+                        checkInterval = null;
+                    }
+                    handleRaceStart();
+                }
+            };
+
+            raceStatusSocket.onclose = function(e) {
+                console.log('Race status socket closed:', e);
+                
+                // Reconnect logic with backoff
+                if (reconnectAttempts < 3 && !hasRedirected) {
+                    const timeout = Math.pow(2, reconnectAttempts) * 1000;
+                    console.log(`Reconnecting in ${timeout/1000} seconds...`);
+                    setTimeout(connectWebSocket, timeout);
+                    reconnectAttempts++;
+                } else {
+                    // If we've tried reconnecting too many times, rely only on polling
+                    if (!checkInterval && !hasRedirected) {
+                        console.log('Switching to polling only');
                         checkInterval = setInterval(checkRaceStatus, 3000);
                     }
-                };
-                
-                raceStatusSocket.onmessage = function(e) {
-                    const data = JSON.parse(e.data);
-                    console.log('WebSocket message received:', data);
-                    if (data.type === 'race_started') {
-                        // Stop race status polling if it's running
-                        if (checkInterval) {
-                            clearInterval(checkInterval);
-                            checkInterval = null;
-                        }
-                        handleRaceStart();
-                    }
-                };
+                }
+            };
 
-                raceStatusSocket.onclose = function(e) {
-                    console.log('Race status socket closed:', e);
-                    
-                    // Reconnect logic with backoff
-                    if (reconnectAttempts < 3 && !hasRedirected) {
-                        const timeout = Math.pow(2, reconnectAttempts) * 1000;
-                        console.log(`Reconnecting in ${timeout/1000} seconds...`);
-                        setTimeout(connectWebSocket, timeout);
-                        reconnectAttempts++;
-                    }
-                };
-                
-                raceStatusSocket.onerror = function(e) {
-                    console.error('WebSocket error:', e);
-                };
-            } catch (error) {
-                console.error('Error creating WebSocket:', error);
-            }
+            raceStatusSocket.onerror = function(e) {
+                console.error('WebSocket error:', e);
+            };
         }
 
         function handleRaceStart() {
@@ -464,12 +454,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function checkRaceStatus() {
             if (hasRedirected) return;
-            
-            // Skip API call if no valid lobby ID
-            if (!lobbyId || lobbyId === "" || lobbyId === "None") {
-                console.log('No lobby ID available - skipping race status check');
-                return;
-            }
             
             console.log('Polling for race status...');
             fetch('/api/lobby/' + lobbyId + '/race-status/')

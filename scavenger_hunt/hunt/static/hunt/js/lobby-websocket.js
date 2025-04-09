@@ -3,8 +3,10 @@
  * Manages real-time updates for the lobby details page
  */
 
-// Connection variable
-let lobbyConnection = null;
+// Initialize with a maximum of 3 reconnect attempts
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 3;
+let socket = null;
 
 // Function to initialize the WebSocket connection
 function initLobbyWebSocket() {
@@ -21,25 +23,28 @@ function initLobbyWebSocket() {
         return null;
     }
     
-    // Create WebSocket URL using WebSocketUtils
-    const socketUrl = WebSocketUtils.createSocketUrl(`ws/lobby/${window.lobbyId}/`);
+    // Set up WebSocket connection
+    const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socketUrl = `${wsScheme}//${window.location.host}/ws/lobby/${window.lobbyId}/`;
+    
     console.log(`Initializing lobby WebSocket connection to: ${socketUrl}`);
     
-    // Create connection using WebSocketUtils
-    lobbyConnection = WebSocketUtils.createConnection(
-        socketUrl,
-        handleSocketMessage,
-        handleSocketOpen,
-        handleSocketClose,
-        handleSocketError
-    );
+    // Create new WebSocket connection
+    socket = new WebSocket(socketUrl);
     
-    return lobbyConnection;
+    // Setup event handlers
+    socket.onopen = handleSocketOpen;
+    socket.onmessage = handleSocketMessage;
+    socket.onclose = handleSocketClose;
+    socket.onerror = handleSocketError;
+    
+    return socket;
 }
 
 // Handle WebSocket open event
-function handleSocketOpen(event, socket) {
+function handleSocketOpen(event) {
     console.log('Lobby WebSocket connection established successfully');
+    reconnectAttempts = 0; // Reset reconnect attempts on successful connection
     
     // Add a connected indicator to the page
     const dashboardBox = document.querySelector('.dashboard-box');
@@ -57,14 +62,6 @@ function handleSocketOpen(event, socket) {
         statusIndicator.style.color = '#90C83C';
         dashboardBox.prepend(statusIndicator);
     }
-    
-    // Send an initial message to ensure the connection is working
-    if (socket) {
-        socket.send(JSON.stringify({
-            'type': 'join',
-            'lobby_id': window.lobbyId
-        }));
-    }
 }
 
 // Handle incoming WebSocket messages
@@ -72,6 +69,9 @@ function handleSocketMessage(event) {
     try {
         const data = JSON.parse(event.data);
         console.log('Received lobby WebSocket message:', data);
+        
+        // Reset reconnect counter on successful message
+        reconnectAttempts = 0;
         
         // Handle different types of messages
         switch (data.type) {
@@ -90,10 +90,6 @@ function handleSocketMessage(event) {
             case 'race_status_changed':
                 console.log('Race status changed event received:', data.status);
                 handleRaceStatusChanged(data.status);
-                break;
-            case 'race_started':
-                console.log('Race started event received with redirect URL:', data.redirect_url);
-                handleRaceStarted(data.redirect_url);
                 break;
             case 'connection_established':
                 console.log('Connection confirmation received from server');
@@ -118,6 +114,11 @@ function handleSocketClose(event) {
         statusIndicator.textContent = '● Live Updates Disconnected - Reconnecting...';
         statusIndicator.style.color = '#dc3545';
     }
+    
+    // Attempt to reconnect if not closing intentionally
+    if (event.code !== 1000) {
+        attemptReconnect();
+    }
 }
 
 // Handle WebSocket errors
@@ -131,6 +132,44 @@ function handleSocketError(error) {
         statusIndicator.textContent = '● Connection Error';
         statusIndicator.style.color = '#dc3545';
     }
+}
+
+// Attempt to reconnect with exponential backoff
+function attemptReconnect() {
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.log('Maximum reconnection attempts reached. Falling back to page reload...');
+        
+        // Update status indicator
+        const statusIndicator = document.getElementById('websocket-status');
+        if (statusIndicator) {
+            statusIndicator.className = 'websocket-status error';
+            statusIndicator.textContent = '● Live Updates Failed - Page will refresh shortly';
+            statusIndicator.style.color = '#dc3545';
+        }
+        
+        // Reload page after a delay as fallback
+        setTimeout(() => {
+            window.location.reload();
+        }, 5000);
+        return;
+    }
+    
+    // Calculate backoff delay: 1s, 2s, 4s, etc.
+    const delay = Math.pow(2, reconnectAttempts) * 1000;
+    console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+    
+    // Update status indicator
+    const statusIndicator = document.getElementById('websocket-status');
+    if (statusIndicator) {
+        statusIndicator.className = 'websocket-status reconnecting';
+        statusIndicator.textContent = `● Reconnecting (${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})...`;
+        statusIndicator.style.color = '#ffc107';
+    }
+    
+    setTimeout(() => {
+        reconnectAttempts++;
+        initLobbyWebSocket();
+    }, delay);
 }
 
 // Handle a team joining the lobby
@@ -154,7 +193,7 @@ function handleTeamJoined(team) {
     // Create team card if teams grid exists
     if (teamsGrid) {
         const teamCard = document.createElement('div');
-        teamCard.className = 'team-card animated-team-card';
+        teamCard.className = 'team-card';
         teamCard.setAttribute('data-team-id', team.id);
         
         teamCard.innerHTML = `
@@ -163,30 +202,28 @@ function handleTeamJoined(team) {
                 <span class="team-code">Code: ${team.code}</span>
             </div>
             <div class="team-body">
-                <p><strong>Members:</strong> ${team.members ? team.members.length : 0}</p>
+                <p><strong>Members:</strong> ${team.members_count || 0}</p>
                 <ul class="members-list">
-                    ${team.members && team.members.length > 0 ? 
-                        team.members.map(member => `<li>${member.role}</li>`).join('') : 
-                        '<li class="no-members">No members</li>'}
+                    ${team.members && team.members.length ? 
+                      team.members.map(member => `<li>${member.role}</li>`).join('') : 
+                      '<li class="no-members">No members</li>'}
                 </ul>
             </div>
             <div class="team-actions">
-                <a href="/team/${team.id}/" class="btn btn-view">View Team</a>
-                <button class="btn btn-delete" data-team-id="${team.id}" onclick="confirmDeleteTeam('${team.id}')">Delete Team</button>
+                <a href="/team/${team.id}/view/" class="btn btn-view">View Team</a>
+                <button class="btn btn-delete" onclick="deleteTeam(${team.id})">Delete Team</button>
             </div>
         `;
         
         teamsGrid.appendChild(teamCard);
         
-        // Update team count
-        const teamCountElement = document.querySelector('.team-count');
-        if (teamCountElement) {
-            const currentCount = parseInt(teamCountElement.textContent) || 0;
-            teamCountElement.textContent = currentCount + 1;
-        }
+        // Add animation class
+        teamCard.classList.add('new-team');
         
-        // Show notification
-        showNotification(`Team "${team.name}" joined the lobby!`, 'success');
+        // Remove animation class after animation completes
+        setTimeout(() => {
+            teamCard.classList.remove('new-team');
+        }, 3000);
     }
 }
 
@@ -196,48 +233,35 @@ function handleTeamLeft(teamId) {
     
     const teamCard = document.querySelector(`.team-card[data-team-id="${teamId}"]`);
     if (teamCard) {
-        // Get team name for notification
-        const teamName = teamCard.querySelector('.team-header h3').textContent;
+        // Add fade-out animation
+        teamCard.style.transition = 'opacity 0.5s, transform 0.5s';
+        teamCard.style.opacity = '0';
+        teamCard.style.transform = 'scale(0.9)';
         
-        // Remove with animation
-        teamCard.classList.add('fade-out');
+        // Remove the element after animation completes
         setTimeout(() => {
-            teamCard.remove();
-            
-            // Update team count
-            const teamCountElement = document.querySelector('.team-count');
-            if (teamCountElement) {
-                const currentCount = parseInt(teamCountElement.textContent) || 0;
-                if (currentCount > 0) {
-                    teamCountElement.textContent = currentCount - 1;
-                }
-            }
-            
-            // Check if there are no teams left
-            const teamsGrid = document.querySelector('.teams-grid');
-            if (teamsGrid && !teamsGrid.querySelector('.team-card')) {
-                const noTeamsMessage = document.querySelector('.no-teams');
-                if (noTeamsMessage) {
-                    noTeamsMessage.style.display = 'block';
-                }
+            if (teamCard.parentElement) {
+                teamCard.parentElement.removeChild(teamCard);
             }
         }, 500);
-        
-        // Show notification
-        showNotification(`Team "${teamName}" left the lobby`, 'warning');
     }
 }
 
-// Handle a team member joining
+// Handle a new member joining a team
 function handleTeamMemberJoined(teamId, member) {
     console.log('Team member joined:', teamId, member);
     
     const teamCard = document.querySelector(`.team-card[data-team-id="${teamId}"]`);
     if (teamCard) {
         const membersList = teamCard.querySelector('.members-list');
+        const membersCount = teamCard.querySelector('.team-body p strong').nextSibling;
         const noMembersItem = membersList.querySelector('.no-members');
         
-        // If there was a "no members" message, remove it
+        // Update the members count
+        const currentCount = parseInt(membersCount.textContent.trim()) || 0;
+        membersCount.textContent = ` ${currentCount + 1}`;
+        
+        // Remove the "no members" message if it exists
         if (noMembersItem) {
             noMembersItem.remove();
         }
@@ -245,25 +269,13 @@ function handleTeamMemberJoined(teamId, member) {
         // Add the new member to the list
         const memberItem = document.createElement('li');
         memberItem.textContent = member.role;
+        memberItem.classList.add('new-member');
         membersList.appendChild(memberItem);
         
-        // Update member count
-        const membersCountEl = teamCard.querySelector('.team-body p strong');
-        if (membersCountEl && membersCountEl.nextSibling) {
-            const currentText = membersCountEl.nextSibling.textContent.trim();
-            const currentCount = parseInt(currentText) || 0;
-            membersCountEl.nextSibling.textContent = ` ${currentCount + 1}`;
-        }
-        
-        // Highlight the team card with animation
-        teamCard.classList.add('animated-team-card');
+        // Highlight the new member briefly
         setTimeout(() => {
-            teamCard.classList.remove('animated-team-card');
-        }, 2000);
-        
-        // Show notification
-        const teamName = teamCard.querySelector('.team-header h3').textContent;
-        showNotification(`New player "${member.role}" joined team "${teamName}"`, 'info');
+            memberItem.classList.remove('new-member');
+        }, 3000);
     }
 }
 
@@ -301,172 +313,71 @@ function handleRaceStatusChanged(status) {
     }
 }
 
-// Handle race started event with countdown and redirect
-function handleRaceStarted(redirectUrl) {
-    console.log('Race started with redirect URL:', redirectUrl);
-    
-    // Show the race started notification
-    const notification = document.getElementById('race-started-notification');
-    if (notification) {
-        notification.style.display = 'block';
-        
-        // Update the redirect button
-        const redirectButton = document.getElementById('go-to-race-btn');
-        if (redirectButton) {
-            redirectButton.href = redirectUrl;
-        }
-        
-        // Start countdown
-        let countdownValue = 5;
-        const countdownEl = document.getElementById('countdown');
-        const countdownTextEl = document.getElementById('race-countdown');
-        
-        if (countdownEl) {
-            const countdownInterval = setInterval(() => {
-                countdownValue--;
-                countdownEl.textContent = countdownValue;
-                
-                if (countdownTextEl) {
-                    countdownTextEl.textContent = `Redirecting in ${countdownValue} seconds...`;
-                }
-                
-                if (countdownValue <= 0) {
-                    clearInterval(countdownInterval);
-                    window.location.href = redirectUrl;
-                }
-            }, 1000);
-        } else {
-            // If countdown element not found, redirect immediately
-            setTimeout(() => {
-                window.location.href = redirectUrl;
-            }, 1000);
-        }
-    } else {
-        // No notification element found, redirect immediately
-        window.location.href = redirectUrl;
-    }
-}
-
-// Add WebSocket-related styles
+// Add CSS styles for WebSocket status and animations
 function addWebSocketStyles() {
-    const style = document.createElement('style');
-    style.textContent = `
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
         .websocket-status {
-            padding: 5px 15px;
-            font-size: 14px;
             margin-bottom: 15px;
+            font-size: 14px;
+            padding: 5px 10px;
             border-radius: 4px;
             display: inline-block;
         }
         
-        .fade-out {
-            opacity: 0;
-            transform: scale(0.8);
-            transition: opacity 0.5s, transform 0.5s;
+        .team-card.new-team {
+            animation: fadeIn 1s;
         }
         
-        #race-started-notification {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .new-member {
+            animation: highlight 3s;
         }
         
-        .race-started-content {
-            background-color: rgba(33, 37, 41, 0.95);
-            border: 2px solid #90C83C;
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-            max-width: 500px;
-            animation: pulse 2s infinite;
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
         
-        .race-title {
-            color: #90C83C;
-            font-size: 32px;
-            margin-bottom: 20px;
-        }
-        
-        .race-description {
-            font-size: 18px;
-            margin-bottom: 30px;
-        }
-        
-        .countdown-container {
-            display: flex;
-            justify-content: center;
-            margin: 30px 0;
-        }
-        
-        .countdown-circle {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background-color: rgba(144, 200, 60, 0.2);
-            border: 3px solid #90C83C;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-        
-        .countdown-number {
-            font-size: 36px;
-            font-weight: bold;
-            color: #90C83C;
-        }
-        
-        .countdown-spinner {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 3px solid transparent;
-            border-top-color: #90C83C;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.4); }
-            70% { box-shadow: 0 0 0 20px rgba(144, 200, 60, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(144, 200, 60, 0); }
+        @keyframes highlight {
+            0% { background-color: rgba(144, 200, 60, 0.4); }
+            100% { background-color: transparent; }
         }
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(styleElement);
 }
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Initializing lobby WebSocket handler');
-    
-    // Extract lobby ID from page
-    window.lobbyId = window.location.pathname.split('/').filter(Boolean)[1];
-    console.log(`Lobby ID extracted from URL: ${window.lobbyId}`);
-    
-    // Add WebSocket styles
+// Force a reload if we've been sitting here too long
+setTimeout(() => {
+    if (reconnectAttempts > 0) {
+        console.log('Page has been inactive for too long, refreshing...');
+        window.location.reload();
+    }
+}, 60000); // 1 minute
+
+// Close WebSocket when page is unloaded
+window.addEventListener('beforeunload', () => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        // Use 1000 code for normal closure
+        socket.close(1000, 'Page navigation');
+    }
+});
+
+// Initialize WebSocket when the DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    // Add styles for WebSocket status indicator
     addWebSocketStyles();
     
-    // Initialize WebSocket connection
-    initLobbyWebSocket();
+    console.log('DOM loaded, initializing WebSocket connection');
     
-    // Create connection status indicator if it doesn't exist
-    if (!document.getElementById('connection-status')) {
-        const statusIndicator = document.createElement('div');
-        statusIndicator.id = 'connection-status';
-        statusIndicator.className = 'connecting';
-        statusIndicator.innerHTML = '<span>Connecting...</span>';
-        document.body.appendChild(statusIndicator);
-    }
+    // Wait a moment for any other scripts to set lobbyId
+    setTimeout(() => {
+        initLobbyWebSocket();
+    }, 100);
+    
+    // As a fallback, manually refresh the page every 2 minutes
+    // This ensures updates even if WebSockets fail silently
+    setTimeout(() => {
+        console.log('Periodic refresh timeout reached, reloading page');
+        window.location.reload();
+    }, 120000);
 }); 

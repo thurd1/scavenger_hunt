@@ -3,19 +3,17 @@
  * Manages real-time updates for the leaderboard page
  */
 
-// Connection variable
-let leaderboardConnection = null;
-let pollingInterval = null;
+// Initialize with a maximum of 3 reconnect attempts
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 3;
+let socket = null;
 
-// Debug mode flag
-const DEBUG_MODE = true;
+// Export socket to window for external access
+window.socket = null;
 
 // Function to show debug info on page
 function showDebugInfo(message, isError = false) {
     console.log(message);
-    
-    // Skip if debug mode is off
-    if (!DEBUG_MODE) return;
     
     // Check if debug container exists, create if not
     let debugContainer = document.getElementById('debug-container');
@@ -56,28 +54,34 @@ function showDebugInfo(message, isError = false) {
 
 // Function to initialize the WebSocket connection
 function initLeaderboardWebSocket() {
-    // Create WebSocket URL using WebSocketUtils
-    const socketUrl = WebSocketUtils.createSocketUrl('ws/leaderboard/');
+    // Set up WebSocket connection
+    const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socketUrl = `${wsScheme}//${window.location.host}/ws/leaderboard/`;
+    
     showDebugInfo(`Initializing WebSocket to: ${socketUrl}`);
     
-    // Create connection using WebSocketUtils
-    leaderboardConnection = WebSocketUtils.createConnection(
-        socketUrl,
-        handleSocketMessage,
-        handleSocketOpen,
-        handleSocketClose,
-        handleSocketError
-    );
-    
-    // Make accessible to window for external access
-    window.leaderboardConnection = leaderboardConnection;
-    
-    return leaderboardConnection;
+    try {
+        // Create new WebSocket connection
+        socket = new WebSocket(socketUrl);
+        window.socket = socket; // Make accessible to window
+        
+        // Setup event handlers
+        socket.onopen = handleSocketOpen;
+        socket.onmessage = handleSocketMessage;
+        socket.onclose = handleSocketClose;
+        socket.onerror = handleSocketError;
+        
+        return socket;
+    } catch (error) {
+        showDebugInfo(`Error creating WebSocket: ${error.message}`, true);
+        return null;
+    }
 }
 
 // Handle WebSocket open event
-function handleSocketOpen(event, socket) {
+function handleSocketOpen(event) {
     showDebugInfo('WebSocket connection established successfully');
+    reconnectAttempts = 0; // Reset reconnect attempts on successful connection
     
     // Add a connected indicator to the page
     const dashboardBox = document.querySelector('.dashboard-box');
@@ -98,21 +102,16 @@ function handleSocketOpen(event, socket) {
     // Update the real-time indicator if it exists
     const rtIndicator = document.getElementById('realtime-indicator');
     if (rtIndicator) {
-        rtIndicator.style.backgroundColor = 'rgba(144, 200, 60, 0.2)';
-        rtIndicator.style.color = '#90C83C';
+        rtIndicator.style.backgroundColor = 'rgba(144, 200, 60, 0.2) !important';
+        rtIndicator.style.color = '#90C83C !important';
         rtIndicator.innerHTML = '<span class="pulse-dot">●</span> Live Updates Active';
     }
     
     // Request initial data
     showDebugInfo('Requesting initial leaderboard data...');
-    if (socket) {
-        socket.send(JSON.stringify({
-            action: 'get_data'
-        }));
-    }
-    
-    // Stop polling if active
-    stopPolling();
+    socket.send(JSON.stringify({
+        action: 'get_data'
+    }));
 }
 
 // Handle incoming WebSocket messages
@@ -122,14 +121,8 @@ function handleSocketMessage(event) {
         showDebugInfo(`Received message: ${data.type}`);
         
         if (data.type === 'leaderboard_update') {
-            showDebugInfo(`Updating leaderboard with ${data.teams ? data.teams.length : 'unknown'} teams`);
-            
-            if (data.teams && Array.isArray(data.teams)) {
-                updateLeaderboard(data.teams);
-            } else if (data.action === 'refresh') {
-                // Server is requesting a refresh
-                fetchLeaderboardData();
-            }
+            showDebugInfo(`Updating leaderboard with ${data.teams.length} teams`);
+            updateLeaderboard(data.teams);
         } else if (data.type === 'error') {
             showDebugInfo(`Server reported error: ${data.message}`, true);
         } else {
@@ -155,21 +148,14 @@ function handleSocketClose(event) {
     // Update the real-time indicator if it exists
     const rtIndicator = document.getElementById('realtime-indicator');
     if (rtIndicator) {
-        rtIndicator.style.backgroundColor = 'rgba(220, 53, 69, 0.2)';
-        rtIndicator.style.color = '#dc3545';
+        rtIndicator.style.backgroundColor = 'rgba(220, 53, 69, 0.2) !important';
+        rtIndicator.style.color = '#dc3545 !important';
         rtIndicator.innerHTML = '<span class="pulse-dot">●</span> Reconnecting...';
     }
     
-    // If we've lost connection too many times, start polling as fallback
-    if (event.code !== 1000 && event.code !== 1001) {
-        // Start API polling as fallback if socket doesn't reconnect
-        setTimeout(() => {
-            if (!leaderboardConnection || 
-                !leaderboardConnection.socket || 
-                leaderboardConnection.socket.readyState !== WebSocket.OPEN) {
-                startPolling();
-            }
-        }, 5000);
+    // Attempt to reconnect if not closing intentionally
+    if (event.code !== 1000) {
+        attemptReconnect();
     }
 }
 
@@ -187,327 +173,270 @@ function handleSocketError(error) {
     // Update the real-time indicator if it exists
     const rtIndicator = document.getElementById('realtime-indicator');
     if (rtIndicator) {
-        rtIndicator.style.backgroundColor = 'rgba(220, 53, 69, 0.2)';
-        rtIndicator.style.color = '#dc3545';
+        rtIndicator.style.backgroundColor = 'rgba(220, 53, 69, 0.2) !important';
+        rtIndicator.style.color = '#dc3545 !important';
         rtIndicator.innerHTML = '<span class="pulse-dot">●</span> Connection Error';
     }
 }
 
-// Start polling for leaderboard updates as fallback
-function startPolling() {
-    showDebugInfo('Starting polling fallback mechanism');
-    
-    // Make sure we only have one polling interval
-    stopPolling();
-    
-    // Update the real-time indicator to show we're using polling
-    const rtIndicator = document.getElementById('realtime-indicator');
-    if (rtIndicator) {
-        rtIndicator.style.backgroundColor = 'rgba(255, 193, 7, 0.2)';
-        rtIndicator.style.color = '#ffc107';
-        rtIndicator.innerHTML = '<span class="pulse-dot">●</span> Using Polling (Slower)';
+// Attempt to reconnect with exponential backoff
+function attemptReconnect() {
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.log('Maximum reconnection attempts reached. Falling back to API polling...');
+        
+        // Update status indicator
+        const statusIndicator = document.getElementById('websocket-status');
+        if (statusIndicator) {
+            statusIndicator.className = 'websocket-status error';
+            statusIndicator.textContent = '● Live Updates Failed - Using Polling';
+        }
+        
+        // Start polling as fallback
+        startPolling();
+        return;
     }
     
-    // Set up polling interval
-    pollingInterval = setInterval(fetchLeaderboardData, 10000); // Every 10 seconds
+    // Calculate backoff delay: 1s, 2s, 4s, etc.
+    const delay = Math.pow(2, reconnectAttempts) * 1000;
+    console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
     
-    // Fetch data immediately
-    fetchLeaderboardData();
+    // Update status indicator
+    const statusIndicator = document.getElementById('websocket-status');
+    if (statusIndicator) {
+        statusIndicator.className = 'websocket-status reconnecting';
+        statusIndicator.textContent = `● Reconnecting (${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})...`;
+    }
+    
+    setTimeout(() => {
+        reconnectAttempts++;
+        initLeaderboardWebSocket();
+    }, delay);
 }
 
-// Stop polling if it's active
+// Start polling API as fallback
+let pollingInterval = null;
+function startPolling() {
+    if (pollingInterval) return; // Don't start multiple intervals
+    
+    console.log('Starting API polling for leaderboard data');
+    
+    // Poll every 3 seconds
+    pollingInterval = setInterval(() => {
+        fetchLeaderboardData();
+    }, 3000);
+}
+
+// Stop polling
 function stopPolling() {
     if (pollingInterval) {
-        showDebugInfo('Stopping polling mechanism');
         clearInterval(pollingInterval);
         pollingInterval = null;
+        console.log('Stopped API polling');
     }
 }
 
-// Fetch leaderboard data from API
+// Fetch leaderboard data via API
 function fetchLeaderboardData() {
-    showDebugInfo('Fetching leaderboard data via API...');
+    console.log('Fetching leaderboard data via API');
     
-    // Get the current race ID if available
-    let raceId = '';
-    if (window.raceId) {
-        raceId = `?race_id=${window.raceId}`;
-    }
-    
-    // Fetch the data
-    fetch(`/api/leaderboard/${raceId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error ${response.status}`);
-            }
-            return response.json();
-        })
+    fetch('/api/leaderboard-data/')
+        .then(response => response.json())
         .then(data => {
-            showDebugInfo(`Received API data with ${data.teams.length} teams`);
-            updateLeaderboard(data.teams);
+            if (data.success) {
+                updateLeaderboard(data.teams);
+            } else {
+                console.error('API returned error:', data.error);
+                
+                // If API doesn't exist, try a simple page refresh as last resort
+                if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS * 2) {
+                    console.log('API polling failed too many times, refreshing page...');
+                    window.location.reload();
+                }
+            }
         })
         .catch(error => {
-            showDebugInfo(`API fetch error: ${error.message}`, true);
+            console.error('Error fetching leaderboard data:', error);
+            reconnectAttempts++;
         });
 }
 
-// Update the leaderboard with team data
+// Update the leaderboard with new data
 function updateLeaderboard(teams) {
-    if (!teams || !Array.isArray(teams)) {
-        showDebugInfo('Invalid teams data received', true);
+    const leaderboardBody = document.getElementById('leaderboard-body');
+    const selectedLobbyId = document.getElementById('lobby-select')?.value || 'all';
+    
+    if (!leaderboardBody) {
+        console.error('Leaderboard body element not found');
         return;
     }
     
-    showDebugInfo(`Updating leaderboard with ${teams.length} teams`);
-    
-    // Sort teams by points (highest first)
-    const sortedTeams = [...teams].sort((a, b) => (b.points || 0) - (a.points || 0));
-    
-    // Get the leaderboard container
-    const leaderboardContainer = document.getElementById('leaderboard-container');
-    if (!leaderboardContainer) {
-        showDebugInfo('Leaderboard container not found', true);
+    if (!teams || teams.length === 0) {
+        leaderboardBody.innerHTML = '<tr><td colspan="3" class="text-center">No teams available</td></tr>';
         return;
     }
     
-    // Clear existing content
-    leaderboardContainer.innerHTML = '';
+    console.log(`Updating leaderboard with ${teams.length} teams, filtering by lobby: ${selectedLobbyId}`);
     
-    // Check if we have teams
-    if (sortedTeams.length === 0) {
-        leaderboardContainer.innerHTML = '<div class="no-teams">No teams have started yet.</div>';
-        return;
-    }
+    // Validate and fix team data if necessary
+    teams = teams.map(team => {
+        // Ensure team name is proper - fix the "Team: 30" format issue
+        if (team.name && team.name.toString().includes(':')) {
+            // Log the issue for debugging
+            console.warn(`Found malformed team name: "${team.name}", extracting actual name`);
+            
+            // If it's in the format "Team: ID" but we have the actual name elsewhere
+            if (team.team_name) {
+                team.name = team.team_name;
+            }
+        }
+        
+        // Ensure the team has a valid name
+        if (!team.name || team.name === 'null' || team.name === 'undefined') {
+            console.warn(`Team with ID ${team.id} has invalid name: "${team.name}"`);
+            team.name = `Team ${team.id}`;
+        }
+        
+        // Make sure score is a number
+        team.score = parseInt(team.score) || 0;
+        
+        return team;
+    });
     
-    // Create table
-    const table = document.createElement('table');
-    table.className = 'leaderboard-table';
+    // Get current teams for comparison (to highlight changes)
+    const currentTeams = {};
+    document.querySelectorAll('.team-row').forEach(row => {
+        const teamId = row.getAttribute('data-team-id');
+        const scoreElement = row.querySelector('.team-score');
+        if (teamId && scoreElement) {
+            currentTeams[teamId] = {
+                score: parseInt(scoreElement.textContent) || 0,
+                element: row
+            };
+        }
+    });
     
-    // Create table header
-    const thead = document.createElement('thead');
-    thead.innerHTML = `
-        <tr>
-            <th>Rank</th>
-            <th>Team</th>
-            <th>Points</th>
-            <th>Progress</th>
-        </tr>
-    `;
-    table.appendChild(thead);
+    // Sort teams by score (highest first)
+    teams.sort((a, b) => b.score - a.score);
     
-    // Create table body
-    const tbody = document.createElement('tbody');
+    // Clear the table to rebuild it in correct order
+    leaderboardBody.innerHTML = '';
     
-    // Add rows for each team
-    sortedTeams.forEach((team, index) => {
+    // Add each team to the table
+    teams.forEach(team => {
+        // Create new row for this team
         const row = document.createElement('tr');
+        row.className = 'team-row';
+        row.dataset.teamId = team.id;
+        row.dataset.lobbyId = team.lobby_id || '';
         
-        // Add special class for top 3 teams
-        if (index < 3) {
-            row.className = `top-${index + 1}`;
+        const nameCell = document.createElement('td');
+        nameCell.className = 'team-name';
+        nameCell.textContent = team.name;
+        
+        const scoreCell = document.createElement('td');
+        scoreCell.className = 'team-score';
+        scoreCell.textContent = team.score;
+        
+        const lobbyCell = document.createElement('td');
+        lobbyCell.className = 'team-lobby';
+        lobbyCell.textContent = team.lobby_name || 'Unknown';
+        
+        row.appendChild(nameCell);
+        row.appendChild(scoreCell);
+        row.appendChild(lobbyCell);
+        
+        // Apply filter based on current selection
+        if (selectedLobbyId !== 'all' && team.lobby_id !== selectedLobbyId) {
+            row.style.display = 'none';
         }
         
-        // Calculate progress percentage
-        const progress = team.progress || 0;
-        const totalQuestions = team.total_questions || 10;
-        const progressPercent = Math.min(100, Math.round((progress / totalQuestions) * 100));
+        // Highlight changed scores
+        if (currentTeams[team.id]) {
+            const currentScore = currentTeams[team.id].score;
+            if (team.score > currentScore) {
+                console.log(`Team ${team.name} score increased from ${currentScore} to ${team.score}`);
+                scoreCell.classList.add('score-increased');
+                
+                // Add animation class
+                row.classList.add('updated');
+                
+                // Remove the highlight class after animation completes
+                setTimeout(() => {
+                    row.classList.remove('updated');
+                    scoreCell.classList.remove('score-increased');
+                }, 3000);
+            }
+        } else {
+            // New team added
+            console.log(`New team added: ${team.name}`);
+            row.classList.add('new-team');
+            
+            // Remove the highlight class after animation completes
+            setTimeout(() => {
+                row.classList.remove('new-team');
+            }, 3000);
+        }
         
-        // Create row content
-        row.innerHTML = `
-            <td class="rank">${index + 1}</td>
-            <td class="team-name">${team.name}</td>
-            <td class="points">${team.points || 0}</td>
-            <td class="progress">
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${progressPercent}%"></div>
-                    <span class="progress-text">${progressPercent}%</span>
-                </div>
-            </td>
-        `;
-        
-        tbody.appendChild(row);
+        leaderboardBody.appendChild(row);
     });
-    
-    table.appendChild(tbody);
-    leaderboardContainer.appendChild(table);
-    
-    // Apply animation to newly updated rows
-    const rows = tbody.querySelectorAll('tr');
-    rows.forEach(row => {
-        row.classList.add('updated');
-        setTimeout(() => {
-            row.classList.remove('updated');
-        }, 2000);
-    });
-    
-    // Update last refresh time
-    const refreshTime = document.getElementById('last-refresh-time');
-    if (refreshTime) {
-        const now = new Date();
-        refreshTime.textContent = now.toLocaleTimeString();
-    }
 }
 
-// Add leaderboard-specific styles
-function addLeaderboardStyles() {
-    const existingStyle = document.getElementById('leaderboard-styles');
-    if (existingStyle) return;
-    
-    const style = document.createElement('style');
-    style.id = 'leaderboard-styles';
-    style.textContent = `
-        .websocket-status {
-            padding: 5px 15px;
-            margin-bottom: 15px;
-            border-radius: 4px;
-            display: inline-block;
-            font-size: 14px;
-        }
-        
-        #realtime-indicator {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(33, 37, 41, 0.8);
-            padding: 8px 12px;
-            border-radius: 4px;
-            z-index: 9999;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .pulse-dot {
-            display: inline-block;
-            margin-right: 5px;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 0.3; }
-            50% { opacity: 1; }
-            100% { opacity: 0.3; }
-        }
-        
-        .leaderboard-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        
-        .leaderboard-table th {
-            background-color: rgba(33, 37, 41, 0.8);
-            color: #90C83C;
-            font-weight: bold;
-            padding: 12px;
-            text-align: left;
-        }
-        
-        .leaderboard-table td {
-            padding: 12px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .leaderboard-table tr.top-1 {
-            background-color: rgba(255, 215, 0, 0.2);
-        }
-        
-        .leaderboard-table tr.top-2 {
-            background-color: rgba(192, 192, 192, 0.2);
-        }
-        
-        .leaderboard-table tr.top-3 {
-            background-color: rgba(205, 127, 50, 0.2);
-        }
-        
-        .leaderboard-table tr.updated {
-            animation: highlight 2s;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            background-color: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-            height: 20px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background-color: #90C83C;
-            border-radius: 10px;
-            transition: width 0.5s;
-        }
-        
-        .progress-text {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        
-        @keyframes highlight {
-            0% { background-color: rgba(144, 200, 60, 0.3); }
-            100% { background-color: transparent; }
-        }
-        
-        .rank {
-            font-weight: bold;
-            width: 60px;
-        }
-        
-        .team-name {
-            font-weight: bold;
-        }
-        
-        .points {
-            font-weight: bold;
-            color: #90C83C;
-            width: 100px;
-        }
-        
-        .no-teams {
-            text-align: center;
-            padding: 40px;
-            color: #aaa;
-            font-size: 18px;
-        }
-    `;
-    document.head.appendChild(style);
-}
+// Force a reload if we've been sitting here too long
+setTimeout(() => {
+    if (reconnectAttempts > 0) {
+        console.log('Page has been inactive for too long, refreshing...');
+        window.location.reload();
+    }
+}, 60000); // 1 minute
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Initializing leaderboard WebSocket handler');
-    
-    // Add styles
-    addLeaderboardStyles();
-    
-    // Create the real-time indicator
-    const rtIndicator = document.createElement('div');
-    rtIndicator.id = 'realtime-indicator';
-    rtIndicator.innerHTML = '<span class="pulse-dot">●</span> Connecting...';
-    rtIndicator.style.backgroundColor = 'rgba(255, 193, 7, 0.2)';
-    rtIndicator.style.color = '#ffc107';
-    document.body.appendChild(rtIndicator);
-    
-    // Create connection status indicator if it doesn't exist
-    if (!document.getElementById('connection-status')) {
-        const statusIndicator = document.createElement('div');
-        statusIndicator.id = 'connection-status';
-        statusIndicator.className = 'connecting';
-        statusIndicator.innerHTML = '<span>Connecting...</span>';
-        document.body.appendChild(statusIndicator);
+// Close WebSocket when page is unloaded
+window.addEventListener('beforeunload', () => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        // Use 1000 code for normal closure
+        socket.close(1000, 'Page navigation');
     }
     
-    // Initialize WebSocket connection
+    // Also stop polling if active
+    stopPolling();
+});
+
+// Initialize WebSocket when the DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    showDebugInfo('DOM loaded, initializing WebSocket connection');
+    
+    // Create a toggle button for debug container
+    const toggleBtn = document.createElement('button');
+    toggleBtn.textContent = 'Debug';
+    toggleBtn.style.position = 'fixed';
+    toggleBtn.style.bottom = '10px';
+    toggleBtn.style.right = '10px';
+    toggleBtn.style.zIndex = '10000';
+    toggleBtn.style.padding = '5px 10px';
+    toggleBtn.style.backgroundColor = '#90C83C';
+    toggleBtn.style.color = 'white';
+    toggleBtn.style.border = 'none';
+    toggleBtn.style.borderRadius = '3px';
+    toggleBtn.style.cursor = 'pointer';
+    toggleBtn.onclick = function() {
+        const debugContainer = document.getElementById('debug-container');
+        if (debugContainer) {
+            debugContainer.style.display = debugContainer.style.display === 'none' ? 'block' : 'none';
+        }
+    };
+    document.body.appendChild(toggleBtn);
+    
     initLeaderboardWebSocket();
+    
+    // As a fallback, request an update every 30 seconds even if websocket is working
+    setInterval(() => {
+        showDebugInfo('Requesting periodic leaderboard refresh');
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                action: 'get_data'
+            }));
+        } else {
+            showDebugInfo('WebSocket not connected, falling back to API');
+            fetchLeaderboardData();
+        }
+    }, 30000);
 }); 
