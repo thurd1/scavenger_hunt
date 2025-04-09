@@ -484,24 +484,33 @@ class RaceConsumer(AsyncWebsocketConsumer):
     Handles real-time updates when race status changes.
     """
     async def connect(self):
+        # Join the race group
         self.race_id = self.scope['url_route']['kwargs']['race_id']
         self.race_group_name = f'race_{self.race_id}'
         
-        # Join the race group
         await self.channel_layer.group_add(
             self.race_group_name,
             self.channel_name
         )
         
-        # Accept the connection
         await self.accept()
-        
-        # Log for debugging
         logger.info(f"WebSocket CONNECTED: Race {self.race_id}, channel: {self.channel_name}")
         
         # Check if race is already started and notify client immediately
         try:
             from hunt.models import Race, Lobby
+            
+            # Check if the race exists first
+            race_exists = await database_sync_to_async(lambda: Race.objects.filter(id=self.race_id).exists())()
+            
+            if not race_exists:
+                logger.warning(f"Race {self.race_id} does not exist - sending error message")
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'Race not found. Please refresh the page or contact an administrator.'
+                }))
+                return
+                
             race = await database_sync_to_async(Race.objects.get)(id=self.race_id)
             lobbies = await database_sync_to_async(lambda: list(Lobby.objects.filter(race=race, hunt_started=True)))()
             
@@ -516,6 +525,11 @@ class RaceConsumer(AsyncWebsocketConsumer):
                 }))
         except Exception as e:
             logger.error(f"Error checking race status on connect: {str(e)}")
+            # Send error message to client
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'An error occurred while checking race status. Please refresh the page.'
+            }))
     
     async def disconnect(self, close_code):
         # Leave the race group
@@ -534,6 +548,18 @@ class RaceConsumer(AsyncWebsocketConsumer):
             if action == 'check_status':
                 # Check if race is already started
                 from hunt.models import Race, Lobby
+                
+                # Check if the race exists first
+                race_exists = await database_sync_to_async(lambda: Race.objects.filter(id=self.race_id).exists())()
+                
+                if not race_exists:
+                    logger.warning(f"Race {self.race_id} does not exist during status check")
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'message': 'Race not found. Please refresh the page or contact an administrator.'
+                    }))
+                    return
+                    
                 race = await database_sync_to_async(Race.objects.get)(id=self.race_id)
                 lobbies = await database_sync_to_async(lambda: list(Lobby.objects.filter(race=race, hunt_started=True)))()
                 
@@ -547,6 +573,11 @@ class RaceConsumer(AsyncWebsocketConsumer):
                     }))
         except Exception as e:
             logger.error(f"Error in race consumer receive: {str(e)}")
+            # Send error message to client
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'An error occurred while processing your request. Please refresh the page.'
+            }))
 
     async def race_started(self, event):
         """

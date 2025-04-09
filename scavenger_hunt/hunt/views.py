@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question, TeamAnswer, TeamRaceProgress, TeamProgress
+from .models import Team, Riddle, Submission, Lobby, TeamMember, Race, Zone, Question, TeamAnswer, TeamRaceProgress, TeamProgress, Answer
 from django.http import JsonResponse
 from .forms import JoinLobbyForm, LobbyForm, TeamForm
 from django.http import HttpResponse
@@ -938,6 +938,7 @@ def view_team(request, team_id):
     race = None
     lobby_code = None
     race_id = None  # Initialize race_id separately
+    race_started = False
     
     # Check if team is part of any lobbies
     lobbies = Lobby.objects.filter(teams=team).select_related('race')
@@ -945,6 +946,7 @@ def view_team(request, team_id):
         lobby = lobbies.first()
         lobby_code = lobby.code
         race = lobby.race if hasattr(lobby, 'race') else None
+        race_started = lobby.hunt_started
         if race:
             race_id = race.id
     
@@ -967,7 +969,10 @@ def view_team(request, team_id):
     
     # Debug logging
     logger.info(f"Final state: Team {team.name}, Members: {len(members)}")
-    logger.info(f"Lobby: {lobby.name if lobby else 'None'}, Race: {race.id if race else 'None'}")
+    if lobby:
+        logger.info(f"Lobby: {lobby.name if lobby else 'None'}, Lobby ID: {lobby.id if lobby else 'None'}, Race: {race.id if race else 'None'}")
+    else:
+        logger.info("No lobby found for this team")
     
     context = {
         'team': team,
@@ -978,6 +983,8 @@ def view_team(request, team_id):
         'race': race,
         'race_id': race_id,  # Always include race_id
         'joined_team': joined_team,  # Add this for the template
+        'player_name': player_name,  # Add player name to context
+        'race_started': race_started,  # Add race_started status
     }
     return render(request, 'hunt/view_team.html', context)
 
@@ -2735,3 +2742,108 @@ def trigger_leaderboard_update_internal(race_id=None):
     except Exception as e:
         logger.error(f"Error in trigger_leaderboard_update_internal: {str(e)}")
         return False
+
+@csrf_exempt
+def question_answers_api(request):
+    """API endpoint for fetching and storing question answers"""
+    if request.method == 'GET':
+        # Get team and race information from query parameters
+        team_id = request.GET.get('team_id')
+        race_id = request.GET.get('race_id')
+        
+        if not team_id or not race_id:
+            return JsonResponse({'error': 'Missing required parameters'}, status=400)
+        
+        try:
+            team = Team.objects.get(id=team_id)
+            race = Race.objects.get(id=race_id)
+            
+            # Get all answers for this team and race
+            answers = Answer.objects.filter(
+                team=team,
+                question__zone__race=race
+            ).select_related('question')
+            
+            # Format the answers for the response
+            answer_data = []
+            for answer in answers:
+                answer_data.append({
+                    'id': answer.id,
+                    'question_id': answer.question.id,
+                    'question_text': answer.question.text,
+                    'answer_text': answer.answer_text,
+                    'answered_correctly': answer.answered_correctly,
+                    'attempts': answer.attempts,
+                    'points_awarded': answer.points_awarded,
+                    'submitted_at': answer.submitted_at.isoformat() if answer.submitted_at else None,
+                    'requires_photo': answer.requires_photo,
+                    'photo_url': answer.photo.url if answer.photo else None,
+                })
+            
+            return JsonResponse({'answers': answer_data})
+            
+        except Team.DoesNotExist:
+            return JsonResponse({'error': 'Team not found'}, status=404)
+        except Race.DoesNotExist:
+            return JsonResponse({'error': 'Race not found'}, status=404)
+        except Exception as e:
+            logger.error(f"Error fetching question answers: {str(e)}")
+            return JsonResponse({'error': 'Internal server error'}, status=500)
+    
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            team_id = data.get('team_id')
+            question_id = data.get('question_id')
+            answer_text = data.get('answer_text')
+            
+            if not team_id or not question_id:
+                return JsonResponse({'error': 'Missing required parameters'}, status=400)
+            
+            team = Team.objects.get(id=team_id)
+            question = Question.objects.get(id=question_id)
+            
+            # Create or update the answer
+            answer, created = Answer.objects.get_or_create(
+                team=team,
+                question=question,
+                defaults={
+                    'answer_text': answer_text,
+                    'attempts': 1,
+                    'answered_correctly': False,
+                    'requires_photo': question.requires_photo
+                }
+            )
+            
+            if not created:
+                # Update existing answer
+                answer.answer_text = answer_text
+                answer.attempts += 1
+                answer.save()
+            
+            # Check if the answer is correct
+            is_correct = answer_text and answer_text.lower().strip() == question.answer.lower().strip()
+            
+            if is_correct and not answer.answered_correctly:
+                answer.answered_correctly = True
+                answer.points_awarded = 10  # Basic points for correct answer
+                answer.save()
+            
+            return JsonResponse({
+                'id': answer.id,
+                'correct': is_correct,
+                'attempts': answer.attempts,
+                'points': answer.points_awarded
+            })
+            
+        except Team.DoesNotExist:
+            return JsonResponse({'error': 'Team not found'}, status=404)
+        except Question.DoesNotExist:
+            return JsonResponse({'error': 'Question not found'}, status=404)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            logger.error(f"Error saving question answer: {str(e)}")
+            return JsonResponse({'error': 'Internal server error'}, status=500)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
