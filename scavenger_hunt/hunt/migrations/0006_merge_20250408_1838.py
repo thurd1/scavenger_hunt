@@ -6,7 +6,10 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('hunt', '0005_auto_20230408_1830'),  # Adjust this to your actual previous migration
+        ('hunt', '0001_initial'),
+        ('hunt', '0002_add_team_progress'),
+        ('hunt', '0003_add_name_to_teammember'),
+        ('hunt', '0004_alter_lobby_options_lobby_last_accessed_and_more'),
     ]
 
     operations = [
