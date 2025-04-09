@@ -59,6 +59,162 @@ function validateForm(formElement) {
     return isValid;
 }
 
+// WebSocket utility functions
+const WebSocketUtils = {
+    // Initialize a WebSocket connection with auto-reconnect
+    createConnection: function(url, onMessageCallback, onOpenCallback, onCloseCallback, onErrorCallback) {
+        let socket = null;
+        let reconnectAttempts = 0;
+        let reconnectTimer = null;
+        const maxReconnectAttempts = 10;
+        const baseReconnectDelay = 1000; // Start with 1 second
+        
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connection-status');
+            if (!statusElement) return;
+            
+            statusElement.classList.remove('connected', 'disconnected', 'connecting');
+            
+            if (status === 'connected') {
+                statusElement.classList.add('connected');
+                statusElement.innerHTML = '<span>Connected ✓</span>';
+            } else if (status === 'disconnected') {
+                statusElement.classList.add('disconnected');
+                statusElement.innerHTML = '<span>Disconnected ✗</span>';
+            } else {
+                statusElement.classList.add('connecting');
+                statusElement.innerHTML = '<span>Connecting...</span>';
+            }
+        }
+        
+        function connect() {
+            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+                console.log('WebSocket already connected or connecting, skipping reconnect');
+                return;
+            }
+            
+            try {
+                updateConnectionStatus('connecting');
+                console.log(`Connecting to WebSocket: ${url} (Attempt ${reconnectAttempts + 1})`);
+                
+                socket = new WebSocket(url);
+                
+                socket.addEventListener('open', function(event) {
+                    console.log('WebSocket connection established');
+                    reconnectAttempts = 0;
+                    updateConnectionStatus('connected');
+                    
+                    if (typeof onOpenCallback === 'function') {
+                        onOpenCallback(event, socket);
+                    }
+                });
+                
+                socket.addEventListener('message', function(event) {
+                    if (typeof onMessageCallback === 'function') {
+                        onMessageCallback(event, socket);
+                    }
+                });
+                
+                socket.addEventListener('close', function(event) {
+                    console.log(`WebSocket connection closed. Code: ${event.code}, Reason: ${event.reason}`);
+                    updateConnectionStatus('disconnected');
+                    
+                    if (typeof onCloseCallback === 'function') {
+                        onCloseCallback(event);
+                    }
+                    
+                    // Don't reconnect if we closed it deliberately (code 1000)
+                    if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+                        const delay = Math.min(30000, baseReconnectDelay * Math.pow(1.5, reconnectAttempts));
+                        console.log(`Reconnecting in ${delay/1000} seconds...`);
+                        
+                        clearTimeout(reconnectTimer);
+                        reconnectTimer = setTimeout(function() {
+                            reconnectAttempts++;
+                            connect();
+                        }, delay);
+                    } else if (reconnectAttempts >= maxReconnectAttempts) {
+                        console.log('Max reconnect attempts reached. Giving up.');
+                        showNotification('Connection lost. Please refresh the page.', 'error', 0);
+                    }
+                });
+                
+                socket.addEventListener('error', function(event) {
+                    console.error('WebSocket error:', event);
+                    updateConnectionStatus('disconnected');
+                    
+                    if (typeof onErrorCallback === 'function') {
+                        onErrorCallback(event);
+                    }
+                });
+                
+                return socket;
+            } catch (error) {
+                console.error('Error creating WebSocket:', error);
+                updateConnectionStatus('disconnected');
+                
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    const delay = Math.min(30000, baseReconnectDelay * Math.pow(1.5, reconnectAttempts));
+                    console.log(`Error connecting. Retrying in ${delay/1000} seconds...`);
+                    
+                    clearTimeout(reconnectTimer);
+                    reconnectTimer = setTimeout(function() {
+                        reconnectAttempts++;
+                        connect();
+                    }, delay);
+                } else {
+                    console.log('Max reconnect attempts reached. Giving up.');
+                    showNotification('Connection failed. Please refresh the page.', 'error', 0);
+                }
+                
+                return null;
+            }
+        }
+        
+        // Return the socket and methods to control it
+        const connection = {
+            socket: connect(),
+            close: function() {
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.close(1000, 'Closed by client');
+                }
+                clearTimeout(reconnectTimer);
+            },
+            reconnect: function() {
+                this.close();
+                reconnectAttempts = 0;
+                this.socket = connect();
+            },
+            send: function(data) {
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    if (typeof data === 'object') {
+                        socket.send(JSON.stringify(data));
+                    } else {
+                        socket.send(data);
+                    }
+                    return true;
+                } else {
+                    console.warn('Cannot send message, socket not connected');
+                    return false;
+                }
+            }
+        };
+        
+        return connection;
+    },
+    
+    // Get WebSocket protocol based on page protocol
+    getSocketProtocol: function() {
+        return window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    },
+    
+    // Create a WebSocket URL
+    createSocketUrl: function(path) {
+        const protocol = this.getSocketProtocol();
+        return `${protocol}//${window.location.host}/${path}`;
+    }
+};
+
 // Add some CSS for notifications
 document.addEventListener('DOMContentLoaded', () => {
     const style = document.createElement('style');
@@ -97,6 +253,31 @@ document.addEventListener('DOMContentLoaded', () => {
         
         .notification-error {
             background-color: #F44336;
+        }
+        
+        #connection-status {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 9999;
+        }
+        
+        #connection-status.connected {
+            background-color: rgba(40, 167, 69, 0.8);
+            color: white;
+        }
+        
+        #connection-status.disconnected {
+            background-color: rgba(220, 53, 69, 0.8);
+            color: white;
+        }
+        
+        #connection-status.connecting {
+            background-color: rgba(255, 193, 7, 0.8);
+            color: black;
         }
     `;
     document.head.appendChild(style);
