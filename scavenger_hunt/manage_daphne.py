@@ -1,30 +1,36 @@
-#!/usr/bin/env python
 import os
 import sys
-import subprocess
+import django
+from django.core.asgi import get_asgi_application
 
-# Configuration
-HOST = "0.0.0.0"  # Listen on all interfaces
-PORT = 8001       # Use port 8001 as requested
+# Add the project directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Set up Django settings
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'scavenger_hunt.settings')
+django.setup()
+
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+from hunt.routing import websocket_urlpatterns
+
+application = ProtocolTypeRouter({
+    "http": get_asgi_application(),
+    "websocket": AuthMiddlewareStack(
+        URLRouter(
+            websocket_urlpatterns
+        )
+    ),
+})
 
 if __name__ == "__main__":
+    from daphne.server import Server
+    from daphne.endpoints import build_endpoint_description_strings
+
     print("Starting Daphne server...")
+    print("Settings module:", os.environ['DJANGO_SETTINGS_MODULE'])
     
-    # First, make sure to collect static files
-    print("Collecting static files...")
-    subprocess.run([sys.executable, "manage.py", "collectstatic", "--noinput"])
-    
-    # Run Daphne directly with command line args
-    # This approach avoids all the import and app registry issues
-    cmd = [
-        sys.executable, 
-        "-m", "daphne",
-        "-b", HOST,    # Bind to all interfaces
-        "-p", str(PORT),  # Use port 8001
-        "scavenger_hunt.asgi:application"
-    ]
-    
-    print(f"Starting Daphne on {HOST}:{PORT}")
-    
-    # Execute the command
-    subprocess.run(cmd) 
+    Server(
+        application=application,
+        endpoints=build_endpoint_description_strings(host="0.0.0.0", port=8000),
+    ).run() 

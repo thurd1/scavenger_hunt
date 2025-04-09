@@ -122,34 +122,7 @@ def team_lobby_association_changed(sender, instance, action, reverse, model, pk_
             if not reverse:
                 # A team was added to lobbies (from Team side)
                 if not isinstance(instance, Team):
-                    # Don't show a warning, but handle appropriately based on instance type
-                    if isinstance(instance, Lobby):
-                        # Handle the case where a Lobby instance is passed
-                        lobby = instance
-                        team_ids = pk_set
-                        
-                        for team_id in team_ids:
-                            try:
-                                team = Team.objects.get(id=team_id)
-                                # Format the team data
-                                team_data = {
-                                    'id': team.id,
-                                    'name': team.name,
-                                    'code': team.code,
-                                    'members_count': team.members.count(),
-                                    'members': [{'role': member.role} for member in team.members.all()]
-                                }
-                                
-                                # Send to the lobby group
-                                async_to_sync(channel_layer.group_send)(
-                                    f'lobby_{lobby.id}',
-                                    {
-                                        'type': 'team_joined',
-                                        'team': team_data
-                                    }
-                                )
-                            except Exception as e:
-                                print(f"ERROR in team_lobby_association_changed (Lobby instance): {str(e)}")
+                    print(f"WARNING: Expected Team instance but got {type(instance).__name__}")
                     return
                 
                 team = instance
@@ -181,33 +154,7 @@ def team_lobby_association_changed(sender, instance, action, reverse, model, pk_
             else:
                 # A lobby was added to teams (from Lobby side)
                 if not isinstance(instance, Lobby):
-                    # Don't show a warning, but handle appropriately based on instance type
-                    if isinstance(instance, Team):
-                        # Handle the case where a Team instance is passed
-                        team = instance
-                        lobby_ids = pk_set
-                        
-                        for lobby_id in lobby_ids:
-                            try:
-                                lobby = Lobby.objects.get(id=lobby_id)
-                                team_data = {
-                                    'id': team.id,
-                                    'name': team.name,
-                                    'code': team.code,
-                                    'members_count': team.members.count(),
-                                    'members': [{'role': member.role} for member in team.members.all()]
-                                }
-                                
-                                # Send to the lobby group
-                                async_to_sync(channel_layer.group_send)(
-                                    f'lobby_{lobby.id}',
-                                    {
-                                        'type': 'team_joined',
-                                        'team': team_data
-                                    }
-                                )
-                            except Exception as e:
-                                print(f"ERROR in team_lobby_association_changed (Team instance): {str(e)}")
+                    print(f"WARNING: Expected Lobby instance but got {type(instance).__name__}")
                     return
                 
                 lobby = instance
