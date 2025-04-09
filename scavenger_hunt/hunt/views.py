@@ -2466,77 +2466,9 @@ def join_existing_team(request):
 @require_http_methods(["GET", "POST"])
 def create_standalone_team(request):
     """Create a new team with the current player as a member."""
-    # For GET requests, render the form
-    if request.method == 'GET':
-        # Ensure player has a name in session
-        player_name = request.session.get('player_name')
-        if not player_name:
-            messages.error(request, "Please set your player name first.")
-            return redirect('join_game_session')
-        
-        # Get lobby code from session if available
-        lobby_code = request.session.get('lobby_code')
-        
-        return render(request, 'hunt/create_standalone_team.html', {'lobby_code': lobby_code})
-        
-    # For POST requests, create the team
-    elif request.method == 'POST':
-        try:
-            # Get data from form 
-            team_name = request.POST.get('team_name')
-            player_name = request.POST.get('player_name') or request.session.get('player_name')
-            
-            if not team_name or not player_name:
-                messages.error(request, 'Both team name and player name are required')
-                return render(request, 'hunt/create_standalone_team.html')
-                
-            # Check if team name already exists
-            if Team.objects.filter(name=team_name).exists():
-                messages.error(request, 'A team with this name already exists')
-                return render(request, 'hunt/create_standalone_team.html')
-                
-            # Generate a unique code
-            while True:
-                code = generate_code()
-                if not Team.objects.filter(code=code).exists():
-                    break
-                    
-            # Create the team
-            team = Team.objects.create(
-                name=team_name,
-                code=code
-            )
-            
-            # Create the team member - removed name field
-            TeamMember.objects.create(
-                team=team,
-                role=player_name
-            )
-            
-            # Associate with lobby if a lobby code is in session
-            lobby_code = request.session.get('lobby_code')
-            if lobby_code:
-                try:
-                    lobby = Lobby.objects.get(code=lobby_code)
-                    lobby.teams.add(team)
-                    print(f"Added team {team.name} to lobby {lobby.name}")
-                except Lobby.DoesNotExist:
-                    print(f"Lobby with code {lobby_code} not found")
-            
-            # Store in session
-            request.session['team_id'] = team.id
-            request.session['player_name'] = player_name
-            request.session.modified = True
-            
-            messages.success(request, f'Team "{team_name}" created successfully! Your team code is: {code}')
-            return redirect('view_team', team_id=team.id)
-            
-        except Exception as e:
-            messages.error(request, f'Error creating team: {str(e)}')
-            return render(request, 'hunt/create_standalone_team.html')
-    
-    # Should never reach here
-    return render(request, 'hunt/create_standalone_team.html')
+    # Instead of handling standalone team creation, redirect to create_team
+    # Redirect to lobby ID 2 (hardcoded for now)
+    return redirect('create_team_for_lobby', lobby_id=2)
 
 def leave_team(request, team_id):
     """Allow a player to leave a team they've joined"""
