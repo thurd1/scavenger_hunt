@@ -653,27 +653,42 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
     
     async def leaderboard_update(self, event):
         """Handle leaderboard update message"""
-        # Extract data from event
-        action = event.get('action', 'update')
-        
-        # Prepare data to send to WebSocket
-        data = {
-            'type': 'leaderboard_update',
-            'action': action
-        }
-        
-        # For full refresh, include the complete data
-        if action == 'full_refresh' and 'data' in event:
-            data['data'] = event['data']
-            data['race_id'] = event.get('race_id')
-        else:
-            # For single update, include the team details
-            data['team_id'] = event.get('team_id')
-            data['team_name'] = event.get('team_name')
-            data['race_id'] = event.get('race_id')
-        
-        # Send message to WebSocket (async)
-        await self.send(text_data=json.dumps(data))
+        try:
+            # Extract data from event and prepare response
+            data = {
+                'type': 'leaderboard_update',
+            }
+            
+            # Check if we have full teams data
+            if 'teams' in event and isinstance(event['teams'], list):
+                # We have a full teams list - use it directly
+                data['teams'] = event['teams']
+                logging.info(f"Sending complete teams list to leaderboard client: {len(event['teams'])} teams")
+                
+            # For full refresh with 'data' attribute (older format)
+            elif 'action' in event and event['action'] == 'full_refresh' and 'data' in event:
+                data['action'] = 'full_refresh'
+                data['data'] = event['data']
+                data['race_id'] = event.get('race_id')
+                logging.info(f"Sending full refresh data to leaderboard client")
+                
+            # For single team update (older format)
+            elif 'team_id' in event:
+                data['action'] = event.get('action', 'update')
+                data['team_id'] = event.get('team_id')
+                data['team_name'] = event.get('team_name')
+                data['race_id'] = event.get('race_id')
+                logging.info(f"Sending single team update to leaderboard client: team_id={event.get('team_id')}")
+                
+            # Empty data case - trigger a refresh from client
+            else:
+                data['action'] = 'refresh'
+                logging.info("Sending refresh request to leaderboard client")
+            
+            # Send message to WebSocket (async)
+            await self.send(text_data=json.dumps(data))
+        except Exception as e:
+            logging.error(f"Error in leaderboard_update consumer: {str(e)}")
     
     async def send_initial_leaderboard_data(self):
         """

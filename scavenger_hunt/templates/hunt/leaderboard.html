@@ -232,8 +232,7 @@
 
 {% block extra_js %}
 <script>
-    // LEADERBOARD TEAMS DISPLAY FIX
-    // Create some test data to ensure the leaderboard isn't empty
+    // Create some test data to ensure the leaderboard isn't empty at startup only
     const testTeams = [
         {id: 1, name: "Team A", score: 10, lobby_id: "1", lobby_name: "Test Race 1"},
         {id: 2, name: "Team B", score: 8, lobby_id: "1", lobby_name: "Test Race 1"},
@@ -244,6 +243,19 @@
     let connectionAttempts = 0;
     let usingFallback = false;
     let lastUpdateTime = 0;
+    let reconnecting = false;
+    let socket = null; // Store WebSocket reference globally
+    
+    // Debug logging that can be turned on/off
+    const DEBUG = true;
+    function debug(message, data = null) {
+        if (!DEBUG) return;
+        if (data) {
+            console.log(`[Leaderboard Debug] ${message}`, data);
+        } else {
+            console.log(`[Leaderboard Debug] ${message}`);
+        }
+    }
     
     // Update connection status display
     function updateStatus(status, color) {
@@ -253,26 +265,29 @@
             statusDot.style.background = color;
             statusText.textContent = status;
         }
+        debug(`Connection status: ${status}`);
     }
     
-    // Initialize WebSocket or fallback
-    function initRealTimeUpdates() {
-        // Try WebSocket first
+    // Initialize WebSocket connection
+    function initWebSocket() {
+        if (reconnecting) return;
+        
         try {
             const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const socketUrl = `${wsScheme}//${window.location.host}/ws/leaderboard/`;
-            console.log(`Attempting WebSocket connection to ${socketUrl}`);
+            debug(`Attempting WebSocket connection to ${socketUrl}`);
             
             updateStatus('Connecting to WebSocket...', '#ffcc00');
             
-            const socket = new WebSocket(socketUrl);
-            window.socket = socket; // Store globally
+            socket = new WebSocket(socketUrl);
+            window.socket = socket; // Store globally for debugging
             
             socket.onopen = function() {
-                console.log('WebSocket connected successfully');
+                debug('WebSocket connected successfully');
                 updateStatus('WebSocket Connected', '#90C83C');
                 connectionAttempts = 0;
                 usingFallback = false;
+                reconnecting = false;
                 
                 // Request initial data
                 socket.send(JSON.stringify({
@@ -281,42 +296,74 @@
             };
             
             socket.onmessage = function(event) {
-                console.log('WebSocket message received', event.data);
+                debug('WebSocket message received', event.data);
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.type === 'leaderboard_update' && data.teams) {
-                        updateLeaderboard(data.teams);
-                        lastUpdateTime = Date.now();
+                    lastUpdateTime = Date.now();
+                    
+                    if (data.type === 'leaderboard_update') {
+                        // Handle different message formats
+                        if (data.teams) {
+                            // Format 1: Full teams array
+                            debug(`Received complete teams list: ${data.teams.length} teams`);
+                            updateLeaderboard(data.teams);
+                        } else if (data.action === 'full_refresh' && data.data) {
+                            // Format 2: Full refresh with data array
+                            debug(`Received full_refresh data: ${data.data.length} teams`);
+                            updateLeaderboard(data.data);
+                        } else if (data.action === 'update' && data.team_id) {
+                            // Format 3: Single team update - refresh all data
+                            debug(`Received single team update for team ${data.team_id} - requesting full refresh`);
+                            fetchLeaderboardData(); // Get fresh data for all teams
+                        } else if (data.action === 'refresh') {
+                            // Format 4: Request to refresh data
+                            debug('Received refresh request - fetching new data');
+                            fetchLeaderboardData();
+                        }
+                    } else if (data.type === 'error') {
+                        debug(`Server reported error: ${data.message}`, true);
+                        updateStatus(`Error: ${data.message}`, '#ff6b6b');
                     }
                 } catch (error) {
                     console.error('Error processing WebSocket message:', error);
                 }
             };
             
-            socket.onclose = function() {
-                console.log('WebSocket connection closed');
-                updateStatus('WebSocket Disconnected - Using API', '#ff6b6b');
-                // Fall back to polling on WebSocket close
-                fallbackToPolling();
+            socket.onclose = function(event) {
+                debug(`WebSocket closed with code: ${event.code}, reason: ${event.reason}`);
+                updateStatus('WebSocket Disconnected - Reconnecting...', '#ffcc00');
+                
+                // Attempt to reconnect
+                reconnecting = true;
+                setTimeout(() => {
+                    reconnecting = false;
+                    connectionAttempts++;
+                    
+                    if (connectionAttempts <= 5) {
+                        debug(`Reconnection attempt ${connectionAttempts}/5`);
+                        initWebSocket();
+                    } else {
+                        debug('Max reconnection attempts reached, falling back to API polling');
+                        fallbackToPolling();
+                    }
+                }, 3000);
             };
             
             socket.onerror = function(error) {
-                console.error('WebSocket error:', error);
-                updateStatus('WebSocket Error - Using API', '#ff6b6b');
-                // Increment connection attempts on error
-                connectionAttempts++;
-                
-                // If we've tried too many times, fall back to polling
-                if (connectionAttempts >= 3) {
-                    fallbackToPolling();
-                }
+                debug('WebSocket error', error);
+                updateStatus('WebSocket Error', '#ff6b6b');
             };
         } catch (error) {
             console.error('Error initializing WebSocket:', error);
             updateStatus('WebSocket Failed - Using API', '#ff6b6b');
-            // Fall back to polling if WebSocket initialization fails
             fallbackToPolling();
         }
+    }
+    
+    // Initialize real-time updates with WebSocket or fallback
+    function initRealTimeUpdates() {
+        debug('Initializing real-time updates');
+        initWebSocket();
     }
     
     // Fall back to polling API for updates
@@ -324,16 +371,13 @@
         if (usingFallback) return; // Prevent multiple polling intervals
         
         usingFallback = true;
-        console.log('Falling back to API polling');
+        debug('Falling back to API polling every 3 seconds');
         updateStatus('Using API Polling', '#ffcc00');
         
-        // Use testTeams if no data has been loaded yet
-        const leaderboardBody = document.getElementById('leaderboard-body');
-        if (leaderboardBody && !leaderboardBody.children.length) {
-            updateLeaderboard(testTeams);
-        }
+        // Start with an immediate data fetch
+        fetchLeaderboardData();
         
-        // Start polling every 3 seconds
+        // Then poll every 3 seconds
         setInterval(function() {
             fetchLeaderboardData();
         }, 3000);
@@ -341,30 +385,25 @@
     
     // Fetch leaderboard data via API
     function fetchLeaderboardData() {
+        debug('Fetching leaderboard data from API');
+        
         fetch('/api/leaderboard-data/')
             .then(response => response.json())
             .then(data => {
-                console.log('API response:', data);
+                debug('API response received', data);
+                lastUpdateTime = Date.now();
+                
                 if (data.success && data.teams) {
                     updateLeaderboard(data.teams);
-                    lastUpdateTime = Date.now();
                     updateStatus('Updated via API', '#90C83C');
                 } else {
-                    console.error('API error:', data.error || 'Unknown error');
-                    updateStatus('API Error - Using Test Data', '#ff6b6b');
-                    
-                    // If no updates for over 10 seconds, use test data
-                    if (Date.now() - lastUpdateTime > 10000) {
-                        updateLeaderboard(testTeams);
-                    }
+                    debug('API error', data.error || 'Unknown error');
+                    updateStatus('API Error', '#ff6b6b');
                 }
             })
             .catch(error => {
                 console.error('Error fetching leaderboard data:', error);
-                updateStatus('Network Error - Using Test Data', '#ff6b6b');
-                
-                // Use test data on network errors
-                updateLeaderboard(testTeams);
+                updateStatus('Network Error', '#ff6b6b');
             });
     }
     
@@ -372,6 +411,8 @@
     document.getElementById('lobby-select').addEventListener('change', function() {
         const selectedLobbyId = this.value;
         const teamRows = document.querySelectorAll('.team-row');
+        
+        debug(`Filtering by lobby: ${selectedLobbyId}`);
         
         teamRows.forEach(row => {
             const lobbyId = row.dataset.lobbyId;
@@ -386,27 +427,28 @@
     
     // Handle manual refresh button
     document.getElementById('refresh-button').addEventListener('click', function() {
+        debug('Manual refresh requested');
+        
         this.disabled = true;
         this.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Refreshing...';
         
         // Method 1: Try to send a message through the WebSocket
-        if (window.socket && window.socket.readyState === WebSocket.OPEN) {
-            window.socket.send(JSON.stringify({
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            debug('Requesting refresh via WebSocket');
+            socket.send(JSON.stringify({
                 action: 'get_data'
             }));
-            
-            setTimeout(() => {
-                this.disabled = false;
-                this.innerHTML = '<i class="fa fa-refresh"></i> Refresh';
-            }, 1000);
         } else {
             // Method 2: Use the API endpoint as fallback
+            debug('Requesting refresh via API');
             fetchLeaderboardData();
-            setTimeout(() => {
-                this.disabled = false;
-                this.innerHTML = '<i class="fa fa-refresh"></i> Refresh';
-            }, 1000);
         }
+        
+        // Re-enable button after a delay
+        setTimeout(() => {
+            this.disabled = false;
+            this.innerHTML = '<i class="fa fa-refresh"></i> Refresh';
+        }, 1000);
     });
     
     // Update the leaderboard with team data
@@ -414,15 +456,15 @@
         const leaderboardBody = document.getElementById('leaderboard-body');
         if (!leaderboardBody) return;
         
-        console.log(`Updating leaderboard with ${teams.length} teams`);
+        debug(`Updating leaderboard with ${teams.length} teams`);
         
-        // Get currently selected lobby
-        const selectedLobbyId = document.getElementById('lobby-select')?.value || 'all';
-        
-        // Handle empty teams array
-        if (!teams || !teams.length) {
-            console.warn('No teams data provided, using test data instead');
+        // Only use test data if no teams are provided AND the table is empty
+        if ((!teams || !teams.length) && (!leaderboardBody.children.length || leaderboardBody.children.length === 1 && leaderboardBody.children[0].cells && leaderboardBody.children[0].cells.length === 1)) {
+            debug('No teams provided and table is empty - using test data');
             teams = testTeams;
+        } else if (!teams || !teams.length) {
+            debug('No teams provided but table has data - keeping current data');
+            return; // Keep current data if no teams are provided
         }
         
         // Clean up team data to ensure valid values
@@ -452,6 +494,9 @@
         
         // Sort teams by score (highest first)
         teams.sort((a, b) => b.score - a.score);
+        
+        // Get currently selected lobby
+        const selectedLobbyId = document.getElementById('lobby-select')?.value || 'all';
         
         // Get current teams for highlighting changes
         const currentTeams = {};
@@ -505,6 +550,26 @@
                 scoreCell.classList.add('score-increased');
                 row.classList.add('updated');
                 
+                // Play sound for score update
+                try {
+                    // Create a simple tone if browser supports AudioContext
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioCtx.createOscillator();
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+                    
+                    const gainNode = audioCtx.createGain();
+                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Low volume
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    
+                    oscillator.start();
+                    oscillator.stop(audioCtx.currentTime + 0.1); // Short beep
+                } catch (e) {
+                    // Ignore errors with audio - it's just a nice-to-have
+                }
+                
                 setTimeout(() => {
                     row.classList.remove('updated');
                     scoreCell.classList.remove('score-increased');
@@ -519,11 +584,14 @@
             
             leaderboardBody.appendChild(row);
         });
+        
+        // Update last update time
+        lastUpdateTime = Date.now();
     }
     
     // Initialize when the page loads
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('Leaderboard page loaded');
+        debug('Leaderboard page loaded');
         
         // Start with test data to ensure something is displayed
         updateLeaderboard(testTeams);
@@ -535,7 +603,7 @@
         setInterval(function() {
             // If no updates for 15 seconds, try force refresh
             if (Date.now() - lastUpdateTime > 15000) {
-                console.log('No updates for 15 seconds, forcing refresh');
+                debug('No updates for 15 seconds, forcing refresh');
                 fetchLeaderboardData();
             }
         }, 15000);

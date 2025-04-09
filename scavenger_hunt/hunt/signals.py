@@ -6,8 +6,9 @@ import json
 import logging
 from django.db import transaction
 from django.db import connection
+from django.db import models
 
-from .models import Team, TeamMember, Lobby, Race, TeamProgress, Question, Zone, TeamRaceProgress
+from .models import Team, TeamMember, Lobby, Race, TeamProgress, Question, Zone, TeamRaceProgress, TeamAnswer
 
 logger = logging.getLogger(__name__)
 
@@ -316,6 +317,101 @@ def team_score_changed(sender, instance, created, **kwargs):
         logging.info(f"SIGNAL: Sent leaderboard update with {len(teams_data)} teams")
     except Exception as e:
         logging.error(f"ERROR in team_score_changed signal: {str(e)}", exc_info=True) 
+
+@receiver(post_save, sender=TeamAnswer)
+def update_team_race_progress(sender, instance, created, **kwargs):
+    """
+    Signal handler to update TeamRaceProgress when a team answers correctly
+    and trigger leaderboard updates
+    """
+    try:
+        # Only process if this is a correct answer with points
+        if not instance.answered_correctly or instance.points_awarded <= 0:
+            return
+            
+        team = instance.team
+        question = instance.question
+        
+        # Find the race from the question's zone
+        if not question.zone or not question.zone.race:
+            logging.warning(f"Question {question.id} has no zone or race - can't update progress")
+            return
+            
+        race = question.zone.race
+        
+        logging.info(f"Updating race progress for team {team.name} in race {race.name}, adding {instance.points_awarded} points")
+        
+        # Update or create TeamRaceProgress
+        progress, created = TeamRaceProgress.objects.get_or_create(
+            team=team,
+            race=race,
+            defaults={
+                'total_points': instance.points_awarded,
+                'current_question_index': 0
+            }
+        )
+        
+        if not created:
+            # Add these points to the total
+            progress.total_points = TeamAnswer.objects.filter(
+                team=team,
+                question__zone__race=race,
+                answered_correctly=True
+            ).aggregate(models.Sum('points_awarded'))['points_awarded__sum'] or 0
+            
+            # Save to trigger post_save signal on TeamRaceProgress
+            progress.save()
+            
+        # Also directly trigger a leaderboard update via WebSocket for immediate feedback
+        channel_layer = get_channel_layer()
+        
+        # Get all teams to refresh the entire leaderboard
+        teams_data = []
+        
+        # Get all active lobbies
+        lobbies = Lobby.objects.filter(is_active=True)
+        
+        for lobby in lobbies:
+            # Skip lobbies without a race
+            if not lobby.race:
+                continue
+                
+            # Get teams in this lobby
+            lobby_teams = Team.objects.filter(participating_lobbies=lobby)
+            
+            for team_obj in lobby_teams:
+                try:
+                    # Get team's progress in the race
+                    team_progress = TeamRaceProgress.objects.get(team=team_obj, race=lobby.race)
+                    total_points = team_progress.total_points
+                except TeamRaceProgress.DoesNotExist:
+                    # If no progress exists, score is 0
+                    total_points = 0
+                
+                teams_data.append({
+                    'id': team_obj.id,
+                    'name': team_obj.name,
+                    'score': total_points,
+                    'lobby_id': str(lobby.id),
+                    'lobby_name': lobby.race.name if lobby.race else 'Unknown Race'
+                })
+        
+        # Sort by score
+        teams_data.sort(key=lambda x: x['score'], reverse=True)
+        
+        # Send update to leaderboard group
+        async_to_sync(channel_layer.group_send)(
+            'leaderboard',
+            {
+                'type': 'leaderboard_update',
+                'teams': teams_data
+            }
+        )
+        
+        logging.info(f"SIGNAL: Sent leaderboard update from TeamAnswer with {len(teams_data)} teams")
+        
+    except Exception as e:
+        logging.error(f"ERROR in update_team_race_progress signal: {str(e)}", exc_info=True)
 
 # Signal handler for when a lobby is deleted
 @receiver(post_delete, sender=Lobby)

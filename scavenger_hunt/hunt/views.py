@@ -1600,6 +1600,63 @@ def check_answer(request, lobby_id=None, question_id=None):
                     team_answer.points_awarded = points
                 team_answer.save()
                 
+                # Update race progress for this team if answer was correct and points awarded
+                if is_correct and points > 0 and lobby and lobby.race:
+                    race = lobby.race
+                    
+                    # Log this update
+                    logger.info(f"Team {team.name} answered correctly with {points} points in race {race.id}")
+                    
+                    # Update team race progress with total points
+                    try:
+                        # Get or create team race progress
+                        team_race_progress, created = TeamRaceProgress.objects.get_or_create(
+                            team=team,
+                            race=race,
+                            defaults={
+                                'total_points': points,
+                                'current_question_index': 0
+                            }
+                        )
+                        
+                        if not created:
+                            # Update total points by querying all correct answers
+                            total_points = TeamAnswer.objects.filter(
+                                team=team,
+                                question__zone__race=race,
+                                answered_correctly=True
+                            ).aggregate(Sum('points_awarded'))['points_awarded__sum'] or 0
+                            
+                            team_race_progress.total_points = total_points
+                            team_race_progress.save()
+                            
+                            logger.info(f"Updated TeamRaceProgress for team {team.name} with total points: {total_points}")
+                        
+                        # Trigger update to leaderboard via WebSocket
+                        try:
+                            from asgiref.sync import async_to_sync
+                            from channels.layers import get_channel_layer
+                            
+                            channel_layer = get_channel_layer()
+                            async_to_sync(channel_layer.group_send)(
+                                'leaderboard',
+                                {
+                                    'type': 'leaderboard_update',
+                                    'team_id': team.id,
+                                    'team_name': team.name,
+                                    'race_id': race.id,
+                                    'action': 'update'
+                                }
+                            )
+                            logger.info(f"Sent leaderboard update for team {team.id} in race {race.id}")
+                            
+                            # Also do an HTTP-based update for redundancy
+                            trigger_leaderboard_update_internal(race.id)
+                        except Exception as e:
+                            logger.error(f"Error sending leaderboard update: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Error updating team race progress: {str(e)}")
+                
                 # Find the lobby this team is in
                 lobby = team.participating_lobbies.first()
                 
@@ -1611,6 +1668,20 @@ def check_answer(request, lobby_id=None, question_id=None):
                     'points': points if is_correct else 0,
                     'photo_uploaded': team_answer.photo_uploaded
                 }
+                
+                # Log and debug data
+                logger.info(f"Answer check for team {team.name} (ID: {team.id}) - Question {question.id} - Correct: {is_correct} - Points: {points if is_correct else 0}")
+                
+                # Debug information about connected teams and active lobbies
+                try:
+                    active_lobbies = Lobby.objects.filter(is_active=True).count()
+                    total_teams = Team.objects.all().count()
+                    active_teams = Team.objects.filter(participating_lobbies__is_active=True).distinct().count()
+                    team_race_progress_count = TeamRaceProgress.objects.all().count()
+                    
+                    logger.info(f"Debug stats - Active lobbies: {active_lobbies}, Total teams: {total_teams}, Active teams: {active_teams}, TeamRaceProgress records: {team_race_progress_count}")
+                except Exception as e:
+                    logger.error(f"Error collecting debug stats: {str(e)}")
                 
                 # If the answer is correct, calculate next_url
                 if is_correct and lobby:
@@ -2191,6 +2262,22 @@ def upload_photo_api(request):
                     race_progress.photo_questions_completed = photo_completed
                     race_progress.save()
                     
+                    # Also update total points in TeamRaceProgress to ensure consistency
+                    # (this triggers the post_save signal that will update the leaderboard)
+                    try:
+                        total_points = TeamAnswer.objects.filter(
+                            team=team,
+                            question__zone__race=race,
+                            answered_correctly=True
+                        ).aggregate(Sum('points_awarded'))['points_awarded__sum'] or 0
+                        
+                        race_progress.total_points = total_points
+                        race_progress.save()
+                        
+                        logger.info(f"Updated TeamRaceProgress for team {team.name} after photo upload, total points: {total_points}")
+                    except Exception as e:
+                        logger.error(f"Error updating total points: {str(e)}")
+                    
                 # Send leaderboard update via WebSocket
                 try:
                     channel_layer = get_channel_layer()
@@ -2198,21 +2285,19 @@ def upload_photo_api(request):
                         'leaderboard',
                         {
                             'type': 'leaderboard_update',
-                            'race_id': race_id,
                             'team_id': team.id,
                             'team_name': team.name,
+                            'race_id': race_id,
                             'action': 'update'
                         }
                     )
-                    logger.info(f"Sent leaderboard update for team {team.id} in race {race_id}")
+                    logger.info(f"Sent leaderboard update for team {team.id} in race {race_id} after photo upload")
+                    
+                    # Also trigger a complete leaderboard refresh for all clients
+                    trigger_leaderboard_update_internal(race_id)
                 except Exception as e:
                     logger.error(f"Error sending leaderboard update: {str(e)}")
                     
-                # Also trigger an HTTP-based leaderboard update for redundancy
-                try:
-                    trigger_leaderboard_update_internal(race_id)
-                except Exception as e:
-                    logger.error(f"Error triggering HTTP leaderboard update: {str(e)}")
             except Exception as e:
                 logger.error(f"Error updating race progress: {str(e)}")
         
