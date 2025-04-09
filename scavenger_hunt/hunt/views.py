@@ -271,8 +271,8 @@ def join_team(request, team_id=None):
                     request.session['team_member_id'] = team_member.id
                     request.session['team_role'] = player_name
                     request.session['team_id'] = team.id
-                request.session.modified = True
-            
+                    request.session.modified = True
+
                     # Log the join
                     logger.info(f"Player {player_name} joined team {team.name}")
                     
@@ -477,7 +477,7 @@ def register(request):
             login(request, user)
             return redirect('home')
         else:
-        form = UserCreationForm()
+            form = UserCreationForm()
     return render(request, 'hunt/register.html', {'form': form})
 
 def register_team(request):
@@ -500,7 +500,7 @@ def leaderboard(request):
     """
     Display the leaderboard for all races.
     """
-            teams = []
+    teams = []
     
     # Debug logging
     logger.info("Leaderboard view accessed")
@@ -792,7 +792,7 @@ def delete_team(request, team_id):
         
         # Broadcast updates if needed
         if lobby_id:
-            try:
+        try:
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
                 f'lobby_{lobby_id}',
@@ -1346,10 +1346,10 @@ def student_question(request, lobby_id, question_id):
         
         # Check if time limit is exceeded - time_limit is on the race object, not lobby
         if lobby.race and lobby.start_time:
-        time_elapsed = timezone.now() - lobby.start_time
+            time_elapsed = timezone.now() - lobby.start_time
             time_limit_minutes = lobby.race.time_limit_minutes if hasattr(lobby.race, 'time_limit_minutes') else 60  # Default to 60 minutes
             if time_elapsed > timedelta(minutes=time_limit_minutes):
-            return render(request, 'hunt/error.html', {
+                return render(request, 'hunt/error.html', {
                 'error': 'Race time limit has been exceeded.'
                 })
         
@@ -1949,14 +1949,14 @@ def race_questions(request, race_id):
             # Save team_id to session for future use
             request.session['team_id'] = team.id
         except Team.DoesNotExist:
-            pass
+                pass
     
     # If no team from parameter, try from session
     if not team:
         team_id = request.session.get('team_id')
         if team_id:
             try:
-            team = Team.objects.get(id=team_id)
+                team = Team.objects.get(id=team_id)
             except Team.DoesNotExist:
                 pass
     
