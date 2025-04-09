@@ -50,7 +50,7 @@
             <h3 style="color: #90C83C; margin-bottom: 1.5rem;">Create New Team</h3>
             
             {% if lobby_code %}
-                <a href="{% url 'create_team_for_lobby' lobby_id=lobby.id %}" class="create-team-btn" id="createTeamBtn">Create Team</a>
+                <a href="/lobby/{{ lobby.id }}/create-team/" class="create-team-btn" id="createTeamBtn">Create Team</a>
                 
                 {% if not lobby.id %}
                 <script>
@@ -60,14 +60,14 @@
                             .then(response => response.json())
                             .then(data => {
                                 if(data.success && data.lobby_id) {
-                                    document.getElementById('createTeamBtn').href = `{% url 'create_team_for_lobby' lobby_id=0 %}`.replace('0', data.lobby_id);
+                                    document.getElementById('createTeamBtn').href = `/lobby/${data.lobby_id}/create-team/`;
                                 }
                             });
                     });
                 </script>
                 {% endif %}
             {% else %}
-                <a href="{% url 'create_team_for_lobby' lobby_id=2 %}" class="create-team-btn">Create Team</a>
+                <a href="/lobby/2/create-team/" class="create-team-btn">Create Team</a>
             {% endif %}
         </div>
 
