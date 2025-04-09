@@ -16,9 +16,4 @@ class Migration(migrations.Migration):
             name='updated_at',
             field=models.DateTimeField(blank=True, null=True, default=None),
         ),
-        migrations.AddField(
-            model_name='lobby',
-            name='last_accessed',
-            field=models.DateTimeField(blank=True, null=True, default=None),
-        ),
     ] 
