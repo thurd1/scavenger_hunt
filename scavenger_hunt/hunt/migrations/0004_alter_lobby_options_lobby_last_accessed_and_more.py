@@ -4,6 +4,22 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
+def handle_existing_column(apps, schema_editor):
+    # Get the database connection
+    connection = schema_editor.connection
+    cursor = connection.cursor()
+    
+    # Check if the column already exists
+    try:
+        cursor.execute("SELECT last_accessed FROM hunt_lobby LIMIT 1")
+        # Column exists, no need to add it
+        print("Column 'last_accessed' already exists in hunt_lobby table.")
+        return True
+    except:
+        # Column doesn't exist
+        return False
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -14,6 +30,10 @@ class Migration(migrations.Migration):
         migrations.AlterModelOptions(
             name='lobby',
             options={'verbose_name_plural': 'Lobbies'},
+        ),
+        migrations.RunPython(
+            handle_existing_column,
+            migrations.RunPython.noop,
         ),
         migrations.AddField(
             model_name='lobby',
