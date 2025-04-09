@@ -593,36 +593,35 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => response.json())
             .then(data => {
-                console.log('Answer check response:', data);
-                
-                const feedbackElement = document.getElementById(`feedback-${questionId}`);
-                feedbackElement.style.display = 'block';
-                
-                // Re-enable the submit button if needed
+                // Enable the submit button
                 if (submitButton) {
+                    submitButton.disabled = false;
                     submitButton.textContent = "Submit Answer";
                 }
                 
+                // Show feedback
+                const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                if (!feedbackElement) return;
+                
+                // Display feedback with proper visibility
+                feedbackElement.style.display = 'block';
+                
+                // Handle already answered case
                 if (data.already_answered) {
-                    // Question was already answered correctly before
                     feedbackElement.className = 'feedback correct';
-                    feedbackElement.textContent = `You have already answered this question correctly.`;
+                    feedbackElement.textContent = 'You have already answered this question correctly.';
                     
-                    // Mark as answered
-                    questionData[questionId].answered = true;
-                    questionData[questionId].points = data.points;
-                    
-                    // Disable further submissions for this question
+                    // Disable further submissions
                     if (submitButton) {
                         submitButton.disabled = true;
                     }
                     
-                    // Show navigation buttons
+                    // Enable navigation to next question
                     document.getElementById('navigation-buttons').style.display = 'block';
-                    
                     return;
                 }
                 
+                // Handle correct answer case
                 if (data.correct) {
                     feedbackElement.className = 'feedback correct';
                     feedbackElement.textContent = `Correct! You earned ${data.points} points.`;
@@ -897,10 +896,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }, 7000);
                 
-                // Automatic navigation after 10 seconds if user doesn't click the Next button
-                if (data.next_url) {
+                // ENHANCED AUTO-NAVIGATION: Improve the auto-redirect mechanism for photo uploads
+                // Determine the URL to navigate to, prioritizing different sources
+                const redirectUrl = data.next_url || data.legacy_next_url;
+                
+                // Automatic navigation after 5 seconds if user doesn't click the Next button
+                if (redirectUrl) {
                     // Show auto-navigation countdown message
                     const autoNavMessage = document.createElement('div');
+                    autoNavMessage.id = 'auto-nav-message';
                     autoNavMessage.style.position = 'fixed';
                     autoNavMessage.style.bottom = '20px';
                     autoNavMessage.style.left = '50%';
@@ -910,11 +914,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     autoNavMessage.style.padding = '10px 20px';
                     autoNavMessage.style.borderRadius = '5px';
                     autoNavMessage.style.zIndex = '10001';
-                    autoNavMessage.innerHTML = 'Auto-navigating to next question in <span id="auto-nav-countdown">10</span> seconds...';
+                    autoNavMessage.style.fontWeight = 'bold';
+                    autoNavMessage.innerHTML = 'Auto-navigating to next question in <span id="auto-nav-countdown">5</span> seconds...';
                     document.body.appendChild(autoNavMessage);
                     
                     // Countdown timer for auto-navigation
-                    let autoNavCountdown = 10;
+                    let autoNavCountdown = 5; // Reduced to 5 seconds
                     const autoNavCountdownEl = document.getElementById('auto-nav-countdown');
                     const autoNavInterval = setInterval(() => {
                         autoNavCountdown--;
@@ -929,28 +934,41 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                             
                             // Navigate to the next question
-                            console.log("Auto-navigating to next question:", data.next_url);
-                            window.location.href = data.next_url;
+                            console.log("Auto-navigating to next question:", redirectUrl);
+                            window.location.href = redirectUrl;
                         }
                     }, 1000);
                     
                     // If user clicks the Next button, cancel auto-navigation
                     const nextButton = document.getElementById('next-question');
                     if (nextButton) {
-                        const originalOnClick = nextButton.onclick;
-                        nextButton.onclick = function(e) {
+                        nextButton.addEventListener('click', function() {
                             // Cancel auto-navigation
                             clearInterval(autoNavInterval);
                             if (document.body.contains(autoNavMessage)) {
                                 document.body.removeChild(autoNavMessage);
                             }
-                            
-                            // Call original click handler if it exists
-                            if (typeof originalOnClick === 'function') {
-                                return originalOnClick.call(this, e);
-                            }
-                        };
+                        });
                     }
+                    
+                    // Store the redirect URL on the Next button so clicking it works even if event listener fails
+                    if (nextButton && !nextButton.hasAttribute('data-next-url')) {
+                        nextButton.setAttribute('data-next-url', redirectUrl);
+                        nextButton.addEventListener('click', function() {
+                            window.location.href = this.getAttribute('data-next-url');
+                        });
+                    }
+                } else {
+                    console.warn("No redirect URL provided by server after photo upload");
+                    
+                    // Create a fallback mechanism: if no URL provided, try to use the "next" button's normal mechanism
+                    setTimeout(() => {
+                        const nextButton = document.getElementById('next-question');
+                        if (nextButton) {
+                            console.log("Auto-clicking next button as fallback");
+                            nextButton.click();
+                        }
+                    }, 5000);
                 }
                 
                 // Also update the existing display
@@ -993,6 +1011,55 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('navigation-buttons').style.display = 'none';
         });
     }
+
+    // Add a new function to periodically update the score from the server
+    function periodicScoreUpdate() {
+        // Only run every 3 seconds to avoid overloading the server
+        setInterval(() => {
+            // Get the team code
+            const teamCode = '{{ team.code }}';
+            const raceId = '{{ race.id }}';
+            
+            if (!teamCode || !raceId) return;
+            
+            // Make API call to get current team score
+            fetch(`/api/leaderboard-data/?team_code=${teamCode}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.teams) {
+                        // Find our team in the response
+                        const ourTeam = data.teams.find(team => team.code === teamCode);
+                        if (ourTeam && ourTeam.score !== undefined) {
+                            // Update the score display
+                            const totalScoreEl = document.getElementById('total-score');
+                            if (totalScoreEl && parseInt(totalScoreEl.textContent) !== ourTeam.score) {
+                                // If score is different, update with animation
+                                totalScoreEl.textContent = ourTeam.score;
+                                totalScoreEl.style.transition = 'color 0.5s';
+                                totalScoreEl.style.color = '#90C83C';
+                                setTimeout(() => {
+                                    totalScoreEl.style.color = '';
+                                }, 1000);
+                            }
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching score update:', error);
+                });
+        }, 3000);
+    }
+
+    // Call this function when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize question data
+        initializeQuestionData();
+        
+        // Start periodic score updates
+        periodicScoreUpdate();
+        
+        // Rest of your existing code...
+    });
 });
 </script>
 {% endblock %} 

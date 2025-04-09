@@ -545,33 +545,22 @@ def leaderboard(request):
 
 @csrf_exempt
 def leaderboard_data_api(request):
-    """API endpoint to get leaderboard data"""
+    """API endpoint to fetch leaderboard data for AJAX updates"""
     try:
-        lobby_filter = request.GET.get('lobby')
-        
         teams = []
-        if not lobby_filter or lobby_filter == 'all':
-            # Get all teams with their progress data
-            team_race_progress_list = TeamRaceProgress.objects.select_related('team', 'race').all()
-        else:
-            # Filter to specific lobby
-            try:
-                lobby = Lobby.objects.get(id=lobby_filter)
-                race = lobby.race
-                if not race:
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'Selected lobby has no race assigned'
-                    })
-                team_race_progress_list = TeamRaceProgress.objects.filter(
-                    race=race,
-                    team__in=lobby.teams.all()
-                ).select_related('team', 'race')
-            except Lobby.DoesNotExist:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Lobby not found'
-                })
+        
+        # Check if we're filtering for a specific team
+        team_code = request.GET.get('team_code')
+        
+        # Get teams with their progress data
+        team_race_progress_list = TeamRaceProgress.objects.select_related('team', 'race').all()
+        
+        # Filter by team code if provided
+        if team_code:
+            logger.info(f"Filtering leaderboard data for team with code: {team_code}")
+            team_race_progress_list = team_race_progress_list.filter(team__code=team_code)
+        
+        logger.info(f"Found {team_race_progress_list.count()} team race progress records")
         
         # Organize teams by their total scores
         for team_progress in team_race_progress_list:
@@ -583,31 +572,28 @@ def leaderboard_data_api(request):
                 lobby_id = lobby.id if lobby else None
                 lobby_name = race.name if race else 'Unknown Race'
                 
-                # Ensure we're using a valid team name (not an ID or object reference)
-                # This fixes the "Team: 30" display issue
-                team_name = team.name
-                if not team_name or team_name == "None" or not isinstance(team_name, str):
-                    team_name = f"Team {team.id}"
+                logger.debug(f"Team: {team.name}, Score: {team_progress.total_points}, Race: {race.name if race else 'None'}, Lobby ID: {lobby_id}")
                 
                 teams.append({
                     'id': team.id,
-                    'name': team_name,
-                    'team_name': team_name,  # Add backup field for the client-side fix
+                    'name': team.name,
+                    'code': team.code,  # Add code to help identify specific teams
                     'score': team_progress.total_points,
-                    'lobby_id': str(lobby_id) if lobby_id else '',
+                    'lobby_id': lobby_id,
                     'lobby_name': lobby_name
                 })
         
         # Sort teams by score (highest first)
         teams.sort(key=lambda x: x['score'], reverse=True)
         
+        # Return success response with teams data
         return JsonResponse({
             'success': True,
             'teams': teams
         })
     
     except Exception as e:
-        logger.error(f"Error retrieving leaderboard data: {str(e)}", exc_info=True)
+        logger.error(f"Error in leaderboard_data_api: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
             'error': str(e)

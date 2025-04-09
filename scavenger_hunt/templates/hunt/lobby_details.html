@@ -743,6 +743,99 @@
             refreshTeamData(true);
         }, 20000);
         
+        // Add a more aggressive auto-reload mechanism as final backup
+        // Reload the entire page if no updates for 45 seconds
+        let lastPageUpdateTime = Date.now();
+        
+        // Track when data actually changes
+        const originalRefreshTeamData = refreshTeamData;
+        refreshTeamData = function(force = false) {
+            originalRefreshTeamData(force);
+            lastPageUpdateTime = Date.now();
+        };
+        
+        // Check and reload if needed
+        setInterval(() => {
+            const timeSinceUpdate = Date.now() - lastPageUpdateTime;
+            if (timeSinceUpdate > 45000) {
+                console.log('No updates for 45 seconds, reloading page');
+                // Add timestamp to URL to bypass cache
+                window.location.href = window.location.href.split('?')[0] + '?t=' + Date.now();
+            }
+        }, 10000);
+        
+        // Add visual indicator for last update time
+        const lastUpdateIndicator = document.createElement('div');
+        lastUpdateIndicator.id = 'last-update-indicator';
+        lastUpdateIndicator.style.position = 'fixed';
+        lastUpdateIndicator.style.bottom = '10px';
+        lastUpdateIndicator.style.left = '10px';
+        lastUpdateIndicator.style.backgroundColor = 'rgba(33, 37, 41, 0.8)';
+        lastUpdateIndicator.style.color = '#90C83C';
+        lastUpdateIndicator.style.padding = '5px 10px';
+        lastUpdateIndicator.style.borderRadius = '4px';
+        lastUpdateIndicator.style.fontSize = '12px';
+        lastUpdateIndicator.style.zIndex = '9999';
+        lastUpdateIndicator.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+        lastUpdateIndicator.innerHTML = 'Last update: <span id="last-update-time">just now</span>';
+        document.body.appendChild(lastUpdateIndicator);
+        
+        // Update the last update time display
+        function updateLastUpdateTime() {
+            const timeDisplay = document.getElementById('last-update-time');
+            if (!timeDisplay) return;
+            
+            const secondsSinceUpdate = Math.floor((Date.now() - lastPageUpdateTime) / 1000);
+            
+            if (secondsSinceUpdate < 5) {
+                timeDisplay.textContent = 'just now';
+                lastUpdateIndicator.style.color = '#90C83C';
+            } else if (secondsSinceUpdate < 15) {
+                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
+                lastUpdateIndicator.style.color = '#90C83C';
+            } else if (secondsSinceUpdate < 30) {
+                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
+                lastUpdateIndicator.style.color = '#FFC107'; // Yellow warning
+            } else {
+                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
+                lastUpdateIndicator.style.color = '#DC3545'; // Red warning
+            }
+        }
+        
+        // Update time display every second
+        setInterval(updateLastUpdateTime, 1000);
+        
+        // Add manual refresh button if not already present
+        if (!document.getElementById('manual-refresh-btn')) {
+            const refreshBtn = document.createElement('button');
+            refreshBtn.id = 'manual-refresh-btn';
+            refreshBtn.className = 'btn btn-sm';
+            refreshBtn.style.position = 'fixed';
+            refreshBtn.style.bottom = '10px';
+            refreshBtn.style.right = '10px';
+            refreshBtn.style.backgroundColor = 'rgba(144, 200, 60, 0.8)';
+            refreshBtn.style.color = 'white';
+            refreshBtn.style.border = 'none';
+            refreshBtn.style.padding = '6px 12px';
+            refreshBtn.style.borderRadius = '4px';
+            refreshBtn.style.fontSize = '12px';
+            refreshBtn.style.zIndex = '9999';
+            refreshBtn.innerHTML = '<i class="fa fa-refresh"></i> Refresh Now';
+            
+            refreshBtn.addEventListener('click', function() {
+                this.disabled = true;
+                this.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Refreshing...';
+                refreshTeamData(true);
+                
+                setTimeout(() => {
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fa fa-refresh"></i> Refresh Now';
+                }, 1000);
+            });
+            
+            document.body.appendChild(refreshBtn);
+        }
+        
         // Check if race already started (in case we missed the WebSocket event)
         if ('{{ lobby.hunt_started }}' === 'True') {
             console.log('Race already started according to page data!');

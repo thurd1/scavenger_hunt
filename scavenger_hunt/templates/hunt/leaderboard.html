@@ -607,6 +607,103 @@
                 fetchLeaderboardData();
             }
         }, 15000);
+        
+        // Set a stronger backup refresh timer that works even if WebSocket is disconnected
+        // This will force a full API refresh every 5 seconds if no updates received
+        // Regardless of WebSocket connection status
+        const forceRefreshInterval = setInterval(function() {
+            if (Date.now() - lastUpdateTime > 5000) {
+                console.log('No updates for 5 seconds, forcing API refresh');
+                fetchLeaderboardData();
+            }
+        }, 5000);
+        
+        // Also add a manual reload timer as a last resort fallback
+        // This will reload the entire page every 60 seconds if no updates for 30 seconds
+        setInterval(function() {
+            if (Date.now() - lastUpdateTime > 30000) {
+                console.log('No updates for 30 seconds, reloading page');
+                // Add timestamp to URL to bypass cache
+                window.location.href = window.location.pathname + '?t=' + Date.now();
+            }
+        }, 60000);
+        
+        // Create a visual indicator to show sync status
+        const syncStatus = document.createElement('div');
+        syncStatus.id = 'sync-status';
+        syncStatus.style.position = 'fixed';
+        syncStatus.style.bottom = '10px';
+        syncStatus.style.right = '10px';
+        syncStatus.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        syncStatus.style.color = '#90C83C';
+        syncStatus.style.padding = '5px 10px';
+        syncStatus.style.borderRadius = '5px';
+        syncStatus.style.fontSize = '12px';
+        syncStatus.style.zIndex = '9999';
+        syncStatus.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+        syncStatus.innerHTML = 'Last update: <span id="last-update-time">just now</span>';
+        document.body.appendChild(syncStatus);
+        
+        // Update the last update time display
+        function updateSyncStatus() {
+            const timeDisplay = document.getElementById('last-update-time');
+            if (!timeDisplay) return;
+            
+            const secondsSinceUpdate = Math.floor((Date.now() - lastUpdateTime) / 1000);
+            if (secondsSinceUpdate < 5) {
+                timeDisplay.textContent = 'just now';
+                syncStatus.style.color = '#90C83C';
+            } else if (secondsSinceUpdate < 10) {
+                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
+                syncStatus.style.color = '#90C83C';
+            } else if (secondsSinceUpdate < 30) {
+                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
+                syncStatus.style.color = '#FFC107'; // Yellow warning
+            } else {
+                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
+                syncStatus.style.color = '#DC3545'; // Red warning
+            }
+        }
+        
+        // Update sync status every second
+        setInterval(updateSyncStatus, 1000);
+        
+        // Add auto-refresh button with countdown
+        const autoRefreshBtn = document.createElement('button');
+        autoRefreshBtn.id = 'auto-refresh-toggle';
+        autoRefreshBtn.className = 'btn btn-sm';
+        autoRefreshBtn.style.backgroundColor = 'rgba(144, 200, 60, 0.2)';
+        autoRefreshBtn.style.color = '#90C83C';
+        autoRefreshBtn.style.border = 'none';
+        autoRefreshBtn.style.borderRadius = '50px';
+        autoRefreshBtn.style.padding = '5px 10px';
+        autoRefreshBtn.style.fontSize = '0.9rem';
+        autoRefreshBtn.style.marginLeft = '10px';
+        autoRefreshBtn.innerHTML = '<i class="fa fa-clock-o"></i> Auto <span id="refresh-countdown">5</span>s';
+        
+        // Insert after the refresh button
+        const refreshBtn = document.getElementById('refresh-button');
+        if (refreshBtn && refreshBtn.parentNode) {
+            refreshBtn.parentNode.insertBefore(autoRefreshBtn, refreshBtn.nextSibling);
+            
+            // Set countdown timer that refreshes every 5 seconds
+            let countdown = 5;
+            const countdownInterval = setInterval(function() {
+                countdown--;
+                const countdownEl = document.getElementById('refresh-countdown');
+                if (countdownEl) {
+                    countdownEl.textContent = countdown;
+                }
+                
+                if (countdown <= 0) {
+                    // Reset countdown
+                    countdown = 5;
+                    
+                    // Force refresh
+                    fetchLeaderboardData();
+                }
+            }, 1000);
+        }
     });
 </script>
 {% endblock %}
