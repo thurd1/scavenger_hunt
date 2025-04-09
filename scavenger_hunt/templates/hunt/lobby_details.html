@@ -57,6 +57,32 @@
         .team-update-notification.visible {
             opacity: 1;
         }
+
+        /* Connection status indicator */
+        #connection-status {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 9999;
+        }
+        
+        #connection-status.connected {
+            background-color: rgba(40, 167, 69, 0.8);
+            color: white;
+        }
+        
+        #connection-status.disconnected {
+            background-color: rgba(220, 53, 69, 0.8);
+            color: white;
+        }
+        
+        #connection-status.connecting {
+            background-color: rgba(255, 193, 7, 0.8);
+            color: black;
+        }
     </style>
 {% endblock %}
 
@@ -162,6 +188,11 @@
     <span>Auto-refreshing in <span id="refresh-countdown">5</span>s</span>
 </div>
 
+<!-- Connection status indicator -->
+<div id="connection-status" class="connecting">
+    <span>Connecting...</span>
+</div>
+
 <!-- Notification div -->
 <div id="team-update-notification" class="team-update-notification"></div>
 {% endblock %}
@@ -174,6 +205,8 @@
     let countdownTimer = null;
     let currentHash = '';
     let lastCheckedAt = Date.now();
+    let socket = null;
+    let forceReloadCounter = 0;
     
     // Initialize when DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
@@ -183,15 +216,112 @@
         // Set up auto-refresh
         startRefreshCountdown();
         
-        // Set up the manual refresh check every second
-        setInterval(checkForUpdates, 1000);
+        // Set up the manual refresh check more frequently
+        setInterval(checkForUpdates, 500);
         
         // Check if race already started
         if ('{{ lobby.hunt_started }}' === 'True') {
             console.log('Race already started according to page data!');
             window.location.href = '/race/{{ lobby.race.id }}/questions/';
         }
+
+        // Set up WebSocket connection
+        setupWebSocket();
+        
+        // Force reload every 30 seconds to ensure fresh data
+        setInterval(function() {
+            forceReloadCounter++;
+            if (forceReloadCounter >= 6) { // 6 * 5 seconds = 30 seconds
+                console.log('Force reloading page to ensure fresh data');
+                reloadPage();
+            }
+        }, 5000);
     });
+    
+    // Set up WebSocket connection
+    function setupWebSocket() {
+        // Get the protocol (ws or wss)
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Create the WebSocket URL
+        const wsUrl = protocol + '//' + window.location.host + '/ws/lobby/{{ lobby.id }}/';
+        
+        console.log('Connecting to WebSocket:', wsUrl);
+        
+        try {
+            socket = new WebSocket(wsUrl);
+            
+            // Connection opened
+            socket.addEventListener('open', (event) => {
+                console.log('WebSocket connection established');
+                updateConnectionStatus('connected');
+            });
+            
+            // Listen for messages
+            socket.addEventListener('message', (event) => {
+                console.log('WebSocket message received:', event.data);
+                
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Handle team updates
+                    if (data.type === 'team_update') {
+                        showNotification('Team update received!', 'info');
+                        reloadPage();
+                    }
+                    
+                    // Handle race start
+                    if (data.type === 'race_start' || (data.hunt_started && data.hunt_started === true)) {
+                        console.log('Race started via WebSocket!');
+                        window.location.href = data.redirect_url || `/race/${data.race_id}/questions/`;
+                    }
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            });
+            
+            // Connection closed
+            socket.addEventListener('close', (event) => {
+                console.log('WebSocket connection closed');
+                updateConnectionStatus('disconnected');
+                
+                // Try to reconnect after a delay
+                setTimeout(() => {
+                    console.log('Attempting to reconnect WebSocket...');
+                    updateConnectionStatus('connecting');
+                    setupWebSocket();
+                }, 3000);
+            });
+            
+            // Connection error
+            socket.addEventListener('error', (event) => {
+                console.error('WebSocket error:', event);
+                updateConnectionStatus('disconnected');
+            });
+        } catch (error) {
+            console.error('Error setting up WebSocket:', error);
+            updateConnectionStatus('disconnected');
+        }
+    }
+    
+    // Update connection status indicator
+    function updateConnectionStatus(status) {
+        const statusElement = document.getElementById('connection-status');
+        
+        // Remove all status classes
+        statusElement.classList.remove('connected', 'disconnected', 'connecting');
+        
+        // Add appropriate class and text
+        if (status === 'connected') {
+            statusElement.classList.add('connected');
+            statusElement.innerHTML = '<span>Connected ✓</span>';
+        } else if (status === 'disconnected') {
+            statusElement.classList.add('disconnected');
+            statusElement.innerHTML = '<span>Disconnected ✗</span>';
+        } else {
+            statusElement.classList.add('connecting');
+            statusElement.innerHTML = '<span>Connecting...</span>';
+        }
+    }
     
     // Modal functions
     function showModal() {
@@ -262,8 +392,8 @@
     
     // Check for updates by polling the server
     function checkForUpdates() {
-        // Don't check more often than once per second
-        if (Date.now() - lastCheckedAt < 1000) {
+        // Don't check more often than once per 500ms
+        if (Date.now() - lastCheckedAt < 500) {
             return;
         }
         
@@ -279,6 +409,7 @@
                 
                 // Check if the race has started
                 if (data.hunt_started) {
+                    console.log('Race started detected from polling!');
                     window.location.href = data.redirect_url || `/race/${data.race_id}/questions/`;
                     return;
                 }
