@@ -1,16 +1,27 @@
 {% extends "base.html" %}
 
-{% block title %}Question {{ question_number }} - {{ question.text|truncatechars:30 }}{% endblock %}
+{% block title %}
+{% if question %}
+    Question {{ question_number }} - {{ question.text|truncatechars:30 }}
+{% else %}
+    Redirecting to Race Questions
+{% endif %}
+{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="question-container text-center">
-        <h2>Redirecting to new question interface...</h2>
-        <p>Please wait while we redirect you to the new and improved question interface.</p>
+        <h2>Redirecting to Race Interface...</h2>
+        <p>Please wait while we redirect you to the race questions interface.</p>
         <div class="spinner-border text-light my-4" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
-        <p>If you are not redirected automatically, <a href="{{ race_questions_url }}" class="text-success">click here</a>.</p>
+        
+        {% if race_questions_url %}
+            <p>If you are not redirected automatically, <a href="{{ race_questions_url }}" class="text-success">click here</a>.</p>
+        {% else %}
+            <p>If you are not redirected automatically, <a href="{% url 'home' %}" class="text-success">click here to go home</a>.</p>
+        {% endif %}
     </div>
 </div>
 
@@ -29,7 +40,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Redirect to the race_questions view after a brief delay
     setTimeout(function() {
-        window.location.href = "{{ race_questions_url }}";
+        {% if race_questions_url %}
+            window.location.href = "{{ race_questions_url }}";
+        {% else %}
+            // Fallback to home if no URL provided
+            window.location.href = "{% url 'home' %}";
+        {% endif %}
     }, 1500);
 });
 </script>

@@ -303,7 +303,13 @@
             <p>Please wait for the leader to start the race.</p>
             <div class="loader"></div>
         </div>
-        <div class="race-status-started">
+        <div class="race-status-started" 
+            {% if team and lobby and lobby.race %}
+            data-redirect-url="/race/{{ lobby.race.id }}/questions/?team_code={{ team.code }}&player_name={{ player_name }}"
+            {% else %}
+            data-redirect-url="{% url 'student_question' lobby_id=lobby.id question_id=1 %}"
+            {% endif %}
+        >
             <p><strong>Race has started!</strong></p>
             <p>You will be redirected to the race page in...</p>
             <div class="countdown" id="countdown">5</div>
@@ -439,8 +445,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         checkInterval = null;
                     }
                     
-                    // Redirect to the first question
-                    window.location.href = "{% url 'student_question' lobby_id=lobby.id question_id=1 %}";
+                    // Get the redirect URL from the data attribute
+                    var redirectUrl = raceStarted.getAttribute('data-redirect-url');
+                    window.location.href = redirectUrl;
                 }
             }, 1000);
         }

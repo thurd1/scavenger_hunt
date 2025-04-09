@@ -1351,7 +1351,6 @@ def student_question(request, lobby_id, question_id):
     
     try:
         lobby = Lobby.objects.get(id=lobby_id)
-        current_question = Question.objects.get(id=question_id)
         
         # Check if race has started
         if not lobby.hunt_started:
@@ -1367,6 +1366,52 @@ def student_question(request, lobby_id, question_id):
                 return render(request, 'hunt/error.html', {
                     'error': 'Race time limit has been exceeded.'
                 })
+        
+        # Try to get the requested question
+        try:
+            current_question = Question.objects.get(id=question_id)
+            
+            # Check if the question belongs to the race in this lobby
+            if lobby.race and hasattr(current_question, 'zone') and current_question.zone.race.id != lobby.race.id:
+                logger.warning(f"Question {question_id} does not belong to race {lobby.race.id}")
+                
+                # If question doesn't belong to this race, try to find the first question in this race instead
+                first_question = Question.objects.filter(
+                    zone__race=lobby.race
+                ).order_by('zone__created_at', 'id').first()
+                
+                if first_question:
+                    # Redirect to the correct first question
+                    logger.info(f"Redirecting to first question {first_question.id} for race {lobby.race.id}")
+                    return redirect('student_question', lobby_id=lobby_id, question_id=first_question.id)
+                else:
+                    # If no questions in this race, redirect to race_questions view
+                    logger.warning(f"No questions found for race {lobby.race.id}")
+                    if lobby.race:
+                        return redirect('race_questions', race_id=lobby.race.id)
+                    else:
+                        return render(request, 'hunt/error.html', {
+                            'error': 'No questions found for this race.'
+                        })
+        except Question.DoesNotExist:
+            logger.error(f"Question {question_id} not found. Trying to redirect to first question in race.")
+            # Try to find the first question in this race
+            if lobby.race:
+                first_question = Question.objects.filter(
+                    zone__race=lobby.race
+                ).order_by('zone__created_at', 'id').first()
+                
+                if first_question:
+                    logger.info(f"Found first question {first_question.id} for race {lobby.race.id}")
+                    return redirect('student_question', lobby_id=lobby_id, question_id=first_question.id)
+                else:
+                    # If no questions in this race, redirect to race_questions view
+                    logger.warning(f"No questions found for race {lobby.race.id}")
+                    return redirect('race_questions', race_id=lobby.race.id)
+            
+            return render(request, 'hunt/error.html', {
+                'error': 'Question not found.'
+            })
         
         # Get the team for this player
         try:
@@ -1970,9 +2015,28 @@ def check_lobby_race_status(request, lobby_id):
         if team_code and player_name:
             redirect_url = f"/race/{race_id}/questions/?team_code={team_code}&player_name={player_name}"
         else:
-            # Fall back to the old URL if we don't have team information
-            redirect_url = reverse('student_question', kwargs={'lobby_id': lobby_id, 'question_id': 1})
-        
+            # Find the first question for this race instead of using hardcoded ID 1
+            try:
+                first_question = Question.objects.filter(
+                    zone__race=lobby.race
+                ).order_by('zone__created_at', 'id').first()
+                
+                if first_question:
+                    # Use the first question we found
+                    redirect_url = reverse('student_question', kwargs={
+                        'lobby_id': lobby_id, 
+                        'question_id': first_question.id
+                    })
+                    logger.info(f"Found first question ID {first_question.id} for race {race_id}")
+                else:
+                    # If no questions in race, just go to race_questions
+                    redirect_url = f"/race/{race_id}/questions/"
+                    logger.warning(f"No questions found for race {race_id}, redirecting to race_questions")
+            except Exception as e:
+                # If error finding question, use the basic race_questions URL
+                logger.error(f"Error finding first question for race {race_id}: {str(e)}")
+                redirect_url = f"/race/{race_id}/questions/"
+    
     # Log the status check for debugging
     logger.info(f"Lobby {lobby_id} race status check: started={started}, race_id={race_id}, redirect_url={redirect_url}")
     
