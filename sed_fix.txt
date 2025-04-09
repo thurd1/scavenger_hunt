@@ -1,0 +1,1 @@
+sed -i '595i\    try:\n        pass  # Added missing try block' hunt/views.py 

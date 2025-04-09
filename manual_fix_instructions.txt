@@ -1,0 +1,52 @@
+MANUAL FIX INSTRUCTIONS FOR SYNTAX ERROR IN VIEWS.PY
+
+The error message shows there's a syntax error at line 595 in views.py with "except Exception as e:" 
+being invalid. This usually happens when there's no corresponding "try:" statement.
+
+Follow these steps to fix the issue:
+
+1. First, backup your file:
+   cp hunt/views.py hunt/views.py.bak
+
+2. Look at the area around line 595:
+   grep -n -A3 -B3 "except Exception as e:" hunt/views.py | head -n 20
+
+3. Check if there's a try statement before the except. If not, you need to add one.
+
+4. Open the file in an editor:
+   nano hunt/views.py
+
+5. Navigate to around line 595 (the exact line with the error).
+
+6. If you see an "except Exception as e:" without a preceding "try:" block, add the missing try block:
+   - Add a line before the except statement with the same indentation level:
+     try:
+         pass  # Added missing try block
+   - Make sure the indentation matches the except statement
+
+7. If there are multiple "except" statements without proper try blocks, fix each one.
+
+8. Save the file and exit the editor:
+   - In nano: Press Ctrl+O (to write out), then Enter, then Ctrl+X (to exit)
+
+9. Run the server again to check if the error is fixed:
+   python manage.py runserver 0.0.0.0:8001
+
+Alternative one-line fix with sed (if you're comfortable with command line):
+
+This command will insert a try block before any except statement at line 595:
+sed -i '595i\    try:\n        pass  # Added missing try block' hunt/views.py
+
+If you need to restore the backup:
+cp hunt/views.py.bak hunt/views.py
+
+COMMON ISSUES TO LOOK FOR:
+
+1. Missing try statement before an except
+2. Indentation issues in try-except blocks
+3. Unmatched parentheses or brackets that break the flow
+4. Incomplete function definitions or missing colons
+
+The direct fix script (direct_fix.py) will attempt to fix this automatically. 
+Copy it to your server and run:
+python direct_fix.py 
