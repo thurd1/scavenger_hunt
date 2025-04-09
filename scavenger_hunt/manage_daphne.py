@@ -14,17 +14,13 @@ if __name__ == "__main__":
     print("Collecting static files...")
     subprocess.run([sys.executable, "manage.py", "collectstatic", "--noinput"])
     
-    # Print settings module
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'scavenger_hunt.settings')
-    print(f"Settings module: {os.environ['DJANGO_SETTINGS_MODULE']}")
-    
-    # Use subprocess to run Daphne with the correct ASGI application
-    daphne_cmd = [
-        sys.executable, "-m", "daphne",
-        "-p", str(PORT),
-        "-b", HOST,
+    # Run Daphne directly with command line args
+    # This approach avoids all the import and app registry issues
+    cmd = [
+        sys.executable, 
+        "-m", "daphne", 
         "scavenger_hunt.asgi:application"
     ]
     
-    # Execute Daphne as a separate process
-    subprocess.run(daphne_cmd) 
+    # Execute the command
+    subprocess.run(cmd) 

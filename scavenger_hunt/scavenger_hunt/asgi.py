@@ -8,6 +8,21 @@ https://docs.djangoproject.com/en/5.1/howto/deployment/asgi/
 """
 
 import os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'scavenger_hunt.settings')
+import django
 
-from .routing import application
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'scavenger_hunt.settings')
+django.setup()  # This is critical - ensures Django is fully loaded before imports
+
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+from django.core.asgi import get_asgi_application
+from hunt.routing import websocket_urlpatterns
+
+application = ProtocolTypeRouter({
+    "http": get_asgi_application(),
+    "websocket": AuthMiddlewareStack(
+        URLRouter(
+            websocket_urlpatterns
+        )
+    ),
+})
