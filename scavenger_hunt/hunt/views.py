@@ -658,12 +658,24 @@ def create_team(request, lobby_id=None):
         try:
             lobby = Lobby.objects.get(id=lobby_id)
         except Lobby.DoesNotExist:
-            pass
+            # Default to lobby ID 2 if not found
+            try:
+                lobby = Lobby.objects.get(id=2)
+            except Lobby.DoesNotExist:
+                # If lobby 2 doesn't exist, try to get any active lobby
+                lobby = Lobby.objects.filter(is_active=True).first()
+    else:
+        # Default to lobby ID 2 if no ID provided
+        try:
+            lobby = Lobby.objects.get(id=2)
+        except Lobby.DoesNotExist:
+            # If lobby 2 doesn't exist, try to get any active lobby
+            lobby = Lobby.objects.filter(is_active=True).first()
     
     return render(request, 'hunt/create_team.html', {
         'form': form,
         'lobby': lobby,
-        'lobby_id': lobby_id
+        'lobby_id': lobby_id if lobby_id else (lobby.id if lobby else None)
     })
 
 def team_dashboard(request, team_id):

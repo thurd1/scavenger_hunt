@@ -307,7 +307,7 @@
             {% if team and lobby and lobby.race %}
             data-redirect-url="/race/{{ lobby.race.id }}/questions/?team_code={{ team.code }}&player_name={{ player_name }}"
             {% else %}
-            data-redirect-url="{% url 'student_question' lobby_id=lobby.id question_id=1 %}"
+            data-redirect-url="/race/1/questions/?team_code={{ team.code }}&player_name={{ player_name }}"
             {% endif %}
         >
             <p><strong>Race has started!</strong></p>
