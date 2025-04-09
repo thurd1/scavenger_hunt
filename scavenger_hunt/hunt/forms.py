@@ -13,3 +13,7 @@ class LobbyForm(forms.ModelForm):
 
 class JoinLobbyForm(forms.Form):
     team_code = forms.CharField(max_length=6)
+
+class JoinTeamForm(forms.Form):
+    team_code = forms.CharField(max_length=6, label='Team Code')
+    player_name = forms.CharField(max_length=100, label='Your Name')
