@@ -587,17 +587,17 @@ def submit_answer(request, riddle_id):
         return JsonResponse({"correct": is_correct})
     return JsonResponse({"error": "Invalid request"}, status=400)
 
-def create_team(request, lobby_code=None):
+def create_team(request, lobby_id=None):
     """Create a new team"""
     if request.method == 'POST':
         form = TeamForm(request.POST)
         if form.is_valid():
             team = form.save()
             
-            # Add the team to the lobby if a lobby code was provided
-            if lobby_code:
+            # Add the team to the lobby if a lobby ID was provided
+            if lobby_id:
                 try:
-                    lobby = Lobby.objects.get(code=lobby_code)
+                    lobby = Lobby.objects.get(id=lobby_id)
                     lobby.teams.add(team)
                     lobby.save()
                     
@@ -652,18 +652,18 @@ def create_team(request, lobby_code=None):
     else:
         form = TeamForm()
     
-    # Get lobby for context if code provided
+    # Get lobby for context if ID provided
     lobby = None
-    if lobby_code:
+    if lobby_id:
         try:
-            lobby = Lobby.objects.get(code=lobby_code)
+            lobby = Lobby.objects.get(id=lobby_id)
         except Lobby.DoesNotExist:
             pass
     
     return render(request, 'hunt/create_team.html', {
         'form': form,
         'lobby': lobby,
-        'lobby_code': lobby_code
+        'lobby_id': lobby_id
     })
 
 def team_dashboard(request, team_id):
