@@ -2749,17 +2749,18 @@ def question_answers_api(request):
     if request.method == 'GET':
         # Get team and race information from query parameters
         team_id = request.GET.get('team_id')
+        team_code = request.GET.get('team_code')
         race_id = request.GET.get('race_id')
         
-        # Also try team_code if team_id is not provided
-        team_code = request.GET.get('team_code')
+        # Get team id from team code if needed
         if not team_id and team_code:
             try:
                 team = Team.objects.get(code=team_code)
                 team_id = team.id
             except Team.DoesNotExist:
-                pass
-                
+                # Return empty data if team not found
+                return JsonResponse({'success': True, 'answers': {}})
+        
         # Return empty success response when parameters are missing
         if not team_id or not race_id:
             return JsonResponse({'success': True, 'answers': {}})
@@ -2805,8 +2806,17 @@ def question_answers_api(request):
         try:
             data = json.loads(request.body)
             team_id = data.get('team_id')
+            team_code = data.get('team_code')
             question_id = data.get('question_id')
             answer_text = data.get('answer_text')
+            
+            # Get team id from team code if needed
+            if not team_id and team_code:
+                try:
+                    team = Team.objects.get(code=team_code)
+                    team_id = team.id
+                except Team.DoesNotExist:
+                    return JsonResponse({'success': False, 'error': 'Team not found'}, status=404)
             
             if not team_id or not question_id:
                 return JsonResponse({'success': False, 'error': 'Missing required parameters'}, status=400)

@@ -24,6 +24,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -110,3 +111,6 @@ CHANNEL_LAYERS = {
 
 # Custom error views
 CSRF_FAILURE_VIEW = 'hunt.views.csrf_failure'
+
+# Add WhiteNoise storage configuration
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
