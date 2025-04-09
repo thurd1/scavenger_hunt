@@ -2751,8 +2751,18 @@ def question_answers_api(request):
         team_id = request.GET.get('team_id')
         race_id = request.GET.get('race_id')
         
+        # Also try team_code if team_id is not provided
+        team_code = request.GET.get('team_code')
+        if not team_id and team_code:
+            try:
+                team = Team.objects.get(code=team_code)
+                team_id = team.id
+            except Team.DoesNotExist:
+                pass
+                
+        # Return empty list instead of error when parameters are missing
         if not team_id or not race_id:
-            return JsonResponse({'error': 'Missing required parameters'}, status=400)
+            return JsonResponse({'answers': []})
         
         try:
             team = Team.objects.get(id=team_id)
@@ -2783,12 +2793,11 @@ def question_answers_api(request):
             return JsonResponse({'answers': answer_data})
             
         except Team.DoesNotExist:
-            return JsonResponse({'error': 'Team not found'}, status=404)
+            return JsonResponse({'answers': []})
         except Race.DoesNotExist:
-            return JsonResponse({'error': 'Race not found'}, status=404)
+            return JsonResponse({'answers': []})
         except Exception as e:
-            logger.error(f"Error fetching question answers: {str(e)}")
-            return JsonResponse({'error': 'Internal server error'}, status=500)
+            return JsonResponse({'answers': []})
     
     elif request.method == 'POST':
         try:
