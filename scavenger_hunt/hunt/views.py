@@ -2760,9 +2760,9 @@ def question_answers_api(request):
             except Team.DoesNotExist:
                 pass
                 
-        # Return empty list instead of error when parameters are missing
+        # Return empty success response when parameters are missing
         if not team_id or not race_id:
-            return JsonResponse({'answers': []})
+            return JsonResponse({'success': True, 'answers': {}})
         
         try:
             team = Team.objects.get(id=team_id)
@@ -2774,10 +2774,10 @@ def question_answers_api(request):
                 question__zone__race=race
             ).select_related('question')
             
-            # Format the answers for the response
-            answer_data = []
+            # Format the answers for the response as a dictionary keyed by question_id
+            answer_data = {}
             for answer in answers:
-                answer_data.append({
+                answer_data[str(answer.question.id)] = {
                     'id': answer.id,
                     'question_id': answer.question.id,
                     'question_text': answer.question.text,
@@ -2787,17 +2787,19 @@ def question_answers_api(request):
                     'points_awarded': answer.points_awarded,
                     'submitted_at': answer.submitted_at.isoformat() if answer.submitted_at else None,
                     'requires_photo': answer.requires_photo,
+                    'photo_uploaded': True if answer.photo else False,
                     'photo_url': answer.photo.url if answer.photo else None,
-                })
+                }
             
-            return JsonResponse({'answers': answer_data})
+            return JsonResponse({'success': True, 'answers': answer_data})
             
         except Team.DoesNotExist:
-            return JsonResponse({'answers': []})
+            return JsonResponse({'success': True, 'answers': {}})
         except Race.DoesNotExist:
-            return JsonResponse({'answers': []})
+            return JsonResponse({'success': True, 'answers': {}})
         except Exception as e:
-            return JsonResponse({'answers': []})
+            logger.error(f"Error fetching question answers: {str(e)}")
+            return JsonResponse({'success': True, 'answers': {}})
     
     elif request.method == 'POST':
         try:
@@ -2807,7 +2809,7 @@ def question_answers_api(request):
             answer_text = data.get('answer_text')
             
             if not team_id or not question_id:
-                return JsonResponse({'error': 'Missing required parameters'}, status=400)
+                return JsonResponse({'success': False, 'error': 'Missing required parameters'}, status=400)
             
             team = Team.objects.get(id=team_id)
             question = Question.objects.get(id=question_id)
@@ -2839,6 +2841,7 @@ def question_answers_api(request):
                 answer.save()
             
             return JsonResponse({
+                'success': True,
                 'id': answer.id,
                 'correct': is_correct,
                 'attempts': answer.attempts,
@@ -2846,13 +2849,13 @@ def question_answers_api(request):
             })
             
         except Team.DoesNotExist:
-            return JsonResponse({'error': 'Team not found'}, status=404)
+            return JsonResponse({'success': False, 'error': 'Team not found'}, status=404)
         except Question.DoesNotExist:
-            return JsonResponse({'error': 'Question not found'}, status=404)
+            return JsonResponse({'success': False, 'error': 'Question not found'}, status=404)
         except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
         except Exception as e:
             logger.error(f"Error saving question answer: {str(e)}")
-            return JsonResponse({'error': 'Internal server error'}, status=500)
+            return JsonResponse({'success': False, 'error': 'Internal server error'}, status=500)
     
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)

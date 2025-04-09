@@ -3,6 +3,10 @@ import sys
 import django
 from django.core.asgi import get_asgi_application
 
+# Configuration
+HOST = "0.0.0.0"  # Listen on all interfaces
+PORT = 8000       # Default port
+
 # Add the project directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -24,13 +28,27 @@ application = ProtocolTypeRouter({
 })
 
 if __name__ == "__main__":
-    from daphne.server import Server
-    from daphne.endpoints import build_endpoint_description_strings
-
     print("Starting Daphne server...")
-    print("Settings module:", os.environ['DJANGO_SETTINGS_MODULE'])
     
-    Server(
-        application=application,
-        endpoints=build_endpoint_description_strings(host="0.0.0.0", port=8000),
-    ).run() 
+    # First, make sure to collect static files
+    if len(sys.argv) > 1 and sys.argv[1] == "restart":
+        print("Collecting static files...")
+        os.system(f"{sys.executable} manage.py collectstatic --noinput")
+    else:
+        # Always collect static files to ensure they're up to date
+        print("Collecting static files...")
+        os.system(f"{sys.executable} manage.py collectstatic --noinput")
+        
+    # Set up Django settings
+    print(f"Settings module: {os.environ['DJANGO_SETTINGS_MODULE']}")
+    
+    # Run Daphne with proper settings
+    cmd = (
+        f"{sys.executable} -m daphne "
+        f"-p {PORT} "
+        f"-b {HOST} "
+        "scavenger_hunt.asgi:application"
+    )
+    
+    # Execute the command
+    os.system(cmd) 
