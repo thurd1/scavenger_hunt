@@ -360,7 +360,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                     'members_count': team.members.count(),
                     'members': list(team.members.values('id', 'role'))
                 })
-                
+            
             return {
                 'id': lobby.id,
                 'name': lobby.name,
@@ -382,7 +382,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         
         # Send message to WebSocket with team data
         try:
-            await self.send(text_data=json.dumps({
+        await self.send(text_data=json.dumps({
                 'type': 'team_joined',
                 'team': event['team']
             }))
@@ -408,7 +408,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         
         # Send message to WebSocket with member data
         try:
-            await self.send(text_data=json.dumps({
+        await self.send(text_data=json.dumps({
                 'type': 'team_member_joined',
                 'member': event['member'],
                 'team_id': event['team_id'],
@@ -708,7 +708,7 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logging.error(f"Error sending initial leaderboard data: {str(e)}")
             # Send error message
-            await self.send(text_data=json.dumps({
+        await self.send(text_data=json.dumps({
                 'type': 'error',
                 'message': 'Failed to load leaderboard data'
             }))

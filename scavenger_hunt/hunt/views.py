@@ -87,7 +87,7 @@ def lobby_details(request, lobby_id):
         
         # Add a timestamp to prevent browser caching
         response = render(request, 'hunt/lobby_details.html', {
-            'lobby': lobby,
+        'lobby': lobby,
             'timestamp': timezone.now().timestamp(),
         })
         
@@ -271,8 +271,8 @@ def join_team(request, team_id=None):
                     request.session['team_member_id'] = team_member.id
                     request.session['team_role'] = player_name
                     request.session['team_id'] = team.id
-                    request.session.modified = True
-                    
+                request.session.modified = True
+            
                     # Log the join
                     logger.info(f"Player {player_name} joined team {team.name}")
                     
@@ -476,7 +476,7 @@ def register(request):
             user = form.save()
             login(request, user)
             return redirect('home')
-    else:
+        else:
         form = UserCreationForm()
     return render(request, 'hunt/register.html', {'form': form})
 
@@ -500,7 +500,7 @@ def leaderboard(request):
     """
     Display the leaderboard for all races.
     """
-    teams = []
+            teams = []
     
     # Debug logging
     logger.info("Leaderboard view accessed")
@@ -591,8 +591,8 @@ def leaderboard_data_api(request):
             'success': True,
             'teams': teams
         })
-    
-    except Exception as e:
+            
+        except Exception as e:
         logger.error(f"Error in leaderboard_data_api: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
@@ -793,10 +793,10 @@ def delete_team(request, team_id):
         # Broadcast updates if needed
         if lobby_id:
             try:
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    f'lobby_{lobby_id}',
-                    {
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'lobby_{lobby_id}',
+                {
                         'type': 'team_left',
                         'team_id': team_id
                     }
@@ -929,7 +929,7 @@ def view_team(request, team_id):
                                 'team_name': team.name
                             }
                         )
-                except Exception as e:
+        except Exception as e:
                     logger.error(f"Error broadcasting team update: {str(e)}")
         except Exception as e:
             logger.error(f"Error creating team member: {e}")
@@ -1346,11 +1346,11 @@ def student_question(request, lobby_id, question_id):
         
         # Check if time limit is exceeded - time_limit is on the race object, not lobby
         if lobby.race and lobby.start_time:
-            time_elapsed = timezone.now() - lobby.start_time
+        time_elapsed = timezone.now() - lobby.start_time
             time_limit_minutes = lobby.race.time_limit_minutes if hasattr(lobby.race, 'time_limit_minutes') else 60  # Default to 60 minutes
             if time_elapsed > timedelta(minutes=time_limit_minutes):
-                return render(request, 'hunt/error.html', {
-                    'error': 'Race time limit has been exceeded.'
+            return render(request, 'hunt/error.html', {
+                'error': 'Race time limit has been exceeded.'
                 })
         
         # Try to get the requested question
@@ -1458,11 +1458,11 @@ def student_question(request, lobby_id, question_id):
                     }
                 
                 # Prepare the context for the template
-                context = {
-                    'lobby': lobby,
+            context = {
+                'lobby': lobby,
                     'question': current_question,
-                    'player_name': player_name,
-                    'team': team,
+                'player_name': player_name,
+                'team': team,
                     'team_member': team_member,
                     'requires_photo': current_question.requires_photo if hasattr(current_question, 'requires_photo') else False,
                     
@@ -1550,8 +1550,8 @@ def check_answer(request, lobby_id=None, question_id=None):
                 # If not, create or update the team answer
                 if not team_answer:
                     team_answer = TeamAnswer.objects.create(
-                        team=team,
-                        question=question,
+                    team=team,
+                    question=question,
                         answered_correctly=False,
                         attempts=0,
                         points_awarded=0,
@@ -1586,6 +1586,9 @@ def check_answer(request, lobby_id=None, question_id=None):
                     team_answer.points_awarded = points
                 team_answer.save()
                 
+                # Find the lobby this team is in
+                lobby = team.participating_lobbies.first()
+
                 # Update race progress for this team if answer was correct and points awarded
                 if is_correct and points > 0 and lobby and lobby.race:
                     race = lobby.race
@@ -1604,7 +1607,7 @@ def check_answer(request, lobby_id=None, question_id=None):
                                 'current_question_index': 0
                             }
                         )
-                        
+                
                         if not created:
                             # Update total points by querying all correct answers
                             total_points = TeamAnswer.objects.filter(
@@ -1642,9 +1645,6 @@ def check_answer(request, lobby_id=None, question_id=None):
                             logger.error(f"Error sending leaderboard update: {str(e)}")
                     except Exception as e:
                         logger.error(f"Error updating team race progress: {str(e)}")
-                
-                # Find the lobby this team is in
-                lobby = team.participating_lobbies.first()
                 
                 # Prepare response data
                 response_data = {
@@ -1707,39 +1707,59 @@ def check_answer(request, lobby_id=None, question_id=None):
                             
                             if next_questions.exists():
                                 next_q_id = next_questions.first().id
-                                logger.info(f"Found next question by ID: {next_q_id}")
-                        except Exception as e2:
-                            logger.error(f"Alternative approach also failed: {str(e2)}")
+                                logger.info(f"Next question ID by alternative method: {next_q_id}")
+                        except Exception as alt_e:
+                            logger.error(f"Alternative approach also failed: {str(alt_e)}")
                     
-                    # Set the next_url
+                    # If we found a next question, add its URL to the response
                     if next_q_id:
-                        # Use direct URL string instead of reverse() to avoid any issues
-                        response_data['next_url'] = f"/studentQuestion/{lobby.id}/{next_q_id}/"
-                        logger.info(f"Set direct next_url to: {response_data['next_url']}")
+                        if lobby_id:
+                            # If this is the lobby-specific question interface
+                            next_url = reverse('student_question', kwargs={
+                                'lobby_id': lobby_id,
+                                'question_id': next_q_id
+                            })
+                            response_data['next_url'] = next_url
+                        else:
+                            # This is the race_questions interface, which needs team_code and player_name
+                            player_name = None
+                            try:
+                                # Try to get player name from recent TeamMember activity
+                                recent_member = TeamMember.objects.filter(
+                                    team=team
+                                ).order_by('-id').first()
+                                
+                                if recent_member:
+                                    player_name = recent_member.role
+                            except Exception as e:
+                                logger.error(f"Error getting player name: {str(e)}")
+                            
+                            if player_name:
+                                next_url = f"/race/{race.id}/questions/?team_code={team.code}&player_name={player_name}"
+                                response_data['next_url'] = next_url
                     else:
-                        response_data['next_url'] = "/race-complete/"
-                        logger.info(f"No next question found, set direct path to: {response_data['next_url']}")
-                else:
-                    reason = "Answer incorrect" if not is_correct else "Lobby not found"
-                    logger.warning(f"Could not calculate next_url: {reason}")
+                        # If this was the last question, go to race complete
+                        response_data['next_url'] = reverse('race_complete')
                 
-                # If the answer is incorrect and max attempts reached, suggest photo upload
-                if not is_correct and team_answer.attempts >= 3:
-                    response_data['suggest_photo'] = True
-                
+                # Return JSON response with all the data
+                logger.info(f"Returning answer check response: {response_data}")
                 return JsonResponse(response_data)
                 
             except Question.DoesNotExist:
                 return JsonResponse({'error': 'Question not found'}, status=404)
             except Team.DoesNotExist:
                 return JsonResponse({'error': 'Team not found'}, status=404)
+            except Exception as e:
+                logger.error(f"Error checking answer: {str(e)}")
+                return JsonResponse({'error': str(e)}, status=500)
                 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
+            logger.error(f"Error in check_answer: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
-    
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 def upload_photo(request, lobby_id, question_id):
     """Handle photo upload for a question"""
@@ -1936,7 +1956,7 @@ def race_questions(request, race_id):
         team_id = request.session.get('team_id')
         if team_id:
             try:
-                team = Team.objects.get(id=team_id)
+            team = Team.objects.get(id=team_id)
             except Team.DoesNotExist:
                 pass
     
@@ -1960,12 +1980,12 @@ def race_questions(request, race_id):
         })
     
     # Find or create team member
-    try:
-        team_member = TeamMember.objects.get(team=team, role=player_name)
-    except TeamMember.DoesNotExist:
+            try:
+                team_member = TeamMember.objects.get(team=team, role=player_name)
+            except TeamMember.DoesNotExist:
         # Create a team member entry
-        team_member = TeamMember.objects.create(team=team, role=player_name)
-        print(f"Created new team member {player_name} for team {team.name}")
+                team_member = TeamMember.objects.create(team=team, role=player_name)
+                print(f"Created new team member {player_name} for team {team.name}")
     
     # Get zones and questions for this race
     zones = Zone.objects.filter(race=race).order_by('created_at')

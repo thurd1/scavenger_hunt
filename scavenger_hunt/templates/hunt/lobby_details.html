@@ -836,6 +836,41 @@
             document.body.appendChild(refreshBtn);
         }
         
+        // Add auto-refresh progress indicator
+        const autoRefreshIndicator = document.createElement('div');
+        autoRefreshIndicator.id = 'auto-refresh-indicator';
+        autoRefreshIndicator.style.position = 'fixed';
+        autoRefreshIndicator.style.bottom = '10px';
+        autoRefreshIndicator.style.left = '50%';
+        autoRefreshIndicator.style.transform = 'translateX(-50%)';
+        autoRefreshIndicator.style.backgroundColor = 'rgba(33, 37, 41, 0.8)';
+        autoRefreshIndicator.style.color = '#90C83C';
+        autoRefreshIndicator.style.padding = '5px 10px';
+        autoRefreshIndicator.style.borderRadius = '4px';
+        autoRefreshIndicator.style.fontSize = '12px';
+        autoRefreshIndicator.style.zIndex = '9999';
+        autoRefreshIndicator.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+        autoRefreshIndicator.innerHTML = 'Auto-refresh in <span id="refresh-countdown">5</span>s';
+        document.body.appendChild(autoRefreshIndicator);
+        
+        // Create and start the auto-refresh countdown
+        let refreshCountdown = 5;
+        function updateRefreshCountdown() {
+            const countdownEl = document.getElementById('refresh-countdown');
+            if (!countdownEl) return;
+            
+            refreshCountdown--;
+            countdownEl.textContent = refreshCountdown;
+            
+            if (refreshCountdown <= 0) {
+                refreshCountdown = 5;
+                refreshTeamData(true);
+            }
+        }
+        
+        // Update countdown every second
+        setInterval(updateRefreshCountdown, 1000);
+        
         // Check if race already started (in case we missed the WebSocket event)
         if ('{{ lobby.hunt_started }}' === 'True') {
             console.log('Race already started according to page data!');

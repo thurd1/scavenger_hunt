@@ -704,6 +704,75 @@
                 }
             }, 1000);
         }
+        
+        // Add visual notification when scores update
+        function showScoreUpdateNotification() {
+            // Create a notification element
+            const notification = document.createElement('div');
+            notification.id = 'score-update-notification';
+            notification.style.position = 'fixed';
+            notification.style.top = '20px';
+            notification.style.left = '50%';
+            notification.style.transform = 'translateX(-50%)';
+            notification.style.backgroundColor = 'rgba(144, 200, 60, 0.9)';
+            notification.style.color = 'white';
+            notification.style.padding = '10px 20px';
+            notification.style.borderRadius = '5px';
+            notification.style.fontWeight = 'bold';
+            notification.style.boxShadow = '0 3px 10px rgba(0, 0, 0, 0.2)';
+            notification.style.zIndex = '10000';
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.3s ease-in-out';
+            notification.textContent = 'Scores Updated!';
+            
+            // Add to the document
+            document.body.appendChild(notification);
+            
+            // Fade in
+            setTimeout(() => {
+                notification.style.opacity = '1';
+            }, 10);
+            
+            // Fade out and remove after 3 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+        
+        // Override updateLeaderboard to show notification when scores change
+        const originalUpdateLeaderboard = updateLeaderboard;
+        updateLeaderboard = function(teams) {
+            // Get current scores before update
+            const currentScores = {};
+            document.querySelectorAll('.team-row').forEach(row => {
+                const teamId = row.getAttribute('data-team-id');
+                const scoreEl = row.querySelector('.team-score');
+                if (teamId && scoreEl) {
+                    currentScores[teamId] = parseInt(scoreEl.textContent) || 0;
+                }
+            });
+            
+            // Call the original function
+            originalUpdateLeaderboard(teams);
+            
+            // Check if any scores changed
+            let scoresChanged = false;
+            teams.forEach(team => {
+                if (currentScores[team.id] !== undefined && team.score !== currentScores[team.id]) {
+                    scoresChanged = true;
+                }
+            });
+            
+            // Show notification if scores changed
+            if (scoresChanged) {
+                showScoreUpdateNotification();
+            }
+        };
     });
 </script>
 {% endblock %}

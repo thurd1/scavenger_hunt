@@ -54,9 +54,9 @@
                                         <!-- Current question container -->
                                         <div id="questionContainer" class="question-container mb-4">
                                             {% if questions %}
-                                                {% for question in questions %}
+                                        {% for question in questions %}
                                                     <div class="question-card" id="question-{{ forloop.counter0 }}" data-question-id="{{ question.id }}" style="display: {% if forloop.first %}block{% else %}none{% endif %};">
-                                                        <h3 class="question-title">Question {{ forloop.counter }}</h3>
+                                                <h3 class="question-title">Question {{ forloop.counter }}</h3>
                                                         <div class="question-text">{{ question.text }}</div>
                                                         
                                                         <form id="answer-form-{{ forloop.counter0 }}" class="answer-form mt-4">
@@ -84,7 +84,7 @@
                                             {% else %}
                                                 <div class="alert alert-warning">No questions available.</div>
                                             {% endif %}
-                                        </div>
+                                            </div>
                                     </div>
                                 {% endwith %}
                             {% endfor %}
@@ -419,7 +419,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (i === currentQuestionIndex) {
                 questions[i].style.display = 'block';
             } else {
-                questions[i].style.display = 'none';
+            questions[i].style.display = 'none';
             }
         }
         
@@ -635,7 +635,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Disable further submissions for this question
                     if (submitButton) {
-                        submitButton.disabled = true;
+                    submitButton.disabled = true;
                     }
                     
                     // Show navigation buttons - now it's safe to proceed
@@ -724,7 +724,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Set the question's input field as read-only to prevent further attempts
-            const answerInput = document.getElementById(`answer-${questionId}`);
+                const answerInput = document.getElementById(`answer-${questionId}`);
             if (answerInput) {
                 answerInput.readOnly = true;
                 answerInput.classList.add('max-attempts-reached');
@@ -751,22 +751,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 uploadPhoto(questionId);
             });
         });
-    }
-    
-    // Helper function to get cookies for CSRF token
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
     }
     
     // Photo upload function
@@ -828,8 +812,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const navButtons = document.getElementById('navigation-buttons');
                 
                 // CRITICAL FIX: Force visibility of navigation buttons with multiple methods
+                navButtons.style.display = 'block';
+                navButtons.style.visibility = 'visible';
+                navButtons.style.opacity = '1';
+                navButtons.style.zIndex = '10000'; // Above the overlay
                 
-                // 1. Create an attention-grabbing overlay to highlight the next button
+                // Create an attention-grabbing overlay to highlight the next button
                 const overlayDiv = document.createElement('div');
                 overlayDiv.style.position = 'fixed';
                 overlayDiv.style.top = '0';
@@ -859,12 +847,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Add to body
                 overlayDiv.appendChild(messageDiv);
                 document.body.appendChild(overlayDiv);
-                
-                // Make the real Next button prominently visible
-                navButtons.style.display = 'block';
-                navButtons.style.visibility = 'visible';
-                navButtons.style.opacity = '1';
-                navButtons.style.zIndex = '10000'; // Above the overlay
                 
                 // Clone the navigation buttons and append to the message for easy access
                 const navButtonsClone = navButtons.cloneNode(true);
@@ -919,7 +901,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.body.appendChild(autoNavMessage);
                     
                     // Countdown timer for auto-navigation
-                    let autoNavCountdown = 5; // Reduced to 5 seconds
+                    let autoNavCountdown = 5; // 5 seconds
                     const autoNavCountdownEl = document.getElementById('auto-nav-countdown');
                     const autoNavInterval = setInterval(() => {
                         autoNavCountdown--;
@@ -1049,17 +1031,92 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
         }, 3000);
     }
-
-    // Call this function when the page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize question data
-        initializeQuestionData();
-        
-        // Start periodic score updates
+    
+    // Add a comprehensive periodic update system
+    function initializePeriodicUpdates() {
+        // 1. Set up periodic score updates
         periodicScoreUpdate();
         
-        // Rest of your existing code...
-    });
+        // 2. Set up auto-refresh of question data every 10 seconds
+        setInterval(() => {
+            const teamCode = '{{ team.code }}';
+            const raceId = '{{ race.id }}';
+            
+            // Only fetch if we have the required data
+            if (!teamCode || !raceId) return;
+            
+            // Fetch updated question answers from server
+            fetch(`/api/question-answers/?team_code=${teamCode}&race_id=${raceId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.answers) {
+                        // Update local data with server data
+                        for (const questionId in data.answers) {
+                            const answer = data.answers[questionId];
+                            
+                            // If we have this question in our local data, update it
+                            if (questionData[questionId]) {
+                                questionData[questionId].attempts = answer.attempts || 0;
+                                questionData[questionId].points = answer.points_awarded || 0;
+                                questionData[questionId].answered = answer.answered_correctly || false;
+                                questionData[questionId].photoUploaded = answer.photo_uploaded || false;
+                                
+                                // Update UI to match server data if needed
+                                const attemptsEl = document.getElementById(`attempts-${questionId}`);
+                                if (attemptsEl) {
+                                    attemptsEl.textContent = answer.attempts || 0;
+                                }
+                                
+                                // Update feedback if needed
+                                const feedbackEl = document.getElementById(`feedback-${questionId}`);
+                                if (feedbackEl) {
+                                    if (answer.answered_correctly && !feedbackEl.classList.contains('correct')) {
+                                        feedbackEl.className = 'feedback correct';
+                                        feedbackEl.style.display = 'block';
+                                        feedbackEl.textContent = `Correct! You earned ${answer.points_awarded} points.`;
+                                    }
+                                }
+                                
+                                // Show navigation buttons if this is the current question and it's been answered
+                                const questions = document.querySelectorAll('.question-card');
+                                const currentQuestion = Array.from(questions).findIndex(q => q.style.display === 'block');
+                                
+                                if (currentQuestion !== -1 && 
+                                    questions[currentQuestion].dataset.questionId === questionId &&
+                                    (answer.answered_correctly || answer.photo_uploaded)) {
+                                    document.getElementById('navigation-buttons').style.display = 'block';
+                                }
+                            }
+                        }
+                        
+                        // Update total score
+                        updateTotalScore();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching question answers:', error);
+                });
+        }, 10000);
+    }
+    
+    // Initialize all periodic updates
+    initializePeriodicUpdates();
 });
+
+// Helper function to get cookies for CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 </script>
 {% endblock %} 
