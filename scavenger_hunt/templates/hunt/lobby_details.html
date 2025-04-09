@@ -165,7 +165,7 @@
                         </div>
                         <div class="team-actions">
                             <a href="{% url 'view_team' team.id %}" class="btn btn-view">View Team</a>
-                            <button class="btn btn-delete" data-team-id="{{ team.id }}" onclick="confirmDeleteTeam({{ team.id }})">Delete Team</button>
+                            <button class="btn btn-delete" data-team-id="{{ team.id }}" onclick="confirmDeleteTeam('{{ team.id }}')">Delete Team</button>
                         </div>
                     </div>
                 {% endfor %}
@@ -248,12 +248,23 @@
         console.log('Connecting to WebSocket:', wsUrl);
         
         try {
+            if (socket !== null) {
+                console.log('Closing existing socket connection before creating a new one');
+                socket.close();
+            }
+            
             socket = new WebSocket(wsUrl);
             
             // Connection opened
             socket.addEventListener('open', (event) => {
                 console.log('WebSocket connection established');
                 updateConnectionStatus('connected');
+                
+                // Send an initial message to ensure the connection is working
+                socket.send(JSON.stringify({
+                    'type': 'join',
+                    'lobby_id': '{{ lobby.id }}'
+                }));
             });
             
             // Listen for messages
@@ -264,8 +275,11 @@
                     const data = JSON.parse(event.data);
                     
                     // Handle team updates
-                    if (data.type === 'team_update') {
+                    if (data.type === 'team_update' || data.type === 'team_joined') {
+                        console.log('Team update event received via WebSocket');
                         showNotification('Team update received!', 'info');
+                        // Reset the force reload counter
+                        forceReloadCounter = 0;
                         reloadPage();
                     }
                     
@@ -281,7 +295,7 @@
             
             // Connection closed
             socket.addEventListener('close', (event) => {
-                console.log('WebSocket connection closed');
+                console.log('WebSocket connection closed. Code:', event.code, 'Reason:', event.reason);
                 updateConnectionStatus('disconnected');
                 
                 // Try to reconnect after a delay
@@ -300,6 +314,13 @@
         } catch (error) {
             console.error('Error setting up WebSocket:', error);
             updateConnectionStatus('disconnected');
+            
+            // Try to reconnect after a delay
+            setTimeout(() => {
+                console.log('Attempting to reconnect WebSocket after error...');
+                updateConnectionStatus('connecting');
+                setupWebSocket();
+            }, 5000);
         }
     }
     
@@ -402,10 +423,18 @@
         const url = `/lobby/{{ lobby.id }}/status/?t=${timestamp}`;
         
         fetch(url)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 // Update the last checked time
                 lastCheckedAt = Date.now();
+                
+                // Log the response (only in debug)
+                console.log('Status update received:', data);
                 
                 // Check if the race has started
                 if (data.hunt_started) {
@@ -416,7 +445,7 @@
                 
                 // Check if team data has changed
                 if (data.teams_hash && data.teams_hash !== currentHash) {
-                    console.log('Team data changed. Reloading page.');
+                    console.log('Team data changed. Old hash:', currentHash, 'New hash:', data.teams_hash);
                     showNotification('Teams updated - reloading page...', 'info');
                     // Force reload after a short delay to show notification
                     setTimeout(reloadPage, 1000);
