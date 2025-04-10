@@ -1908,6 +1908,13 @@ def race_complete(request):
     """Display race completion page"""
     player_name = request.session.get('player_name')
     
+    # If accessed from admin dashboard, show an example view
+    if not player_name and request.user.is_authenticated:
+        return render(request, 'hunt/race_complete.html', {
+            'player_name': 'Example Player',
+            'total_score': 1000
+        })
+    
     if not player_name:
         return redirect('join_game_session')
     
