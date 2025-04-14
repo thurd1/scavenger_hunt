@@ -26,6 +26,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
 import time
 import uuid
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -141,9 +142,10 @@ def start_race(request, lobby_id):
                 }
             )
             
-            # Also send to race channel
+            # Also send to race channel but only for this specific lobby's race
+            # This prevents starting all races with the same ID
             async_to_sync(channel_layer.group_send)(
-                f'race_{race.id}',
+                f'race_{race.id}_lobby_{lobby_id}',
                 {
                     'type': 'race_started',
                     'redirect_url': redirect_url
@@ -1533,117 +1535,122 @@ def check_answer(request, lobby_id=None, question_id=None):
                     except Lobby.DoesNotExist:
                         return JsonResponse({'error': 'Lobby not found'}, status=404)
                 
-                # Check if the question has already been answered correctly by this team
-                team_answer = TeamAnswer.objects.filter(team=team, question=question).first()
+                # Use Django's select_for_update to prevent race conditions
+                # This locks the row until the transaction is complete
+                from django.db import transaction
                 
-                if team_answer and team_answer.answered_correctly:
-                    # Question was already answered correctly
-                    return JsonResponse({
-                        'correct': True,
-                        'already_answered': True,
-                        'points': team_answer.points_awarded,
-                        'photo_uploaded': team_answer.photo_uploaded,
-                        'message': 'Already answered correctly'
-                    })
-                
-                # If not, create or update the team answer
-                if not team_answer:
-                    team_answer = TeamAnswer.objects.create(
-                        team=team,
-                        question=question,
-                        answered_correctly=False,
-                        attempts=0,
-                        points_awarded=0,
-                        requires_photo=question.requires_photo
-                    )
-                
-                # Record this attempt
-                team_answer.attempts += 1
-                
-                # Check if the answer is correct
-                correct_answer = question.answer.lower().strip()
-                user_answer = answer.lower().strip()
-                
-                # Simple exact match for now
-                is_correct = user_answer == correct_answer
-                
-                # Calculate points based on attempts
-                points = 0
-                if is_correct:
-                    if team_answer.attempts == 1:
-                        points = 3  # 3 points for first attempt
-                    elif team_answer.attempts == 2:
-                        points = 2  # 2 points for second attempt
-                    elif team_answer.attempts == 3:
-                        points = 1  # 1 point for third attempt
-                    else:
-                        points = 0  # 0 points for more than three attempts
-                
-                # Update the team answer
-                team_answer.answered_correctly = is_correct
-                if is_correct:
-                    team_answer.points_awarded = points
-                team_answer.save()
-                
-                # Find the lobby this team is in
-                lobby = team.participating_lobbies.first()
-
-                # Update race progress for this team if answer was correct and points awarded
-                if is_correct and points > 0 and lobby and lobby.race:
-                    race = lobby.race
+                with transaction.atomic():
+                    # Check if the question has already been answered correctly by this team
+                    team_answer = TeamAnswer.objects.select_for_update().filter(team=team, question=question).first()
                     
-                    # Log this update
-                    logger.info(f"Team {team.name} answered correctly with {points} points in race {race.id}")
+                    if team_answer and team_answer.answered_correctly:
+                        # Question was already answered correctly
+                        return JsonResponse({
+                            'correct': True,
+                            'already_answered': True,
+                            'points': team_answer.points_awarded,
+                            'photo_uploaded': team_answer.photo_uploaded,
+                            'message': 'Already answered correctly'
+                        })
                     
-                    # Update team race progress with total points
-                    try:
-                        # Get or create team race progress
-                        team_race_progress, created = TeamRaceProgress.objects.get_or_create(
+                    # If not, create or update the team answer
+                    if not team_answer:
+                        team_answer = TeamAnswer.objects.create(
                             team=team,
-                            race=race,
-                            defaults={
-                                'total_points': points,
-                                'current_question_index': 0
-                            }
+                            question=question,
+                            answered_correctly=False,
+                            attempts=0,
+                            points_awarded=0,
+                            requires_photo=question.requires_photo
                         )
-                
-                        if not created:
-                            # Update total points by querying all correct answers
-                            total_points = TeamAnswer.objects.filter(
-                                team=team,
-                                question__zone__race=race,
-                                answered_correctly=True
-                            ).aggregate(Sum('points_awarded'))['points_awarded__sum'] or 0
-                            
-                            team_race_progress.total_points = total_points
-                            team_race_progress.save()
-                            
-                            logger.info(f"Updated TeamRaceProgress for team {team.name} with total points: {total_points}")
+                    
+                    # Record this attempt
+                    team_answer.attempts += 1
+                    
+                    # Check if the answer is correct
+                    correct_answer = question.answer.lower().strip()
+                    user_answer = answer.lower().strip()
+                    
+                    # Simple exact match for now
+                    is_correct = user_answer == correct_answer
+                    
+                    # Calculate points based on attempts
+                    points = 0
+                    if is_correct:
+                        if team_answer.attempts == 1:
+                            points = 3  # 3 points for first attempt
+                        elif team_answer.attempts == 2:
+                            points = 2  # 2 points for second attempt
+                        elif team_answer.attempts == 3:
+                            points = 1  # 1 point for third attempt
+                        else:
+                            points = 0  # 0 points for more than three attempts
+                    
+                    # Update the team answer
+                    team_answer.answered_correctly = is_correct
+                    if is_correct:
+                        team_answer.points_awarded = points
+                    team_answer.save()
+                    
+                    # Find the lobby this team is in
+                    lobby = team.participating_lobbies.first()
+
+                    # Update race progress for this team if answer was correct and points awarded
+                    if is_correct and points > 0 and lobby and lobby.race:
+                        race = lobby.race
                         
-                        # Trigger update to leaderboard via WebSocket
+                        # Log this update
+                        logger.info(f"Team {team.name} answered correctly with {points} points in race {race.id}")
+                        
+                        # Update team race progress with total points
                         try:
-                            from asgiref.sync import async_to_sync
-                            from channels.layers import get_channel_layer
-                            
-                            channel_layer = get_channel_layer()
-                            async_to_sync(channel_layer.group_send)(
-                                'leaderboard',
-                                {
-                                    'type': 'leaderboard_update',
-                                    'team_id': team.id,
-                                    'team_name': team.name,
-                                    'race_id': race.id,
-                                    'action': 'update'
+                            # Get or create team race progress
+                            team_race_progress, created = TeamRaceProgress.objects.get_or_create(
+                                team=team,
+                                race=race,
+                                defaults={
+                                    'total_points': points,
+                                    'current_question_index': 0
                                 }
                             )
-                            logger.info(f"Sent leaderboard update for team {team.id} in race {race.id}")
+                    
+                            if not created:
+                                # Update total points by querying all correct answers
+                                total_points = TeamAnswer.objects.filter(
+                                    team=team,
+                                    question__zone__race=race,
+                                    answered_correctly=True
+                                ).aggregate(Sum('points_awarded'))['points_awarded__sum'] or 0
+                                
+                                team_race_progress.total_points = total_points
+                                team_race_progress.save()
+                                
+                                logger.info(f"Updated TeamRaceProgress for team {team.name} with total points: {total_points}")
                             
-                            # Also do an HTTP-based update for redundancy
-                            trigger_leaderboard_update_internal(race.id)
+                            # Trigger update to leaderboard via WebSocket
+                            try:
+                                from asgiref.sync import async_to_sync
+                                from channels.layers import get_channel_layer
+                                
+                                channel_layer = get_channel_layer()
+                                async_to_sync(channel_layer.group_send)(
+                                    'leaderboard',
+                                    {
+                                        'type': 'leaderboard_update',
+                                        'team_id': team.id,
+                                        'team_name': team.name,
+                                        'race_id': race.id,
+                                        'action': 'update'
+                                    }
+                                )
+                                logger.info(f"Sent leaderboard update for team {team.id} in race {race.id}")
+                                
+                                # Also do an HTTP-based update for redundancy
+                                trigger_leaderboard_update_internal(race.id)
+                            except Exception as e:
+                                logger.error(f"Error sending leaderboard update: {str(e)}")
                         except Exception as e:
-                            logger.error(f"Error sending leaderboard update: {str(e)}")
-                    except Exception as e:
-                        logger.error(f"Error updating team race progress: {str(e)}")
+                            logger.error(f"Error updating team race progress: {str(e)}")
                 
                 # Prepare response data
                 response_data = {
@@ -1993,9 +2000,19 @@ def race_questions(request, race_id):
         team_member = TeamMember.objects.create(team=team, role=player_name)
         print(f"Created new team member {player_name} for team {team.name}")
     
-    # Get zones and questions for this race
+    # Get zones and questions for this race - add additional logging
     zones = Zone.objects.filter(race=race).order_by('created_at')
+    logger.info(f"Found {zones.count()} zones for race {race.id}")
+    
     questions = Question.objects.filter(zone__race=race).select_related('zone').order_by('zone__created_at')
+    logger.info(f"Found {questions.count()} questions for race {race.id}")
+    
+    # Debug log for zones and their questions
+    for zone in zones:
+        zone_questions = Question.objects.filter(zone=zone)
+        logger.info(f"Zone {zone.id} ({zone.name}) has {zone_questions.count()} questions")
+        for q in zone_questions:
+            logger.info(f"  Question {q.id}: {q.text[:30]}...")
     
     # Group questions by zone
     questions_by_zone = {}
@@ -2003,6 +2020,11 @@ def race_questions(request, race_id):
         questions_by_zone[zone.id] = []
     
     for question in questions:
+        # Ensure the question's zone ID is in the dictionary
+        if question.zone.id not in questions_by_zone:
+            questions_by_zone[question.zone.id] = []
+            logger.warning(f"Question {question.id} has zone {question.zone.id} which wasn't in the zones query")
+        
         questions_by_zone[question.zone.id].append(question)
     
     # Get existing team answers
@@ -2035,7 +2057,12 @@ def race_questions(request, race_id):
         'questions_by_zone': questions_by_zone,
         'answers_by_question': answers_by_question,
         'current_question_index': current_question_index,
-        'total_points': total_points
+        'total_points': total_points,
+        'debug_info': {
+            'zone_count': zones.count(),
+            'question_count': questions.count(),
+            'zones_with_questions': [z.id for z in zones if questions_by_zone.get(z.id)]
+        }
     }
     
     return render(request, 'hunt/race_questions.html', context)
