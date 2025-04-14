@@ -1810,3 +1810,41 @@ def race_detail(request, race_id):
         "zones": zones,
         "questions": questions
     })
+
+def student_question(request, lobby_id, question_id):
+    """View for students to answer a specific question in a lobby."""
+    lobby = get_object_or_404(Lobby, id=lobby_id)
+    question = get_object_or_404(Question, id=question_id)
+    
+    # Get player name from session
+    player_name = request.session.get('player_name')
+    
+    # If no player name, redirect to join page
+    if not player_name:
+        return redirect('join_game_session')
+    
+    # Try to get the team for this player
+    team = None
+    try:
+        team_member = TeamMember.objects.filter(role=player_name).first()
+        if team_member:
+            team = team_member.team
+    except Exception as e:
+        logger.error(f"Error finding team: {e}")
+    
+    # If no team found, redirect to join team page
+    if not team:
+        return redirect('join_team')
+    
+    # Get existing team answer for this question
+    team_answer = TeamAnswer.objects.filter(team=team, question=question).first()
+    
+    context = {
+        'lobby': lobby,
+        'question': question,
+        'team': team,
+        'player_name': player_name,
+        'team_answer': team_answer
+    }
+    
+    return render(request, 'hunt/student_question.html', context)
