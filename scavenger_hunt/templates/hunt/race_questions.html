@@ -857,25 +857,64 @@ document.addEventListener('DOMContentLoaded', function() {
                 const directNextButton = document.getElementById(`direct-next-button-${questionId}`);
                 if (directNextButton) {
                     directNextButton.addEventListener('click', function() {
+                        // Store important data from server response
                         const redirectUrl = data.next_url;
+                        const isLastQuestion = data.is_last_question;
+                        const nextQuestionId = data.next_question_id;
+                        
+                        console.log("Continue button clicked with data:", {
+                            redirectUrl,
+                            isLastQuestion, 
+                            nextQuestionId,
+                            currentQuestionId: data.current_question_id
+                        });
+                        
+                        // Method 1: Try direct URL navigation first
                         if (redirectUrl) {
-                            console.log("Direct navigation to:", redirectUrl);
+                            console.log("Method 1: Direct navigation to:", redirectUrl);
                             window.location.href = redirectUrl;
-                        } else {
-                            // No URL in the response, trigger the next question logic
-                            const questions = document.querySelectorAll('.question-card');
-                            let currentQuestionIndex = Array.from(questions).findIndex(q => q.style.display === 'block');
-                            
-                            if (currentQuestionIndex >= 0 && currentQuestionIndex < questions.length - 1) {
-                                // Hide current question
-                                questions[currentQuestionIndex].style.display = 'none';
-                                // Show next question
-                                questions[currentQuestionIndex + 1].style.display = 'block';
-                            } else if (currentQuestionIndex === questions.length - 1) {
-                                // If this is the last question, go to race completion
-                                window.location.href = '/race-complete/';
-                            }
+                            return;
                         }
+                        
+                        // Method 2: If it's the last question, go to race completion
+                        if (isLastQuestion) {
+                            console.log("Method 2: Last question, going to race completion");
+                            window.location.href = '/race-complete/';
+                            return;
+                        }
+                        
+                        // Method 3: Manual DOM-based navigation within the page
+                        console.log("Method 3: Using DOM-based navigation");
+                        const questions = document.querySelectorAll('.question-card');
+                        let currentQuestionIndex = Array.from(questions).findIndex(q => q.style.display === 'block');
+                        console.log("Current visible question index:", currentQuestionIndex);
+                        
+                        if (currentQuestionIndex >= 0 && currentQuestionIndex < questions.length - 1) {
+                            // Hide all questions first
+                            questions.forEach(q => q.style.display = 'none');
+                            
+                            // Show the next question
+                            questions[currentQuestionIndex + 1].style.display = 'block';
+                            console.log("Showing next question at index:", currentQuestionIndex + 1);
+                            return;
+                        }
+                        
+                        // Method 4: Rebuilding the race questions URL
+                        console.log("Method 4: Rebuilding race questions URL");
+                        const teamCode = '{{ team.code }}';
+                        const playerName = '{{ team_member.role }}';
+                        const raceId = '{{ race.id }}';
+                        
+                        if (teamCode && playerName && raceId) {
+                            const newUrl = `/race/${raceId}/questions/?team_code=${teamCode}&player_name=${playerName}`;
+                            console.log("Navigating to rebuilt URL:", newUrl);
+                            window.location.href = newUrl;
+                            return;
+                        }
+                        
+                        // Method 5: Last resort - reload the page
+                        console.log("Method 5: Last resort - reloading page");
+                        window.location.reload();
                     });
                 }
                 

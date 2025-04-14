@@ -1889,19 +1889,28 @@ def upload_photo(request, lobby_id, question_id):
             next_q_id = None
             try:
                 current_index = question_ids.index(int(question_id))
+                logger.info(f"Upload_photo: Current question index: {current_index} out of {len(question_ids)-1} questions")
+                
                 if current_index < len(question_ids) - 1:
                     next_q_id = question_ids[current_index + 1]
                     logger.info(f"Upload_photo: Found next question ID: {next_q_id}")
                 else:
-                    logger.info("Upload_photo: This is the last question")
+                    logger.info("Upload_photo: This is the last question - no next question ID")
             except (ValueError, IndexError) as e:
                 logger.error(f"Upload_photo: Error finding question index: {str(e)}")
                 
             # Set absolute paths for navigation
             if next_q_id:
-                # Use direct URL path instead of relative path
-                next_url = f"{request.build_absolute_uri('/').rstrip('/')}/studentQuestion/{lobby_id}/{next_q_id}/"
-                logger.info(f"Upload_photo: Setting absolute next_url to: {next_url}")
+                # Determine the appropriate next URL - using race_questions endpoint
+                player_name = request.session.get('player_name')
+                if player_name:
+                    # Use the race_questions URL instead of studentQuestion
+                    next_url = f"{request.build_absolute_uri('/').rstrip('/')}/race/{lobby.race.id}/questions/?team_code={team.code}&player_name={player_name}"
+                    logger.info(f"Upload_photo: Setting direct race_questions URL: {next_url}")
+                else:
+                    # Fallback to studentQuestion URL
+                    next_url = f"{request.build_absolute_uri('/').rstrip('/')}/studentQuestion/{lobby_id}/{next_q_id}/"
+                    logger.info(f"Upload_photo: Setting studentQuestion URL: {next_url}")
             else:
                 # No next question, this is the last one - go to race complete with total score
                 try:
@@ -1939,7 +1948,9 @@ def upload_photo(request, lobby_id, question_id):
                 # Add explicit flags for last question case
                 'is_last_question': next_q_id is None,
                 'is_race_complete': next_q_id is None,
-                'total_score': request.session.get('total_score', 0) if next_q_id is None else 0
+                'total_score': request.session.get('total_score', 0) if next_q_id is None else 0,
+                'current_question_id': question_id,
+                'next_question_id': next_q_id
             })
             
         except TeamMember.DoesNotExist:
