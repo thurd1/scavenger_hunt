@@ -1737,8 +1737,23 @@ def check_answer(request, lobby_id=None, question_id=None):
                                 next_url = f"/race/{race.id}/questions/?team_code={team.code}&player_name={player_name}"
                                 response_data['next_url'] = next_url
                     else:
-                        # If this was the last question, go to race complete
-                        response_data['next_url'] = reverse('race_complete')
+                        # If this was the last question, go to race complete with total points
+                        try:
+                            # Get the total points for this team and race
+                            total_points = 0
+                            if team_race_progress:
+                                total_points = team_race_progress.total_points
+                            
+                            # Save the total score in the session for race_complete view
+                            request.session['total_score'] = total_points
+                            
+                            # Redirect to race complete
+                            response_data['next_url'] = reverse('race_complete')
+                            
+                            logger.info(f"Team {team.name} completed all questions with total score: {total_points}")
+                        except Exception as e:
+                            logger.error(f"Error preparing race completion: {str(e)}")
+                            response_data['next_url'] = reverse('race_complete')
                 
                 # Return JSON response with all the data
                 logger.info(f"Returning answer check response: {response_data}")
@@ -1882,6 +1897,28 @@ def upload_photo(request, lobby_id, question_id):
                 next_url = f"/studentQuestion/{lobby_id}/{next_q_id}/"
                 logger.info(f"Upload_photo: Setting direct next_url to: {next_url}")
             else:
+                # No next question, this is the last one - go to race complete with total score
+                try:
+                    # Get or create team race progress record
+                    team_race_progress = TeamRaceProgress.objects.filter(team=team, race=lobby.race).first()
+                    total_points = 0
+                    
+                    if team_race_progress:
+                        total_points = team_race_progress.total_points
+                    else:
+                        # If no progress record, calculate total points from answers
+                        total_points = TeamAnswer.objects.filter(
+                            team=team,
+                            question__zone__race=lobby.race,
+                            answered_correctly=True
+                        ).aggregate(Sum('points_awarded'))['points_awarded__sum'] or 0
+                    
+                    # Store total score in session
+                    request.session['total_score'] = total_points
+                    logger.info(f"Upload_photo: Team {team.name} completed all questions with total score: {total_points}")
+                except Exception as e:
+                    logger.error(f"Upload_photo: Error calculating total score: {str(e)}")
+                
                 next_url = "/race-complete/"
                 logger.info(f"Upload_photo: No next question, setting next_url to: {next_url}")
             
@@ -1907,6 +1944,7 @@ def upload_photo(request, lobby_id, question_id):
 def race_complete(request):
     """Display race completion page"""
     player_name = request.session.get('player_name')
+    total_score = request.session.get('total_score', 0)
     
     # If accessed from admin dashboard, show an example view
     if not player_name and request.user.is_authenticated:
@@ -1919,7 +1957,8 @@ def race_complete(request):
         return redirect('join_game_session')
     
     return render(request, 'hunt/race_complete.html', {
-        'player_name': player_name
+        'player_name': player_name,
+        'total_score': total_score
     })
 
 def race_questions(request, race_id):
