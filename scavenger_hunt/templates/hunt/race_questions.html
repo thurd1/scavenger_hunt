@@ -648,7 +648,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Disable further submissions for this question
                     if (submitButton) {
-                    submitButton.disabled = true;
+                        submitButton.disabled = true;
+                    }
+                    
+                    // RACE COMPLETION CHECK:
+                    // If server indicates this is the last question, redirect to race completion page
+                    if (data.is_last_question || data.is_race_complete) {
+                        console.log("SERVER INDICATED RACE COMPLETION - REDIRECTING NOW");
+                        
+                        // Show message to user before redirecting
+                        const redirectMessage = document.createElement('div');
+                        redirectMessage.style.position = 'fixed';
+                        redirectMessage.style.top = '50%';
+                        redirectMessage.style.left = '50%';
+                        redirectMessage.style.transform = 'translate(-50%, -50%)';
+                        redirectMessage.style.background = 'rgba(40, 167, 69, 0.9)';
+                        redirectMessage.style.color = 'white';
+                        redirectMessage.style.padding = '20px';
+                        redirectMessage.style.borderRadius = '10px';
+                        redirectMessage.style.zIndex = '10000';
+                        redirectMessage.innerHTML = '<h3>Congratulations!</h3><p>You\'ve completed all questions!</p><p>Redirecting to results page...</p>';
+                        document.body.appendChild(redirectMessage);
+                        
+                        // Redirect after a short delay (1.5 seconds)
+                        setTimeout(() => {
+                            window.location.href = data.next_url || '/race-complete/';
+                        }, 1500);
+                        
+                        return; // Exit early
                     }
                     
                     // Show navigation buttons - now it's safe to proceed
@@ -894,6 +921,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 // ENHANCED AUTO-NAVIGATION: Improve the auto-redirect mechanism for photo uploads
                 // Determine the URL to navigate to, prioritizing different sources
                 const redirectUrl = data.next_url || data.legacy_next_url;
+                
+                // RACE COMPLETION CHECK:
+                // If server indicates this is the last question, redirect to race completion page
+                if (data.is_last_question || data.is_race_complete) {
+                    console.log("SERVER INDICATED RACE COMPLETION AFTER PHOTO UPLOAD - REDIRECTING NOW");
+                    
+                    // Show message to user before redirecting
+                    const completeMessage = document.createElement('div');
+                    completeMessage.style.position = 'fixed';
+                    completeMessage.style.top = '50%';
+                    completeMessage.style.left = '50%';
+                    completeMessage.style.transform = 'translate(-50%, -50%)';
+                    completeMessage.style.background = 'rgba(40, 167, 69, 0.9)';
+                    completeMessage.style.color = 'white';
+                    completeMessage.style.padding = '20px';
+                    completeMessage.style.borderRadius = '10px';
+                    completeMessage.style.zIndex = '20000'; // Higher than other overlays
+                    completeMessage.innerHTML = '<h3>Congratulations!</h3><p>You\'ve completed all questions!</p><p>Redirecting to results page...</p>';
+                    document.body.appendChild(completeMessage);
+                    
+                    // Redirect after a short delay (2 seconds)
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 2000);
+                    
+                    // Don't do any more processing
+                    return;
+                }
                 
                 // Automatic navigation after 5 seconds if user doesn't click the Next button
                 if (redirectUrl) {

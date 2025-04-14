@@ -1747,8 +1747,14 @@ def check_answer(request, lobby_id=None, question_id=None):
                             # Save the total score in the session for race_complete view
                             request.session['total_score'] = total_points
                             
-                            # Redirect to race complete
+                            # Add race completion URL with explicit flags
                             response_data['next_url'] = reverse('race_complete')
+                            response_data['is_last_question'] = True
+                            response_data['is_race_complete'] = True
+                            response_data['total_score'] = total_points
+                            
+                            # Add message to make it visible in debugging
+                            response_data['message'] = "This is the last question. Race complete!"
                             
                             logger.info(f"Team {team.name} completed all questions with total score: {total_points}")
                         except Exception as e:
@@ -1928,7 +1934,11 @@ def upload_photo(request, lobby_id, question_id):
                 'show_next_button': True,  # Always show next button
                 'photo_uploaded': True,    # Confirm photo is recorded
                 'question_completed': True,# Mark as completed
-                'next_url': next_url
+                'next_url': next_url,
+                # Add explicit flags for last question case
+                'is_last_question': next_q_id is None,
+                'is_race_complete': next_q_id is None,
+                'total_score': request.session.get('total_score', 0) if next_q_id is None else 0
             })
             
         except TeamMember.DoesNotExist:
