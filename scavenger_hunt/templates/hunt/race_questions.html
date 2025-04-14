@@ -842,23 +842,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 const feedbackElement = document.getElementById(`feedback-${questionId}`);
                 feedbackElement.className = 'feedback correct';
                 feedbackElement.style.display = 'block';
-                feedbackElement.textContent = 'Photo uploaded successfully!';
+                
+                // Create a special continue button directly in the feedback
+                feedbackElement.innerHTML = `
+                    <p>Photo uploaded successfully!</p>
+                    <button id="direct-next-button-${questionId}" 
+                            style="background: #28a745; color: white; border: none; padding: 10px 20px; 
+                                   border-radius: 5px; margin-top: 15px; font-weight: bold; cursor: pointer; width: 100%;">
+                        CONTINUE TO NEXT QUESTION →
+                    </button>
+                `;
+                
+                // Add direct click handler to the button
+                const directNextButton = document.getElementById(`direct-next-button-${questionId}`);
+                if (directNextButton) {
+                    directNextButton.addEventListener('click', function() {
+                        const redirectUrl = data.next_url;
+                        if (redirectUrl) {
+                            console.log("Direct navigation to:", redirectUrl);
+                            window.location.href = redirectUrl;
+                        } else {
+                            // No URL in the response, trigger the next question logic
+                            const questions = document.querySelectorAll('.question-card');
+                            let currentQuestionIndex = Array.from(questions).findIndex(q => q.style.display === 'block');
+                            
+                            if (currentQuestionIndex >= 0 && currentQuestionIndex < questions.length - 1) {
+                                // Hide current question
+                                questions[currentQuestionIndex].style.display = 'none';
+                                // Show next question
+                                questions[currentQuestionIndex + 1].style.display = 'block';
+                            } else if (currentQuestionIndex === questions.length - 1) {
+                                // If this is the last question, go to race completion
+                                window.location.href = '/race-complete/';
+                            }
+                        }
+                    });
+                }
                 
                 // Mark photo as uploaded
                 questionData[questionId].photoUploaded = true;
-                
-                // SIMPLIFIED DIRECT NAVIGATION - This is the important part
-                // Get the URL from the server response
-                const redirectUrl = data.next_url || data.legacy_next_url;
-                
-                if (redirectUrl) {
-                    // Direct, simple alert that we're about to navigate
-                    alert('Photo uploaded successfully! Continuing to next question...');
-                    
-                    // Force navigation to the next URL directly
-                    window.location.href = redirectUrl;
-                    return;
-                }
             } else {
                 alert('Error uploading photo: ' + (data.error || 'Unknown error'));
                 
