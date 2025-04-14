@@ -622,6 +622,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 attemptsElement.textContent = questionData[questionId].attempts;
             }
             
+            // Create the request data
+            const requestData = {
+                question_id: dbQuestionId, // Use the database ID
+                answer: answer ? answer.trim() : "",
+                team_code: teamCode,
+                attempt_number: questionData[questionId].attempts
+            };
+            
+            console.log("Sending data:", requestData);
+            
             // Make API call to check answer
             fetch('/check-answer/', {
                 method: 'POST',
@@ -629,22 +639,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken')
                 },
-                body: JSON.stringify({
-                    question_id: dbQuestionId, // Use the database ID
-                    answer: answer ? answer.trim() : "",
-                    team_code: teamCode,
-                    attempt_number: questionData[questionId].attempts
-                })
+                body: JSON.stringify(requestData)
             })
             .then(response => {
                 // Check for HTTP errors first
                 if (!response.ok) {
+                    console.error(`HTTP error! Status: ${response.status}`);
                     throw new Error(`HTTP error! Status: ${response.status}`);
                 }
+                
+                // Log the raw response for debugging
+                console.log("Response status:", response.status);
                 return response.json();
             })
             .then(data => {
-                // Enable the submit button
+                console.log("Received response data:", data);
+                
+                // Always re-enable the submit button first
                 if (submitButton) {
                     submitButton.disabled = false;
                     submitButton.textContent = "Submit Answer";
@@ -686,7 +697,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Disable further submissions for this question
                     if (submitButton) {
-                    submitButton.disabled = true;
+                        submitButton.disabled = true;
                     }
                     
                     // Show navigation buttons - now it's safe to proceed
@@ -695,11 +706,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     feedbackElement.className = 'feedback incorrect';
                     feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
-                    
-                    // Re-enable the submit button for next attempt
-                    if (submitButton) {
-                        submitButton.disabled = false;
-                    }
                     
                     // IMPORTANT: Ensure navigation buttons are hidden for incorrect answers
                     document.getElementById('navigation-buttons').style.display = 'none';
@@ -714,18 +720,18 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Error checking answer:', error);
                 
+                // Always re-enable the submit button on error
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
+                
                 // Show a user-friendly error message in the feedback element
                 const feedbackElement = document.getElementById(`feedback-${questionId}`);
                 if (feedbackElement) {
                     feedbackElement.className = 'feedback incorrect';
                     feedbackElement.style.display = 'block';
                     feedbackElement.textContent = 'Error checking answer: Please try again or refresh the page.';
-                }
-                
-                // Re-enable the submit button on error
-                if (submitButton) {
-                    submitButton.disabled = false;
-                    submitButton.textContent = "Submit Answer";
                 }
             });
         }
