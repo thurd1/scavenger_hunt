@@ -313,6 +313,10 @@ input.max-attempts-reached {
 const currentQuestionIndexFromServer = {% if current_question_index %}{{ current_question_index }}{% else %}0{% endif %};
 const totalPointsFromServer = {% if total_points %}{{ total_points }}{% else %}0{% endif %};
 
+// Extract force_question_id from URL if present
+const urlParams = new URLSearchParams(window.location.search);
+const forceQuestionId = urlParams.get('force_question_id');
+
 // Store answers from server in a variable that JavaScript can process
 const answersFromServer = {
 {% for question_id, answer_data in answers_by_question.items %}
@@ -338,6 +342,47 @@ document.addEventListener('DOMContentLoaded', function() {
         // Collect all questions
         const questions = document.querySelectorAll('.question-card');
         const totalQuestions = questions.length;
+        
+        // DIRECT FIX: If force_question_id is present, find and show that question
+        if (forceQuestionId) {
+            console.log("Attempting to show forced question ID:", forceQuestionId);
+            
+            // Find the question card with the matching question ID
+            let foundQuestion = false;
+            for (let i = 0; i < questions.length; i++) {
+                const questionCard = questions[i];
+                const dataQuestionId = questionCard.getAttribute('data-question-id');
+                
+                // Hide all questions first
+                questionCard.style.display = 'none';
+                
+                // If this is the question we want to show, display it and update index
+                if (dataQuestionId === forceQuestionId) {
+                    questionCard.style.display = 'block';
+                    currentQuestionIndex = i;
+                    foundQuestion = true;
+                    console.log("Found and displaying forced question at index:", i);
+                    
+                    // Save this as the current question index
+                    saveCurrentQuestionIndex(i);
+                }
+            }
+            
+            if (!foundQuestion) {
+                console.warn("Could not find question with ID:", forceQuestionId);
+                // Fall back to showing the current question index
+                questions[currentQuestionIndex].style.display = 'block';
+            }
+        } else {
+            // Default behavior: Hide all questions initially except the current one
+            for (let i = 0; i < questions.length; i++) {
+                if (i === currentQuestionIndex) {
+                    questions[i].style.display = 'block';
+                } else {
+                    questions[i].style.display = 'none';
+                }
+            }
+        }
         
         // Initialize total score
         const totalScoreElement = document.getElementById('total-score');
@@ -413,15 +458,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
-        
-        // Hide all questions initially except the current one
-        for (let i = 0; i < questions.length; i++) {
-            if (i === currentQuestionIndex) {
-                questions[i].style.display = 'block';
-            } else {
-            questions[i].style.display = 'none';
-            }
-        }
         
         // Update the question counter
         const updateQuestionCounter = function() {
