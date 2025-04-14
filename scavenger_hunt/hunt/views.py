@@ -2769,3 +2769,46 @@ def trigger_leaderboard_update_internal(race_id=None):
     except Exception as e:
         logger.error(f"Error in trigger_leaderboard_update_internal: {str(e)}")
         return False
+
+@csrf_exempt
+def question_answers_api(request):
+    """
+    API endpoint to get answers for questions in a race for a specific team
+    """
+    team_code = request.GET.get('team_code')
+    race_id = request.GET.get('race_id')
+    
+    if not team_code or not race_id:
+        return JsonResponse({'success': False, 'error': 'Missing required parameters'})
+    
+    try:
+        team = Team.objects.get(code=team_code)
+        race = Race.objects.get(id=race_id)
+        
+        # Get all team answers for this race
+        answers = TeamAnswer.objects.filter(
+            team=team, 
+            question__zone__race=race
+        ).select_related('question')
+        
+        # Format the answers
+        answer_data = {}
+        for answer in answers:
+            answer_data[answer.question.id] = {
+                'attempts': answer.attempts,
+                'points_awarded': answer.points_awarded,
+                'answered_correctly': answer.answered_correctly,
+                'photo_uploaded': answer.photo_uploaded
+            }
+        
+        return JsonResponse({
+            'success': True,
+            'answers': answer_data
+        })
+    except Team.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Team not found'})
+    except Race.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Race not found'})
+    except Exception as e:
+        logger.error(f"Error in question_answers_api: {str(e)}")
+        return JsonResponse({'success': False, 'error': str(e)})
