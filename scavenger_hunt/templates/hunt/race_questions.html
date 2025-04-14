@@ -54,10 +54,12 @@
                                         <!-- Current question container -->
                                         <div id="questionContainer" class="question-container mb-4">
                                             {% if questions %}
+                                            <script>console.log("Zone {{ zone.id }} ({{ zone.name }}) has {{ questions|length }} questions");</script>
                                         {% for question in questions %}
                                                     <div class="question-card" id="question-{{ forloop.counter0 }}" data-question-id="{{ question.id }}" style="display: {% if forloop.first %}block{% else %}none{% endif %};">
                                                 <h3 class="question-title">Question {{ forloop.counter }}</h3>
                                                         <div class="question-text">{{ question.text }}</div>
+                                                        <script>console.log("Rendering question {{ question.id }} in zone {{ zone.id }}");</script>
                                                         
                                                         <form id="answer-form-{{ forloop.counter0 }}" class="answer-form mt-4">
                                                             <div class="form-group">
@@ -349,8 +351,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const questionData = {};
         
         // Initialize question data
-        document.querySelectorAll('.question-card').forEach(question => {
-            const questionId = question.id.split('-')[1];
+        document.querySelectorAll('.question-card').forEach(function(question) {
+            const questionId = question.getAttribute('data-question-id');
+            if (!questionId) {
+                console.error('Question is missing data-question-id attribute', question);
+                return;
+            }
+            
             questionData[questionId] = {
                 attempts: 0,
                 points: 0,
@@ -578,7 +585,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Make API call to check answer
-            fetch('/check-answer/', {
+            fetch('{% url "check_answer" %}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
