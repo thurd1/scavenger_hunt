@@ -940,7 +940,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             const answerInput = document.getElementById(`answer-${nextQuestionId}`);
                             const submitButton = document.querySelector(`.submit-answer[data-question-id="${nextQuestionId}"]`);
                             
-                            // Enable input and button
                             if (answerInput) {
                                 answerInput.readOnly = false;
                                 answerInput.classList.remove('max-attempts-reached');
@@ -953,6 +952,33 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             if (submitButton) {
                                 submitButton.disabled = false;
+                                
+                                // CRITICAL FIX: Explicitly reinitialize the submit button event listener
+                                // First, remove any existing listeners by cloning and replacing
+                                const newSubmitButton = submitButton.cloneNode(true);
+                                submitButton.parentNode.replaceChild(newSubmitButton, submitButton);
+                                
+                                // Add fresh event listener to new button
+                                newSubmitButton.addEventListener('click', function() {
+                                    const qId = this.getAttribute('data-question-id');
+                                    const input = document.getElementById(`answer-${qId}`);
+                                    if (input && input.value) {
+                                        console.log("Submit button clicked for question:", qId);
+                                        // Call submitAnswer directly with explicit parameters
+                                        submitAnswer(qId, input.value);
+                                    } else {
+                                        console.log("Submit clicked but no input value");
+                                    }
+                                });
+                            }
+                            
+                            // Also reset the question data for this question
+                            if (questionData[nextQuestionId]) {
+                                // Only reset if it doesn't already have progress data
+                                if (!questionData[nextQuestionId].answered && !questionData[nextQuestionId].photoUploaded) {
+                                    console.log("Resetting question data for:", nextQuestionId);
+                                    questionData[nextQuestionId].attempts = 0;
+                                }
                             }
                             
                             // Save the new question index
