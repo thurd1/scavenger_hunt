@@ -950,6 +950,38 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
+                // IMMEDIATE NAVIGATION FIX:
+                // Store the redirect URL on the Next button
+                const nextButton = document.getElementById('next-question');
+                if (nextButton) {
+                    // Make it stand out
+                    nextButton.classList.add('ready');
+                    nextButton.style.backgroundColor = '#90C83C';
+                    nextButton.style.color = 'white';
+                    nextButton.style.fontSize = '1.3rem';
+                    nextButton.style.boxShadow = '0 0 20px rgba(144, 200, 60, 0.8)';
+                    
+                    // Set the URL on the button
+                    if (redirectUrl) {
+                        nextButton.setAttribute('data-next-url', redirectUrl);
+                        
+                        // Completely remove any previous event listeners to avoid conflicts
+                        const newNextButton = nextButton.cloneNode(true);
+                        nextButton.parentNode.replaceChild(newNextButton, nextButton);
+                        
+                        // Add new event listener for direct navigation
+                        newNextButton.addEventListener('click', function(event) {
+                            event.preventDefault();
+                            console.log("Next button clicked, navigating to:", redirectUrl);
+                            window.location.href = redirectUrl;
+                            return false;
+                        });
+                    }
+                    
+                    // Ensure it's enabled
+                    nextButton.disabled = false;
+                }
+                
                 // Automatic navigation after 5 seconds if user doesn't click the Next button
                 if (redirectUrl) {
                     // Show auto-navigation countdown message
@@ -1019,20 +1051,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             nextButton.click();
                         }
                     }, 5000);
-                }
-                
-                // Also update the existing display
-                const nextButton = document.getElementById('next-question');
-                if (nextButton) {
-                    // Make it stand out
-                    nextButton.classList.add('ready');
-                    nextButton.style.backgroundColor = '#90C83C';
-                    nextButton.style.color = 'white';
-                    nextButton.style.fontSize = '1.3rem';
-                    nextButton.style.boxShadow = '0 0 20px rgba(144, 200, 60, 0.8)';
-                    
-                    // Ensure it's enabled
-                    nextButton.disabled = false;
                 }
             } else {
                 alert('Error uploading photo: ' + (data.error || 'Unknown error'));
