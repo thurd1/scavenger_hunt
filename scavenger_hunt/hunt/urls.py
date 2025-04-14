@@ -34,8 +34,8 @@ urlpatterns = [
     path('team/<int:team_id>/view/', views.team_details, name='view_team'),
     # path('lobby/<int:lobby_id>/start/', views.start_hunt, name='start_hunt'),
     # path('lobby/<int:lobby_id>/status/', views.check_hunt_status, name='check_hunt_status'),
-    # path('manage-riddles/', views.manage_riddles, name='manage_riddles'),
-    # path('race/<int:race_id>/', views.race_detail, name='race_detail'),
+    path('manage-riddles/', views.riddle_list, name='manage_riddles'),
+    path('race/<int:race_id>/', views.race_detail, name='race_detail'),
     # path('race/<int:race_id>/toggle/', views.toggle_race, name='toggle_race'),
     # path('delete-race/<int:race_id>/', views.delete_race, name='delete_race'),
     # path('race/<int:race_id>/edit/', views.edit_race, name='edit_race'),
@@ -55,7 +55,7 @@ urlpatterns = [
     # path('lobby/<int:lobby_id>/question/<int:question_id>/upload/', views.upload_photo, name='upload_photo'),
     # path('lobby/<int:lobby_id>/question/<int:question_id>/upload-photo/', views.upload_photo, name='upload_photo_student'),
     # path('race-complete/', views.race_complete, name='race_complete'),
-    # path('race/<int:race_id>/questions/', views.race_questions, name='race_questions'),
+    path('race/<int:race_id>/questions/', views.race_questions, name='race_questions'),
     path('check-answer/', views.check_answer, name='check_answer'),
     
     # API endpoints

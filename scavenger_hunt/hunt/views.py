@@ -1799,3 +1799,14 @@ def question_answers_api(request):
     except Exception as e:
         logger.error(f"Error in question_answers_api: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)})
+
+def race_detail(request, race_id):
+    """View details of a race."""
+    race = get_object_or_404(Race, id=race_id)
+    zones = Zone.objects.filter(race=race).order_by('created_at')
+    questions = Question.objects.filter(zone__race=race).order_by('zone__created_at')
+    return render(request, "hunt/race_detail.html", {
+        "race": race,
+        "zones": zones,
+        "questions": questions
+    })
