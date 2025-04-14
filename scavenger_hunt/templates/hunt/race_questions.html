@@ -930,8 +930,37 @@ document.addEventListener('DOMContentLoaded', function() {
                             questions.forEach(q => q.style.display = 'none');
                             
                             // Show the next question
-                            questions[currentQuestionIndex + 1].style.display = 'block';
-                            console.log("Showing next question at index:", currentQuestionIndex + 1);
+                            const nextQuestionIndex = currentQuestionIndex + 1;
+                            const nextQuestion = questions[nextQuestionIndex];
+                            nextQuestion.style.display = 'block';
+                            console.log("Showing next question at index:", nextQuestionIndex);
+                            
+                            // Ensure next question is fully enabled
+                            const nextQuestionId = nextQuestion.id.split('-')[1];
+                            const answerInput = document.getElementById(`answer-${nextQuestionId}`);
+                            const submitButton = document.querySelector(`.submit-answer[data-question-id="${nextQuestionId}"]`);
+                            
+                            // Enable input and button
+                            if (answerInput) {
+                                answerInput.readOnly = false;
+                                answerInput.classList.remove('max-attempts-reached');
+                                answerInput.placeholder = 'Type your answer';
+                                answerInput.focus(); // Set focus to the input field
+                                
+                                // Clear any previous answer
+                                answerInput.value = '';
+                            }
+                            
+                            if (submitButton) {
+                                submitButton.disabled = false;
+                            }
+                            
+                            // Save the new question index
+                            saveCurrentQuestionIndex(nextQuestionIndex);
+                            
+                            // Hide the navigation buttons until this question is answered
+                            document.getElementById('navigation-buttons').style.display = 'none';
+                            
                             return;
                         }
                         
