@@ -1897,11 +1897,11 @@ def upload_photo(request, lobby_id, question_id):
             except (ValueError, IndexError) as e:
                 logger.error(f"Upload_photo: Error finding question index: {str(e)}")
                 
-            next_url = ""
+            # Set absolute paths for navigation
             if next_q_id:
-                # Use direct URL path instead of reverse
-                next_url = f"/studentQuestion/{lobby_id}/{next_q_id}/"
-                logger.info(f"Upload_photo: Setting direct next_url to: {next_url}")
+                # Use direct URL path instead of relative path
+                next_url = f"{request.build_absolute_uri('/').rstrip('/')}/studentQuestion/{lobby_id}/{next_q_id}/"
+                logger.info(f"Upload_photo: Setting absolute next_url to: {next_url}")
             else:
                 # No next question, this is the last one - go to race complete with total score
                 try:
@@ -1925,8 +1925,9 @@ def upload_photo(request, lobby_id, question_id):
                 except Exception as e:
                     logger.error(f"Upload_photo: Error calculating total score: {str(e)}")
                 
-                next_url = "/race-complete/"
-                logger.info(f"Upload_photo: No next question, setting next_url to: {next_url}")
+                # Use absolute URL for race completion page
+                next_url = f"{request.build_absolute_uri('/').rstrip('/')}/race-complete/"
+                logger.info(f"Upload_photo: No next question, setting absolute next_url to: {next_url}")
             
             return JsonResponse({
                 'success': True,
