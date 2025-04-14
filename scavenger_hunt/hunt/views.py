@@ -607,7 +607,7 @@ def team_details(request, team_id):
 @login_required
 def dashboard(request):
     teams = Team.objects.all()
-    return render(request, "hunt/dashboard.html", {"teams": teams})
+    return render(request, "hunt/leader_dashboard.html", {"teams": teams})
 
 @login_required
 def team_detail(request, team_id):
@@ -632,130 +632,130 @@ def check_answer(request, lobby_id=None, question_id=None):
         except json.JSONDecodeError:
             data = request.POST
             print(f"POST data: {data}")
-        
-        # Get question_id either from URL or from POST data
-        question_id = question_id or data.get('question_id')
+            
+            # Get question_id either from URL or from POST data
+            question_id = question_id or data.get('question_id')
         answer = data.get('answer', '')
-        team_code = data.get('team_code')
-        
+            team_code = data.get('team_code')
+            
         print(f"Processing answer: question_id={question_id}, team_code={team_code}, answer={answer}")
         
         if not question_id or not team_code:
-            return JsonResponse({'error': 'Missing required fields'}, status=400)
-        
-        try:
+                return JsonResponse({'error': 'Missing required fields'}, status=400)
+            
+            try:
             # Get the question and team
-            question = Question.objects.get(id=question_id)
-            team = Team.objects.get(code=team_code)
-            
+                question = Question.objects.get(id=question_id)
+                team = Team.objects.get(code=team_code)
+                
             # Check if the question has already been answered correctly
-            team_answer = TeamAnswer.objects.filter(team=team, question=question).first()
-            
-            if team_answer and team_answer.answered_correctly:
+                team_answer = TeamAnswer.objects.filter(team=team, question=question).first()
+                
+                if team_answer and team_answer.answered_correctly:
                 # Already answered correctly
                 print(f"Question {question_id} already answered correctly")
-                return JsonResponse({
-                    'correct': True,
-                    'already_answered': True,
-                    'points': team_answer.points_awarded,
-                    'photo_uploaded': team_answer.photo_uploaded,
-                    'message': 'Already answered correctly'
-                })
-            
+                    return JsonResponse({
+                        'correct': True,
+                        'already_answered': True,
+                        'points': team_answer.points_awarded,
+                        'photo_uploaded': team_answer.photo_uploaded,
+                        'message': 'Already answered correctly'
+                    })
+                
             # If not, create or update team answer
-            if not team_answer:
-                team_answer = TeamAnswer.objects.create(
-                    team=team,
-                    question=question,
-                    answered_correctly=False,
-                    attempts=0,
-                    points_awarded=0,
-                    requires_photo=question.requires_photo
-                )
-            
+                if not team_answer:
+                    team_answer = TeamAnswer.objects.create(
+                        team=team,
+                        question=question,
+                        answered_correctly=False,
+                        attempts=0,
+                        points_awarded=0,
+                        requires_photo=question.requires_photo
+                    )
+                
             # Increment attempts
-            team_answer.attempts += 1
-            
+                team_answer.attempts += 1
+                
             # Check if answer is correct
-            correct_answer = question.answer.lower().strip()
+                correct_answer = question.answer.lower().strip()
             user_answer = answer.lower().strip() if answer else ""
-            is_correct = user_answer == correct_answer
-            
+                is_correct = user_answer == correct_answer
+                
             print(f"Comparing answers: user='{user_answer}', correct='{correct_answer}', match={is_correct}")
             
             # Calculate points
-            points = 0
-            if is_correct:
-                if team_answer.attempts == 1:
+                points = 0
+                if is_correct:
+                    if team_answer.attempts == 1:
                     points = 3
-                elif team_answer.attempts == 2:
+                    elif team_answer.attempts == 2:
                     points = 2
-                elif team_answer.attempts == 3:
+                    elif team_answer.attempts == 3:
                     points = 1
-            
+                
             # Update the answer record
-            team_answer.answered_correctly = is_correct
-            if is_correct:
-                team_answer.points_awarded = points
-            team_answer.save()
-            
-            # Find the lobby this team is in
-            lobby = team.participating_lobbies.first()
-            
+                team_answer.answered_correctly = is_correct
+                if is_correct:
+                    team_answer.points_awarded = points
+                team_answer.save()
+                
+                # Find the lobby this team is in
+                lobby = team.participating_lobbies.first()
+
             # Update race progress
             if is_correct and lobby and lobby.race:
-                race = lobby.race
-                team_race_progress, created = TeamRaceProgress.objects.get_or_create(
-                    team=team,
-                    race=race,
-                    defaults={
-                        'total_points': points,
-                        'current_question_index': 0
-                    }
-                )
+                    race = lobby.race
+                        team_race_progress, created = TeamRaceProgress.objects.get_or_create(
+                            team=team,
+                            race=race,
+                            defaults={
+                                'total_points': points,
+                                'current_question_index': 0
+                            }
+                        )
                 
-                if not created:
+                        if not created:
                     # Update total points
-                    total_points = TeamAnswer.objects.filter(
-                        team=team,
-                        question__zone__race=race,
-                        answered_correctly=True
-                    ).aggregate(Sum('points_awarded'))['points_awarded__sum'] or 0
-                    
-                    team_race_progress.total_points = total_points
-                    team_race_progress.save()
-            
+                            total_points = TeamAnswer.objects.filter(
+                                team=team,
+                                question__zone__race=race,
+                                answered_correctly=True
+                            ).aggregate(Sum('points_awarded'))['points_awarded__sum'] or 0
+                            
+                            team_race_progress.total_points = total_points
+                            team_race_progress.save()
+                            
             # Prepare response
-            response_data = {
-                'correct': is_correct,
-                'attempts': team_answer.attempts,
+                response_data = {
+                    'correct': is_correct,
+                    'attempts': team_answer.attempts,
                 'max_attempts': 3,
-                'points': points if is_correct else 0,
-                'photo_uploaded': team_answer.photo_uploaded
-            }
-            
+                    'points': points if is_correct else 0,
+                    'photo_uploaded': team_answer.photo_uploaded
+                }
+                
             # Log response
             print(f"Sending response: {response_data}")
             
-            return JsonResponse(response_data)
-            
-        except Question.DoesNotExist:
+                return JsonResponse(response_data)
+                
+            except Question.DoesNotExist:
             print(f"Question {question_id} not found")
-            return JsonResponse({'error': 'Question not found'}, status=404)
-        except Team.DoesNotExist:
+                return JsonResponse({'error': 'Question not found'}, status=404)
+            except Team.DoesNotExist:
             print(f"Team with code {team_code} not found")
-            return JsonResponse({'error': 'Team not found'}, status=404)
-        except Exception as e:
+                return JsonResponse({'error': 'Team not found'}, status=404)
+            except Exception as e:
             print(f"Error processing answer: {str(e)}")
             import traceback
             traceback.print_exc()
-            return JsonResponse({'error': str(e)}, status=500)
-    except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        except Exception as e:
         print(f"Outer exception: {str(e)}")
         import traceback
         traceback.print_exc()
-        return JsonResponse({'error': str(e)}, status=500)
-
+            return JsonResponse({'error': str(e)}, status=500)
+    
 def upload_photo(request, lobby_id, question_id):
     """Handle photo upload for a question"""
     if request.method != 'POST':
