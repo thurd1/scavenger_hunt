@@ -1509,30 +1509,51 @@ def student_question(request, lobby_id, question_id):
     
 @csrf_exempt
 def check_answer(request, lobby_id=None, question_id=None):
+    # Add immediate validation for question_id to handle direct API calls
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        
+    logger.info(f"check_answer called with lobby_id={lobby_id}, question_id={question_id}")
+    
     if request.method == 'POST':
         try:
-            data = json.loads(request.body)
+            # Try to parse JSON data, but also handle form data
+            try:
+                data = json.loads(request.body)
+                logger.info(f"Received JSON data: {data}")
+            except json.JSONDecodeError:
+                # Handle form data instead
+                data = request.POST
+                logger.info(f"Received form data: {dict(data)}")
             
-            # Get question_id either from URL or from POST data
+            # Get question_id either from URL or from data
             question_id = question_id or data.get('question_id')
             answer = data.get('answer')
             team_code = data.get('team_code')
             
-            if not all([question_id, answer, team_code]):
+            if not all([question_id, team_code]):
+                logger.error(f"Missing required fields: question_id={question_id}, team_code={team_code}")
                 return JsonResponse({'error': 'Missing required fields'}, status=400)
+            
+            # Additional logging
+            logger.info(f"Processing answer check for question {question_id} from team {team_code}")
             
             # Look up the question and team
             try:
                 question = Question.objects.get(id=question_id)
                 team = Team.objects.get(code=team_code)
                 
+                logger.info(f"Found question: {question.id} (zone: {question.zone_id}) and team: {team.id}")
+                
                 # If lobby_id is provided in URL, ensure the team is part of the lobby
                 if lobby_id:
                     try:
                         lobby = Lobby.objects.get(id=lobby_id)
                         if not team.participating_lobbies.filter(id=lobby_id).exists():
+                            logger.error(f"Team {team.id} is not part of lobby {lobby_id}")
                             return JsonResponse({'error': 'Team is not part of this lobby'}, status=403)
                     except Lobby.DoesNotExist:
+                        logger.error(f"Lobby {lobby_id} not found")
                         return JsonResponse({'error': 'Lobby not found'}, status=404)
                 
                 # Use Django's select_for_update to prevent race conditions
@@ -1545,6 +1566,7 @@ def check_answer(request, lobby_id=None, question_id=None):
                     
                     if team_answer and team_answer.answered_correctly:
                         # Question was already answered correctly
+                        logger.info(f"Question {question.id} was already answered correctly by team {team.id}")
                         return JsonResponse({
                             'correct': True,
                             'already_answered': True,
@@ -1563,13 +1585,17 @@ def check_answer(request, lobby_id=None, question_id=None):
                             points_awarded=0,
                             requires_photo=question.requires_photo
                         )
+                        logger.info(f"Created new TeamAnswer record for team {team.id}, question {question.id}")
                     
                     # Record this attempt
                     team_answer.attempts += 1
                     
                     # Check if the answer is correct
                     correct_answer = question.answer.lower().strip()
-                    user_answer = answer.lower().strip()
+                    user_answer = answer.lower().strip() if answer else ""
+                    
+                    # Log the comparison
+                    logger.info(f"Comparing: User='{user_answer}' vs Correct='{correct_answer}'")
                     
                     # Simple exact match for now
                     is_correct = user_answer == correct_answer
@@ -1585,6 +1611,10 @@ def check_answer(request, lobby_id=None, question_id=None):
                             points = 1  # 1 point for third attempt
                         else:
                             points = 0  # 0 points for more than three attempts
+                        
+                        logger.info(f"Correct answer! Team {team.id} earned {points} points for question {question.id}")
+                    else:
+                        logger.info(f"Incorrect answer for team {team.id}, question {question.id}. Attempt #{team_answer.attempts}")
                     
                     # Update the team answer
                     team_answer.answered_correctly = is_correct
@@ -1596,7 +1626,7 @@ def check_answer(request, lobby_id=None, question_id=None):
                     lobby = team.participating_lobbies.first()
 
                     # Update race progress for this team if answer was correct and points awarded
-                    if is_correct and points > 0 and lobby and lobby.race:
+                    if is_correct and lobby and lobby.race:
                         race = lobby.race
                         
                         # Log this update
@@ -1661,112 +1691,24 @@ def check_answer(request, lobby_id=None, question_id=None):
                     'photo_uploaded': team_answer.photo_uploaded
                 }
                 
-                # Log and debug data
-                logger.info(f"Answer check for team {team.name} (ID: {team.id}) - Question {question.id} - Correct: {is_correct} - Points: {points if is_correct else 0}")
+                # Log the response we're sending back
+                logger.info(f"Sending response for question {question.id}: {response_data}")
                 
-                # Debug information about connected teams and active lobbies
-                try:
-                    active_lobbies = Lobby.objects.filter(is_active=True).count()
-                    total_teams = Team.objects.all().count()
-                    active_teams = Team.objects.filter(participating_lobbies__is_active=True).distinct().count()
-                    team_race_progress_count = TeamRaceProgress.objects.all().count()
-                    
-                    logger.info(f"Debug stats - Active lobbies: {active_lobbies}, Total teams: {total_teams}, Active teams: {active_teams}, TeamRaceProgress records: {team_race_progress_count}")
-                except Exception as e:
-                    logger.error(f"Error collecting debug stats: {str(e)}")
-                
-                # If the answer is correct, calculate next_url
-                if is_correct and lobby:
-                    # Get all questions for this race
-                    race = lobby.race
-                    
-                    # DEBUG: Log information about the current question and race
-                    logger.info(f"Calculating next question after question_id={question_id} in race_id={race.id if race else 'None'}")
-                    
-                    # Get all questions for this race, ordered by zone creation time then question ID
-                    questions = Question.objects.filter(zone__race=race).order_by('zone__created_at', 'id')
-                    question_ids = list(questions.values_list('id', flat=True))
-                    
-                    # Log the full list of question IDs for debugging
-                    logger.info(f"All question IDs in order: {question_ids}")
-                    
-                    # Find the next question if any
-                    next_q_id = None
-                    try:
-                        current_index = question_ids.index(int(question_id))
-                        logger.info(f"Current question index: {current_index} of {len(question_ids)-1}")
-                        
-                        if current_index < len(question_ids) - 1:
-                            next_q_id = question_ids[current_index + 1]
-                            logger.info(f"Next question ID determined: {next_q_id}")
-                        else:
-                            logger.info("This appears to be the last question")
-                    except (ValueError, IndexError) as e:
-                        logger.error(f"Error finding question index: {str(e)}")
-                        # Try a different approach - find questions with higher ID
-                        try:
-                            # Find questions with higher ID in same race
-                            next_questions = Question.objects.filter(
-                                zone__race=race,
-                                id__gt=int(question_id)
-                            ).order_by('zone__created_at', 'id')
-                            
-                            if next_questions.exists():
-                                next_q_id = next_questions.first().id
-                                logger.info(f"Next question ID by alternative method: {next_q_id}")
-                        except Exception as alt_e:
-                            logger.error(f"Alternative approach also failed: {str(alt_e)}")
-                    
-                    # If we found a next question, add its URL to the response
-                    if next_q_id:
-                        if lobby_id:
-                            # If this is the lobby-specific question interface
-                            next_url = reverse('student_question', kwargs={
-                                'lobby_id': lobby_id,
-                                'question_id': next_q_id
-                            })
-                            response_data['next_url'] = next_url
-                        else:
-                            # This is the race_questions interface, which needs team_code and player_name
-                            player_name = None
-                            try:
-                                # Try to get player name from recent TeamMember activity
-                                recent_member = TeamMember.objects.filter(
-                                    team=team
-                                ).order_by('-id').first()
-                                
-                                if recent_member:
-                                    player_name = recent_member.role
-                            except Exception as e:
-                                logger.error(f"Error getting player name: {str(e)}")
-                            
-                            if player_name:
-                                next_url = f"/race/{race.id}/questions/?team_code={team.code}&player_name={player_name}"
-                                response_data['next_url'] = next_url
-                    else:
-                        # If this was the last question, go to race complete
-                        response_data['next_url'] = reverse('race_complete')
-                
-                # Return JSON response with all the data
-                logger.info(f"Returning answer check response: {response_data}")
                 return JsonResponse(response_data)
                 
             except Question.DoesNotExist:
-                return JsonResponse({'error': 'Question not found'}, status=404)
+                logger.error(f"Question with ID {question_id} not found")
+                return JsonResponse({'error': f'Question with ID {question_id} not found'}, status=404)
             except Team.DoesNotExist:
-                return JsonResponse({'error': 'Team not found'}, status=404)
-            except Exception as e:
-                logger.error(f"Error checking answer: {str(e)}")
-                return JsonResponse({'error': str(e)}, status=500)
-                
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+                logger.error(f"Team with code {team_code} not found")
+                return JsonResponse({'error': f'Team with code {team_code} not found'}, status=404)
+            
         except Exception as e:
-            logger.error(f"Error in check_answer: {str(e)}")
+            logger.error(f"Error in check_answer: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
     
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
+
 def upload_photo(request, lobby_id, question_id):
     """Handle photo upload for a question"""
     if request.method != 'POST':
@@ -1932,140 +1874,161 @@ def race_complete(request):
 def race_questions(request, race_id):
     """View for participants to see and answer questions during a race"""
     # Get race and check if it's active
-    race = get_object_or_404(Race, id=race_id)
-    
-    # Process query parameters first
-    team_code = request.GET.get('team_code')
-    player_name_param = request.GET.get('player_name')
-    
-    # Get player name from session or query parameter
-    player_name = request.session.get('player_name') or player_name_param
-    
-    # If player name is in the query, save it to the session for future use
-    if player_name_param and not request.session.get('player_name'):
-        request.session['player_name'] = player_name_param
-    
-    # Check if we have a player name
-    if not player_name:
-        # If no player name, show join form with team code populated if provided
-        return render(request, 'hunt/race_questions.html', {
-            'show_join_form': True,
-            'race': race,
-            'team_code_prefill': team_code
-        })
-    
-    # Try to find the team - first from the team_code parameter, then from session
-    team = None
-    if team_code:
-        try:
-            team = Team.objects.get(code=team_code)
-            # Save team_id to session for future use
-            request.session['team_id'] = team.id
-        except Team.DoesNotExist:
-                pass
-    
-    # If no team from parameter, try from session
-    if not team:
-        team_id = request.session.get('team_id')
-        if team_id:
-            try:
-                team = Team.objects.get(id=team_id)
-            except Team.DoesNotExist:
-                pass
-    
-    # If still no team, check if player is in any team
-    if not team:
-        try:
-            team_member = TeamMember.objects.filter(role=player_name).first()
-            if team_member:
-                team = team_member.team
-                # Save team_id to session
-                request.session['team_id'] = team.id
-        except Exception as e:
-            print(f"Error finding team: {e}")
-    
-    # If no team found at all, show join form
-    if not team:
-        return render(request, 'hunt/race_questions.html', {
-            'show_join_form': True,
-            'race': race,
-            'error': 'Could not find a team for you. Please join a team first.'
-        })
-    
-    # Find or create team member
     try:
-        team_member = TeamMember.objects.get(team=team, role=player_name)
-    except TeamMember.DoesNotExist:
-        # Create a team member entry
-        team_member = TeamMember.objects.create(team=team, role=player_name)
-        print(f"Created new team member {player_name} for team {team.name}")
-    
-    # Get zones and questions for this race - add additional logging
-    zones = Zone.objects.filter(race=race).order_by('created_at')
-    logger.info(f"Found {zones.count()} zones for race {race.id}")
-    
-    questions = Question.objects.filter(zone__race=race).select_related('zone').order_by('zone__created_at')
-    logger.info(f"Found {questions.count()} questions for race {race.id}")
-    
-    # Debug log for zones and their questions
-    for zone in zones:
-        zone_questions = Question.objects.filter(zone=zone)
-        logger.info(f"Zone {zone.id} ({zone.name}) has {zone_questions.count()} questions")
-        for q in zone_questions:
-            logger.info(f"  Question {q.id}: {q.text[:30]}...")
-    
-    # Group questions by zone
-    questions_by_zone = {}
-    for zone in zones:
-        questions_by_zone[zone.id] = []
-    
-    for question in questions:
-        # Ensure the question's zone ID is in the dictionary
-        if question.zone.id not in questions_by_zone:
-            questions_by_zone[question.zone.id] = []
-            logger.warning(f"Question {question.id} has zone {question.zone.id} which wasn't in the zones query")
+        race = get_object_or_404(Race, id=race_id)
+        logger.info(f"Found race {race.id}: {race.name}")
         
-        questions_by_zone[question.zone.id].append(question)
-    
-    # Get existing team answers
-    team_answers = TeamAnswer.objects.filter(team=team, question__zone__race=race)
-    
-    # Organize answers by question ID for easy lookup
-    answers_by_question = {}
-    for answer in team_answers:
-        answers_by_question[answer.question_id] = {
-            'answered_correctly': answer.answered_correctly,
-            'attempts': answer.attempts,
-            'points_awarded': answer.points_awarded,
-            'photo_uploaded': answer.photo_uploaded
+        # Process query parameters first
+        team_code = request.GET.get('team_code')
+        player_name_param = request.GET.get('player_name')
+        
+        # Get player name from session or query parameter
+        player_name = request.session.get('player_name') or player_name_param
+        
+        # If player name is in the query, save it to the session for future use
+        if player_name_param and not request.session.get('player_name'):
+            request.session['player_name'] = player_name_param
+        
+        # Check if we have a player name
+        if not player_name:
+            # If no player name, show join form with team code populated if provided
+            return render(request, 'hunt/race_questions.html', {
+                'show_join_form': True,
+                'race': race,
+                'team_code_prefill': team_code
+            })
+        
+        # Try to find the team - first from the team_code parameter, then from session
+        team = None
+        if team_code:
+            try:
+                team = Team.objects.get(code=team_code)
+                # Save team_id to session for future use
+                request.session['team_id'] = team.id
+                logger.info(f"Found team by code {team_code}: {team.name} (ID: {team.id})")
+            except Team.DoesNotExist:
+                logger.error(f"Team with code {team_code} not found")
+        
+        # If no team from parameter, try from session
+        if not team:
+            team_id = request.session.get('team_id')
+            if team_id:
+                try:
+                    team = Team.objects.get(id=team_id)
+                    logger.info(f"Found team by session ID {team_id}: {team.name}")
+                except Team.DoesNotExist:
+                    logger.error(f"Team with ID {team_id} from session not found")
+        
+        # If still no team, check if player is in any team
+        if not team:
+            try:
+                team_member = TeamMember.objects.filter(role=player_name).first()
+                if team_member:
+                    team = team_member.team
+                    # Save team_id to session
+                    request.session['team_id'] = team.id
+                    logger.info(f"Found team through team member {player_name}: {team.name} (ID: {team.id})")
+            except Exception as e:
+                logger.error(f"Error finding team for {player_name}: {e}")
+        
+        # If no team found at all, show join form
+        if not team:
+            logger.error(f"No team found for player {player_name}")
+            return render(request, 'hunt/race_questions.html', {
+                'show_join_form': True,
+                'race': race,
+                'error': 'Could not find a team for you. Please join a team first.'
+            })
+        
+        # Find or create team member
+        try:
+            team_member = TeamMember.objects.get(team=team, role=player_name)
+            logger.info(f"Found existing team member: {player_name} for team {team.name}")
+        except TeamMember.DoesNotExist:
+            # Create a team member entry
+            team_member = TeamMember.objects.create(team=team, role=player_name)
+            logger.info(f"Created new team member: {player_name} for team {team.name}")
+        
+        # Get zones and questions for this race with more detailed logging
+        zones = Zone.objects.filter(race=race).order_by('created_at')
+        logger.info(f"Found {zones.count()} zones for race {race.id}: {[z.id for z in zones]}")
+        
+        # Load all questions in a separate query to ensure we get everything
+        all_questions = Question.objects.filter(zone__race=race).select_related('zone')
+        logger.info(f"Found {all_questions.count()} questions for race {race.id}")
+        
+        # Group questions by zone
+        questions_by_zone = {}
+        for zone in zones:
+            # Initialize an empty list for each zone
+            questions_by_zone[zone.id] = []
+            
+            # Find questions for this specific zone
+            zone_questions = [q for q in all_questions if q.zone_id == zone.id]
+            logger.info(f"Zone {zone.id} ({zone.name}) has {len(zone_questions)} questions")
+            
+            for q in zone_questions:
+                logger.info(f"  Question {q.id}: {q.text[:30]}")
+                # Add the question to the zone
+                questions_by_zone[zone.id].append(q)
+        
+        # Get existing team answers
+        team_answers = TeamAnswer.objects.filter(team=team, question__zone__race=race)
+        logger.info(f"Found {team_answers.count()} answers for team {team.id} in race {race.id}")
+        
+        # Organize answers by question ID for easy lookup
+        answers_by_question = {}
+        for answer in team_answers:
+            answers_by_question[answer.question_id] = {
+                'answered_correctly': answer.answered_correctly,
+                'attempts': answer.attempts,
+                'points_awarded': answer.points_awarded,
+                'photo_uploaded': answer.photo_uploaded
+            }
+            logger.info(f"Answer for Q{answer.question_id}: correct={answer.answered_correctly}, attempts={answer.attempts}")
+        
+        # Get team race progress
+        team_race_progress = TeamRaceProgress.objects.filter(team=team, race=race).first()
+        current_question_index = 0
+        total_points = 0
+        
+        if team_race_progress:
+            current_question_index = team_race_progress.current_question_index
+            total_points = team_race_progress.total_points
+            logger.info(f"Team progress: index={current_question_index}, points={total_points}")
+        else:
+            logger.info("No team race progress found, creating default values")
+        
+        # Add useful diagnostic information to the context
+        context = {
+            'race': race,
+            'team': team,
+            'team_member': team_member,
+            'zones': zones,
+            'questions_by_zone': questions_by_zone,
+            'answers_by_question': answers_by_question,
+            'current_question_index': current_question_index,
+            'total_points': total_points,
+            'debug_info': {
+                'zone_count': zones.count(),
+                'total_question_count': all_questions.count(),
+                'zones_with_questions': [z.id for z in zones if questions_by_zone.get(z.id)],
+                'question_counts_by_zone': {z.id: len(questions_by_zone.get(z.id, [])) for z in zones}
+            }
         }
-    
-    # Get team race progress
-    team_race_progress = TeamRaceProgress.objects.filter(team=team, race=race).first()
-    current_question_index = 0
-    total_points = 0
-    
-    if team_race_progress:
-        current_question_index = team_race_progress.current_question_index
-        total_points = team_race_progress.total_points
-    
-    context = {
-        'race': race,
-        'team': team,
-        'team_member': team_member,
-        'zones': zones,
-        'questions_by_zone': questions_by_zone,
-        'answers_by_question': answers_by_question,
-        'current_question_index': current_question_index,
-        'total_points': total_points,
-        'debug_info': {
-            'zone_count': zones.count(),
-            'question_count': questions.count(),
-            'zones_with_questions': [z.id for z in zones if questions_by_zone.get(z.id)]
-        }
-    }
-    
-    return render(request, 'hunt/race_questions.html', context)
+        
+        return render(request, 'hunt/race_questions.html', context)
+        
+    except Race.DoesNotExist:
+        logger.error(f"Race with ID {race_id} not found")
+        return render(request, 'hunt/error.html', {
+            'error': f'Race with ID {race_id} not found. Please check the URL and try again.'
+        })
+    except Exception as e:
+        logger.error(f"Error in race_questions view: {str(e)}")
+        return render(request, 'hunt/error.html', {
+            'error': f'An error occurred while loading the race: {str(e)}'
+        })
 
 def check_race_status(request, race_id):
     """Check if the race has started - called by client-side polling"""

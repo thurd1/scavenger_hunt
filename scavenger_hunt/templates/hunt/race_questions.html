@@ -4,6 +4,12 @@
 
 {% block title %}Race Questions - {{ race.name|default:"Join Race" }}{% endblock %}
 
+{% block extrahead %}
+<!-- Include JS libraries from CDNs to prevent file not found errors -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4">
     <div class="dashboard-box p-4">
@@ -320,6 +326,22 @@ input.max-attempts-reached {
 </style>
 
 <script>
+// Helper function to get cookies for CSRF token - defined at the top to ensure it's available
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 // Pre-process Django template variables to JavaScript variables
 const currentQuestionIndexFromServer = {% if current_question_index %}{{ current_question_index }}{% else %}0{% endif %};
 const totalPointsFromServer = {% if total_points %}{{ total_points }}{% else %}0{% endif %};
@@ -1131,21 +1153,5 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize all periodic updates
     initializePeriodicUpdates();
 });
-
-// Helper function to get cookies for CSRF token
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
 </script>
 {% endblock %} 
