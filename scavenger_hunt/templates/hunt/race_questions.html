@@ -444,6 +444,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Next button event listener
         document.getElementById('next-question').addEventListener('click', function() {
+            // Check if this button has a redirect URL (set by photo upload response)
+            const redirectUrl = this.getAttribute('data-next-url');
+            if (redirectUrl) {
+                console.log("Redirecting to:", redirectUrl);
+                window.location.href = redirectUrl;
+                return;
+            }
+            
             if (currentQuestionIndex < totalQuestions - 1) {
                 questions[currentQuestionIndex].style.display = 'none';
                 currentQuestionIndex++;
@@ -461,6 +469,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     console.log('Moving to next question that is already answered or has photo, showing navigation buttons');
                 }
+            } else {
+                // This is the last question and we're trying to go beyond it
+                // Redirect to race completion page
+                console.log("Last question completed, redirecting to race completion page");
+                window.location.href = "/race-complete/";
             }
         });
         
