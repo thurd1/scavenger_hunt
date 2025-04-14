@@ -54,21 +54,10 @@
                                         <!-- Current question container -->
                                         <div id="questionContainer" class="question-container mb-4">
                                             {% if questions %}
-                                            <script>
-                                                console.log("Zone {{ zone.id }} ({{ zone.name }}) has {{ questions|length }} questions");
-                                                console.log("Zone ID type: " + typeof "{{ zone.id }}");
-                                                {% if zone.name == "Zone 2" %}
-                                                console.log("This is Zone 2 - Debug Mode");
-                                                {% for question in questions %}
-                                                console.log("Zone 2 Question: {{ question.id }} - {{ question.text|truncatechars:20 }}");
-                                                {% endfor %}
-                                                {% endif %}
-                                            </script>
                                         {% for question in questions %}
                                                     <div class="question-card" id="question-{{ forloop.counter0 }}" data-question-id="{{ question.id }}" style="display: {% if forloop.first %}block{% else %}none{% endif %};">
                                                 <h3 class="question-title">Question {{ forloop.counter }}</h3>
                                                         <div class="question-text">{{ question.text }}</div>
-                                                        <script>console.log("Rendering question {{ question.id }} in zone {{ zone.id }}");</script>
                                                         
                                                         <form id="answer-form-{{ forloop.counter0 }}" class="answer-form mt-4">
                                                             <div class="form-group">
@@ -320,22 +309,6 @@ input.max-attempts-reached {
 </style>
 
 <script>
-// Helper function to get cookies for CSRF token - defined at the top to ensure it's available
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
 // Pre-process Django template variables to JavaScript variables
 const currentQuestionIndexFromServer = {% if current_question_index %}{{ current_question_index }}{% else %}0{% endif %};
 const totalPointsFromServer = {% if total_points %}{{ total_points }}{% else %}0{% endif %};
@@ -376,24 +349,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const questionData = {};
         
         // Initialize question data
-        document.querySelectorAll('.question-card').forEach(function(question) {
-            const questionId = question.getAttribute('data-question-id');
-            const zoneId = question.closest('.zone').id;
-            
-            console.log(`Initializing question ${questionId} in ${zoneId}`);
-            
-            if (!questionId) {
-                console.error('Question is missing data-question-id attribute', question);
-                return;
-            }
-            
+        document.querySelectorAll('.question-card').forEach(question => {
+            const questionId = question.id.split('-')[1];
             questionData[questionId] = {
                 attempts: 0,
                 points: 0,
                 maxAttempts: 3,
                 photoUploaded: false,
-                answered: false,
-                zoneId: zoneId
+                answered: false
             };
             
             // Apply data from server if available
@@ -491,10 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveCurrentQuestionIndex(currentQuestionIndex);
                 
                 // IMPORTANT: Hide navigation buttons for new question until it's answered correctly or photo uploaded
-                const currentQuestion = questions[currentQuestionIndex];
-                const questionId = currentQuestion.getAttribute('data-question-id');
-                console.log(`Moving to question index ${currentQuestionIndex}, question ID: ${questionId}`);
-                
+                const questionId = questions[currentQuestionIndex].id.split('-')[1];
                 if (questionData[questionId] && !questionData[questionId].answered && !questionData[questionId].photoUploaded) {
                     document.getElementById('navigation-buttons').style.display = 'none';
                     console.log('Moving to next question, hiding navigation buttons');
@@ -508,14 +468,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const hasAnsweredQuestions = document.querySelectorAll('.feedback.correct').length > 0;
         if (hasAnsweredQuestions) {
             // Only show if current question is already answered or has photo uploaded
-            const currentQuestion = questions[currentQuestionIndex];
-            if (currentQuestion) {
-                const currentQuestionId = currentQuestion.getAttribute('data-question-id');
-                console.log(`Current question ID: ${currentQuestionId}`);
-                if (questionData[currentQuestionId] && (questionData[currentQuestionId].answered || questionData[currentQuestionId].photoUploaded)) {
-                    document.getElementById('navigation-buttons').style.display = 'block';
-                    console.log('Current question is already answered, showing navigation buttons');
-                }
+            const currentQuestionId = questions[currentQuestionIndex].id.split('-')[1];
+            if (questionData[currentQuestionId] && (questionData[currentQuestionId].answered || questionData[currentQuestionId].photoUploaded)) {
+                document.getElementById('navigation-buttons').style.display = 'block';
             }
         }
 
@@ -560,16 +515,16 @@ document.addEventListener('DOMContentLoaded', function() {
             // Get the team code from the page
             const teamCode = '{{ team.code }}';
             
-            // Get the actual database question ID - use getAttribute to get data-db-question-id
+            // Get the actual database question ID
             const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
             if (!submitButton) {
-                console.error("Submit button not found for ID:", questionId);
+                console.error("Submit button not found");
                 return;
             }
             
             const dbQuestionId = submitButton.getAttribute('data-db-question-id');
             if (!dbQuestionId) {
-                console.error("Database question ID not found for:", questionId);
+                console.error("Database question ID not found");
                 return;
             }
             
@@ -622,16 +577,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 attemptsElement.textContent = questionData[questionId].attempts;
             }
             
-            // Create the request data
-            const requestData = {
-                question_id: dbQuestionId, // Use the database ID
-                answer: answer ? answer.trim() : "",
-                team_code: teamCode,
-                attempt_number: questionData[questionId].attempts
-            };
-            
-            console.log("Sending data:", requestData);
-            
             // Make API call to check answer
             fetch('/check-answer/', {
                 method: 'POST',
@@ -639,23 +584,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken')
                 },
-                body: JSON.stringify(requestData)
+                body: JSON.stringify({
+                    question_id: dbQuestionId, // Use the database ID
+                    answer: answer.trim(),
+                    team_code: teamCode,
+                    attempt_number: questionData[questionId].attempts
+                })
             })
-            .then(response => {
-                // Check for HTTP errors first
-                if (!response.ok) {
-                    console.error(`HTTP error! Status: ${response.status}`);
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                
-                // Log the raw response for debugging
-                console.log("Response status:", response.status);
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log("Received response data:", data);
-                
-                // Always re-enable the submit button first
+                // Enable the submit button
                 if (submitButton) {
                     submitButton.disabled = false;
                     submitButton.textContent = "Submit Answer";
@@ -697,7 +635,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Disable further submissions for this question
                     if (submitButton) {
-                        submitButton.disabled = true;
+                    submitButton.disabled = true;
                     }
                     
                     // Show navigation buttons - now it's safe to proceed
@@ -706,6 +644,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     feedbackElement.className = 'feedback incorrect';
                     feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
+                    
+                    // Re-enable the submit button for next attempt
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
                     
                     // IMPORTANT: Ensure navigation buttons are hidden for incorrect answers
                     document.getElementById('navigation-buttons').style.display = 'none';
@@ -719,19 +662,12 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Error checking answer:', error);
+                alert('Error checking answer. Please try again.');
                 
-                // Always re-enable the submit button on error
+                // Re-enable the submit button on error
                 if (submitButton) {
                     submitButton.disabled = false;
                     submitButton.textContent = "Submit Answer";
-                }
-                
-                // Show a user-friendly error message in the feedback element
-                const feedbackElement = document.getElementById(`feedback-${questionId}`);
-                if (feedbackElement) {
-                    feedbackElement.className = 'feedback incorrect';
-                    feedbackElement.style.display = 'block';
-                    feedbackElement.textContent = 'Error checking answer: Please try again or refresh the page.';
                 }
             });
         }
@@ -1166,5 +1102,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize all periodic updates
     initializePeriodicUpdates();
 });
+
+// Helper function to get cookies for CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 </script>
 {% endblock %} 
