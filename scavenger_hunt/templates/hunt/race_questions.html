@@ -882,132 +882,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Create a special continue button directly in the feedback
                 feedbackElement.innerHTML = `
                     <p>Photo uploaded successfully!</p>
-                    <button id="direct-next-button-${questionId}" 
-                            style="background: #28a745; color: white; border: none; padding: 10px 20px; 
-                                   border-radius: 5px; margin-top: 15px; font-weight: bold; cursor: pointer; width: 100%;">
-                        CONTINUE TO NEXT QUESTION →
-                    </button>
+                    <form method="get" action="${data.next_url || ''}">
+                        <input type="hidden" name="team_code" value="{{ team.code }}">
+                        <input type="hidden" name="player_name" value="{{ team_member.role }}">
+                        <input type="hidden" name="force_question_id" value="${data.next_question_id || ''}">
+                        <button type="submit" 
+                                style="background: #28a745; color: white; border: none; padding: 10px 20px; 
+                                       border-radius: 5px; margin-top: 15px; font-weight: bold; cursor: pointer; width: 100%;">
+                            CONTINUE TO NEXT QUESTION →
+                        </button>
+                    </form>
                 `;
-                
-                // Add direct click handler to the button
-                const directNextButton = document.getElementById(`direct-next-button-${questionId}`);
-                if (directNextButton) {
-                    directNextButton.addEventListener('click', function() {
-                        // Store important data from server response
-                        const redirectUrl = data.next_url;
-                        const isLastQuestion = data.is_last_question;
-                        const nextQuestionId = data.next_question_id;
-                        
-                        console.log("Continue button clicked with data:", {
-                            redirectUrl,
-                            isLastQuestion, 
-                            nextQuestionId,
-                            currentQuestionId: data.current_question_id
-                        });
-                        
-                        // Method 1: Try direct URL navigation first
-                        if (redirectUrl) {
-                            console.log("Method 1: Direct navigation to:", redirectUrl);
-                            window.location.href = redirectUrl;
-                            return;
-                        }
-                        
-                        // Method 2: If it's the last question, go to race completion
-                        if (isLastQuestion) {
-                            console.log("Method 2: Last question, going to race completion");
-                            window.location.href = '/race-complete/';
-                            return;
-                        }
-                        
-                        // Method 3: Manual DOM-based navigation within the page
-                        console.log("Method 3: Using DOM-based navigation");
-                        const questions = document.querySelectorAll('.question-card');
-                        let currentQuestionIndex = Array.from(questions).findIndex(q => q.style.display === 'block');
-                        console.log("Current visible question index:", currentQuestionIndex);
-                        
-                        if (currentQuestionIndex >= 0 && currentQuestionIndex < questions.length - 1) {
-                            // Hide all questions first
-                            questions.forEach(q => q.style.display = 'none');
-                            
-                            // Show the next question
-                            const nextQuestionIndex = currentQuestionIndex + 1;
-                            const nextQuestion = questions[nextQuestionIndex];
-                            nextQuestion.style.display = 'block';
-                            console.log("Showing next question at index:", nextQuestionIndex);
-                            
-                            // Ensure next question is fully enabled
-                            const nextQuestionId = nextQuestion.id.split('-')[1];
-                            const answerInput = document.getElementById(`answer-${nextQuestionId}`);
-                            const submitButton = document.querySelector(`.submit-answer[data-question-id="${nextQuestionId}"]`);
-                            
-                            if (answerInput) {
-                                answerInput.readOnly = false;
-                                answerInput.classList.remove('max-attempts-reached');
-                                answerInput.placeholder = 'Type your answer';
-                                answerInput.focus(); // Set focus to the input field
-                                
-                                // Clear any previous answer
-                                answerInput.value = '';
-                            }
-                            
-                            if (submitButton) {
-                                submitButton.disabled = false;
-                                
-                                // CRITICAL FIX: Explicitly reinitialize the submit button event listener
-                                // First, remove any existing listeners by cloning and replacing
-                                const newSubmitButton = submitButton.cloneNode(true);
-                                submitButton.parentNode.replaceChild(newSubmitButton, submitButton);
-                                
-                                // Add fresh event listener to new button
-                                newSubmitButton.addEventListener('click', function() {
-                                    const qId = this.getAttribute('data-question-id');
-                                    const input = document.getElementById(`answer-${qId}`);
-                                    if (input && input.value) {
-                                        console.log("Submit button clicked for question:", qId);
-                                        // Call submitAnswer directly with explicit parameters
-                                        submitAnswer(qId, input.value);
-                                    } else {
-                                        console.log("Submit clicked but no input value");
-                                    }
-                                });
-                            }
-                            
-                            // Also reset the question data for this question
-                            if (questionData[nextQuestionId]) {
-                                // Only reset if it doesn't already have progress data
-                                if (!questionData[nextQuestionId].answered && !questionData[nextQuestionId].photoUploaded) {
-                                    console.log("Resetting question data for:", nextQuestionId);
-                                    questionData[nextQuestionId].attempts = 0;
-                                }
-                            }
-                            
-                            // Save the new question index
-                            saveCurrentQuestionIndex(nextQuestionIndex);
-                            
-                            // Hide the navigation buttons until this question is answered
-                            document.getElementById('navigation-buttons').style.display = 'none';
-                            
-                            return;
-                        }
-                        
-                        // Method 4: Rebuilding the race questions URL
-                        console.log("Method 4: Rebuilding race questions URL");
-                        const teamCode = '{{ team.code }}';
-                        const playerName = '{{ team_member.role }}';
-                        const raceId = '{{ race.id }}';
-                        
-                        if (teamCode && playerName && raceId) {
-                            const newUrl = `/race/${raceId}/questions/?team_code=${teamCode}&player_name=${playerName}`;
-                            console.log("Navigating to rebuilt URL:", newUrl);
-                            window.location.href = newUrl;
-                            return;
-                        }
-                        
-                        // Method 5: Last resort - reload the page
-                        console.log("Method 5: Last resort - reloading page");
-                        window.location.reload();
-                    });
-                }
                 
                 // Mark photo as uploaded
                 questionData[questionId].photoUploaded = true;
