@@ -4,12 +4,6 @@
 
 {% block title %}Race Questions - {{ race.name|default:"Join Race" }}{% endblock %}
 
-{% block extrahead %}
-<!-- Include JS libraries from CDNs to prevent file not found errors -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
-{% endblock %}
-
 {% block content %}
 <div class="container py-4">
     <div class="dashboard-box p-4">
@@ -384,6 +378,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize question data
         document.querySelectorAll('.question-card').forEach(function(question) {
             const questionId = question.getAttribute('data-question-id');
+            const zoneId = question.closest('.zone').id;
+            
+            console.log(`Initializing question ${questionId} in ${zoneId}`);
+            
             if (!questionId) {
                 console.error('Question is missing data-question-id attribute', question);
                 return;
@@ -394,7 +392,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 points: 0,
                 maxAttempts: 3,
                 photoUploaded: false,
-                answered: false
+                answered: false,
+                zoneId: zoneId
             };
             
             // Apply data from server if available
@@ -492,7 +491,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveCurrentQuestionIndex(currentQuestionIndex);
                 
                 // IMPORTANT: Hide navigation buttons for new question until it's answered correctly or photo uploaded
-                const questionId = questions[currentQuestionIndex].id.split('-')[1];
+                const currentQuestion = questions[currentQuestionIndex];
+                const questionId = currentQuestion.getAttribute('data-question-id');
+                console.log(`Moving to question index ${currentQuestionIndex}, question ID: ${questionId}`);
+                
                 if (questionData[questionId] && !questionData[questionId].answered && !questionData[questionId].photoUploaded) {
                     document.getElementById('navigation-buttons').style.display = 'none';
                     console.log('Moving to next question, hiding navigation buttons');
@@ -506,9 +508,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const hasAnsweredQuestions = document.querySelectorAll('.feedback.correct').length > 0;
         if (hasAnsweredQuestions) {
             // Only show if current question is already answered or has photo uploaded
-            const currentQuestionId = questions[currentQuestionIndex].id.split('-')[1];
-            if (questionData[currentQuestionId] && (questionData[currentQuestionId].answered || questionData[currentQuestionId].photoUploaded)) {
-                document.getElementById('navigation-buttons').style.display = 'block';
+            const currentQuestion = questions[currentQuestionIndex];
+            if (currentQuestion) {
+                const currentQuestionId = currentQuestion.getAttribute('data-question-id');
+                console.log(`Current question ID: ${currentQuestionId}`);
+                if (questionData[currentQuestionId] && (questionData[currentQuestionId].answered || questionData[currentQuestionId].photoUploaded)) {
+                    document.getElementById('navigation-buttons').style.display = 'block';
+                    console.log('Current question is already answered, showing navigation buttons');
+                }
             }
         }
 
@@ -553,16 +560,16 @@ document.addEventListener('DOMContentLoaded', function() {
             // Get the team code from the page
             const teamCode = '{{ team.code }}';
             
-            // Get the actual database question ID
+            // Get the actual database question ID - use getAttribute to get data-db-question-id
             const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
             if (!submitButton) {
-                console.error("Submit button not found");
+                console.error("Submit button not found for ID:", questionId);
                 return;
             }
             
             const dbQuestionId = submitButton.getAttribute('data-db-question-id');
             if (!dbQuestionId) {
-                console.error("Database question ID not found");
+                console.error("Database question ID not found for:", questionId);
                 return;
             }
             
@@ -624,7 +631,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     question_id: dbQuestionId, // Use the database ID
-                    answer: answer.trim(),
+                    answer: answer ? answer.trim() : "",
                     team_code: teamCode,
                     attempt_number: questionData[questionId].attempts
                 })
