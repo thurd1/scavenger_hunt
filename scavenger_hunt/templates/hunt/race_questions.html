@@ -929,6 +929,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Mark question as having photo uploaded in our data
         questionData[questionId].photoUploaded = true;
         
+        // Hide the "Maximum attempts reached" message
+        const photoUploadSection = document.getElementById(`photo-upload-${questionId}`);
+        if (photoUploadSection) {
+            photoUploadSection.style.display = 'none';
+        }
+        
         // Get all questions
         const questions = document.querySelectorAll('.question-card');
         const totalQuestions = questions.length;
@@ -936,55 +942,61 @@ document.addEventListener('DOMContentLoaded', function() {
         // Find current question index
         let currentQuestionIndex = Array.from(questions).findIndex(q => q.style.display === 'block');
         
-        if (currentQuestionIndex >= 0 && currentQuestionIndex < totalQuestions - 1) {
-            // DIRECT NAVIGATION: explicitly move to next question in DOM
-            console.log("Moving directly to next question in sequence");
-            
-            // Hide all questions
-            questions.forEach(q => q.style.display = 'none');
-            
-            // Show next question
-            const nextQuestionIndex = currentQuestionIndex + 1;
-            questions[nextQuestionIndex].style.display = 'block';
-            
-            // Scroll to top to ensure user sees the new question
-            window.scrollTo(0, 0);
-            
-            // Update question data
-            saveCurrentQuestionIndex(nextQuestionIndex);
-            
-            // Reset the next question's state to ensure it's usable
-            const nextId = questions[nextQuestionIndex].id.split('-')[1];
-            const nextInput = document.getElementById(`answer-${nextId}`);
-            const nextSubmitButton = document.querySelector(`.submit-answer[data-question-id="${nextId}"]`);
-            
-            if (nextInput) {
-                nextInput.readOnly = false;
-                nextInput.value = '';
-                nextInput.classList.remove('max-attempts-reached');
-                nextInput.placeholder = 'Type your answer';
+        // Set a small delay to allow the user to see the success message before moving on
+        setTimeout(() => {
+            if (currentQuestionIndex >= 0 && currentQuestionIndex < totalQuestions - 1) {
+                // DIRECT NAVIGATION: explicitly move to next question in DOM
+                console.log("Moving directly to next question in sequence");
+                
+                // Hide all questions
+                questions.forEach(q => q.style.display = 'none');
+                
+                // Show next question
+                const nextQuestionIndex = currentQuestionIndex + 1;
+                questions[nextQuestionIndex].style.display = 'block';
+                
+                // Scroll to top to ensure user sees the new question
+                window.scrollTo(0, 0);
+                
+                // Update question data
+                saveCurrentQuestionIndex(nextQuestionIndex);
+                
+                // Reset the next question's state to ensure it's usable
+                const nextId = questions[nextQuestionIndex].id.split('-')[1];
+                const nextInput = document.getElementById(`answer-${nextId}`);
+                const nextSubmitButton = document.querySelector(`.submit-answer[data-question-id="${nextId}"]`);
+                
+                // Clear any feedback for the next question
+                const nextFeedback = document.getElementById(`feedback-${nextId}`);
+                if (nextFeedback) {
+                    nextFeedback.style.display = 'none';
+                    nextFeedback.className = '';
+                    nextFeedback.textContent = '';
+                }
+                
+                // Reset input field for the next question
+                if (nextInput) {
+                    nextInput.readOnly = false;
+                    nextInput.value = '';
+                    nextInput.classList.remove('max-attempts-reached');
+                    nextInput.placeholder = 'Type your answer';
+                }
+                
+                if (nextSubmitButton) {
+                    nextSubmitButton.disabled = false;
+                }
+                
+                // Hide photo upload section for next question until needed
+                const nextPhotoUpload = document.getElementById(`photo-upload-${nextId}`);
+                if (nextPhotoUpload) {
+                    nextPhotoUpload.style.display = 'none';
+                }
+            } else {
+                // This was the last question, go to completion page
+                console.log("Last question completed, redirecting to race completion");
+                window.location.href = '/race-complete/';
             }
-            
-            if (nextSubmitButton) {
-                nextSubmitButton.disabled = false;
-            }
-            
-            // Hide max attempts message if shown
-            const nextFeedback = document.getElementById(`feedback-${nextId}`);
-            if (nextFeedback) {
-                nextFeedback.style.display = 'none';
-            }
-            
-            // Hide photo upload section for next question until needed
-            const nextPhotoUpload = document.getElementById(`photo-upload-${nextId}`);
-            if (nextPhotoUpload) {
-                nextPhotoUpload.style.display = 'none';
-            }
-        } else {
-            // This was the last question, go to completion page
-            console.log("Last question completed, redirecting to race completion");
-            window.location.href = '/race-complete/';
-        }
+        }, 1500);  // 1.5 second delay
     }
 
     // Add a new function to periodically update the score from the server
