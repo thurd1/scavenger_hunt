@@ -1191,7 +1191,8 @@ document.addEventListener('DOMContentLoaded', function() {
         startTime = new Date();
     }
     
-    const timeLimitMinutes = {{ time_limit_minutes|default:20 }};
+    // Get time limit from race object or fall back to default
+    const timeLimitMinutes = {% if race.time_limit_minutes %}{{ race.time_limit_minutes }}{% else %}{{ time_limit_minutes|default:20 }}{% endif %};
     console.log("Race start time:", startTime);
     console.log("Time limit (minutes):", timeLimitMinutes);
     
