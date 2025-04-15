@@ -1176,17 +1176,39 @@ document.addEventListener('DOMContentLoaded', function() {
     initializePeriodicUpdates();
     
     // ADD THE NEW TIMER CODE RIGHT HERE, BEFORE THE CLOSING BRACKET
-    const startTime = new Date("{{ start_time|safe }}");
+    // Get start time from server or use current time as fallback
+    let startTime;
+    try {
+        const startTimeStr = "{{ start_time|safe }}";
+        startTime = startTimeStr && startTimeStr !== "None" ? new Date(startTimeStr) : new Date();
+        // Check if date is valid, otherwise use current time
+        if (isNaN(startTime.getTime())) {
+            console.log("Invalid start time, using current time as fallback");
+            startTime = new Date();
+        }
+    } catch (e) {
+        console.log("Error parsing start time, using current time as fallback:", e);
+        startTime = new Date();
+    }
+    
     const timeLimitMinutes = {{ time_limit_minutes|default:20 }};
+    console.log("Race start time:", startTime);
+    console.log("Time limit (minutes):", timeLimitMinutes);
     
     // Initialize timer functionality
     const timerDisplay = document.getElementById('race-timer');
     if (timerDisplay) {
         // Calculate end time
         const endTime = new Date(startTime.getTime() + (timeLimitMinutes * 60 * 1000));
+        console.log("Race end time:", endTime);
+        
+        // Update timer immediately once
+        updateTimer();
         
         // Update timer every second
-        const timerInterval = setInterval(function() {
+        const timerInterval = setInterval(updateTimer, 1000);
+        
+        function updateTimer() {
             const now = new Date();
             const timeRemaining = endTime - now;
             
@@ -1221,7 +1243,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert("5 minutes remaining!");
                 }
             }
-        }, 1000);
+        }
     }
 });
 
