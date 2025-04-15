@@ -77,12 +77,6 @@
                                                                 <h4>Maximum attempts reached. Upload a photo instead:</h4>
                                                                 <input type="file" id="photo-{{ forloop.counter0 }}" class="form-control mt-3">
                                                                 <button type="button" class="btn btn-primary mt-3 upload-photo" data-question-id="{{ forloop.counter0 }}" data-db-question-id="{{ question.id }}">Upload Photo</button>
-                                                                
-                                                                <!-- EMERGENCY OVERRIDE - Direct link to the next question -->
-                                                                <a href="?team_code={{ team.code }}&player_name={{ team_member.role }}&force_question_id={% if not forloop.last %}{{ questions.1.id }}{% endif %}" 
-                                                                   class="btn btn-danger mt-3" style="display: block; width: 100%; font-weight: bold;">
-                                                                    BYPASS - GO TO NEXT QUESTION →
-                                                                </a>
                                                             </div>
                                                         </form>
                                                     </div>
@@ -319,10 +313,6 @@ input.max-attempts-reached {
 const currentQuestionIndexFromServer = {% if current_question_index %}{{ current_question_index }}{% else %}0{% endif %};
 const totalPointsFromServer = {% if total_points %}{{ total_points }}{% else %}0{% endif %};
 
-// Extract force_question_id from URL if present
-const urlParams = new URLSearchParams(window.location.search);
-const forceQuestionId = urlParams.get('force_question_id');
-
 // Store answers from server in a variable that JavaScript can process
 const answersFromServer = {
 {% for question_id, answer_data in answers_by_question.items %}
@@ -348,47 +338,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Collect all questions
         const questions = document.querySelectorAll('.question-card');
         const totalQuestions = questions.length;
-        
-        // DIRECT FIX: If force_question_id is present, find and show that question
-        if (forceQuestionId) {
-            console.log("Attempting to show forced question ID:", forceQuestionId);
-            
-            // Find the question card with the matching question ID
-            let foundQuestion = false;
-            for (let i = 0; i < questions.length; i++) {
-                const questionCard = questions[i];
-                const dataQuestionId = questionCard.getAttribute('data-question-id');
-                
-                // Hide all questions first
-                questionCard.style.display = 'none';
-                
-                // If this is the question we want to show, display it and update index
-                if (dataQuestionId === forceQuestionId) {
-                    questionCard.style.display = 'block';
-                    currentQuestionIndex = i;
-                    foundQuestion = true;
-                    console.log("Found and displaying forced question at index:", i);
-                    
-                    // Save this as the current question index
-                    saveCurrentQuestionIndex(i);
-                }
-            }
-            
-            if (!foundQuestion) {
-                console.warn("Could not find question with ID:", forceQuestionId);
-                // Fall back to showing the current question index
-                questions[currentQuestionIndex].style.display = 'block';
-            }
-        } else {
-            // Default behavior: Hide all questions initially except the current one
-            for (let i = 0; i < questions.length; i++) {
-                if (i === currentQuestionIndex) {
-                    questions[i].style.display = 'block';
-                } else {
-                    questions[i].style.display = 'none';
-                }
-            }
-        }
         
         // Initialize total score
         const totalScoreElement = document.getElementById('total-score');
@@ -464,6 +413,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+        
+        // Hide all questions initially except the current one
+        for (let i = 0; i < questions.length; i++) {
+            if (i === currentQuestionIndex) {
+                questions[i].style.display = 'block';
+            } else {
+            questions[i].style.display = 'none';
+            }
+        }
         
         // Update the question counter
         const updateQuestionCounter = function() {
@@ -862,47 +820,246 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadButton.textContent = "Uploading...";
         }
         
-        // EMERGENCY FIX: FORCEFUL REFRESH AND NAVIGATION
-        console.log("EMERGENCY NAVIGATION: Force refreshing page to question 2");
+        const formData = new FormData();
+        formData.append('photo', photoInput.files[0]);
+        formData.append('question_id', dbQuestionId); // Use the database ID
+        formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
         
-        // Mark question as having photo uploaded in our data
-        if (questionData[questionId]) {
-            questionData[questionId].photoUploaded = true;
-        }
+        // Get the team code
+        const teamCode = '{{ team.code }}';
+        formData.append('team_code', teamCode);
         
-        // Calculate the next question index
-        const questions = document.querySelectorAll('.question-card');
-        const currentQuestionIndex = Array.from(questions).findIndex(q => q.style.display === 'block');
-        const nextQuestionIndex = currentQuestionIndex + 1;
-        
-        if (nextQuestionIndex < questions.length) {
-            const nextQuestionElement = questions[nextQuestionIndex];
-            const nextQuestionId = nextQuestionElement.getAttribute('data-question-id');
+        fetch('/api/upload-photo/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                feedbackElement.className = 'feedback correct';
+                feedbackElement.style.display = 'block';
+                feedbackElement.textContent = 'Photo uploaded successfully!';
+                
+                // Mark photo as uploaded
+                questionData[questionId].photoUploaded = true;
+                
+                // Always show the next button after a successful photo upload
+                // regardless of what the server returns
+                const navButtons = document.getElementById('navigation-buttons');
+                
+                // CRITICAL FIX: Force visibility of navigation buttons with multiple methods
+                navButtons.style.display = 'block';
+                navButtons.style.visibility = 'visible';
+                navButtons.style.opacity = '1';
+                navButtons.style.zIndex = '10000'; // Above the overlay
+                
+                // Create an attention-grabbing overlay to highlight the next button
+                const overlayDiv = document.createElement('div');
+                overlayDiv.style.position = 'fixed';
+                overlayDiv.style.top = '0';
+                overlayDiv.style.left = '0';
+                overlayDiv.style.width = '100%';
+                overlayDiv.style.height = '100%';
+                overlayDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                overlayDiv.style.zIndex = '9999';
+                overlayDiv.style.display = 'flex';
+                overlayDiv.style.flexDirection = 'column';
+                overlayDiv.style.justifyContent = 'center';
+                overlayDiv.style.alignItems = 'center';
+                overlayDiv.style.transition = 'opacity 0.5s';
+                
+                // Create success message
+                const messageDiv = document.createElement('div');
+                messageDiv.innerHTML = `
+                    <div style="background-color: rgba(40, 167, 69, 0.9); border-radius: 10px; padding: 20px; max-width: 90%; text-align: center; margin-bottom: 30px;">
+                        <h3 style="color: white; margin-bottom: 15px;"><i class="fas fa-check-circle"></i> Photo Successfully Uploaded!</h3>
+                        <p style="color: white; font-size: 1.2rem;">Click the 'Next Question' button below to continue</p>
+                        <div style="margin-top: 20px;">
+                            <button id="overlay-next-btn" class="btn btn-light btn-lg">Next Question <i class="fas fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+                `;
+                
+                // Add to body
+                overlayDiv.appendChild(messageDiv);
+                document.body.appendChild(overlayDiv);
+                
+                // Clone the navigation buttons and append to the message for easy access
+                const navButtonsClone = navButtons.cloneNode(true);
+                navButtonsClone.style.display = 'block';
+                navButtonsClone.style.marginTop = '20px';
+                messageDiv.appendChild(navButtonsClone);
+                
+                // Set up click events
+                document.getElementById('overlay-next-btn').addEventListener('click', function() {
+                    // Trigger click on the actual next button
+                    document.getElementById('next-question').click();
+                    // Remove overlay
+                    document.body.removeChild(overlayDiv);
+                });
+                
+                // Allow clicking anywhere to dismiss the overlay after a delay
+                setTimeout(() => {
+                    overlayDiv.addEventListener('click', function(e) {
+                        if (e.target === overlayDiv) {
+                            document.body.removeChild(overlayDiv);
+                        }
+                    });
+                }, 1000);
+                
+                // Auto-dismiss after 7 seconds
+                setTimeout(() => {
+                    if (document.body.contains(overlayDiv)) {
+                        document.body.removeChild(overlayDiv);
+                    }
+                }, 7000);
+                
+                // ENHANCED AUTO-NAVIGATION: Improve the auto-redirect mechanism for photo uploads
+                // Determine the URL to navigate to, prioritizing different sources
+                const redirectUrl = data.next_url || data.legacy_next_url;
+                
+                // RACE COMPLETION CHECK:
+                // If server indicates this is the last question, redirect to race completion page
+                if (data.is_last_question || data.is_race_complete) {
+                    console.log("SERVER INDICATED RACE COMPLETION AFTER PHOTO UPLOAD - REDIRECTING NOW");
+                    
+                    // Show message to user before redirecting
+                    const completeMessage = document.createElement('div');
+                    completeMessage.style.position = 'fixed';
+                    completeMessage.style.top = '50%';
+                    completeMessage.style.left = '50%';
+                    completeMessage.style.transform = 'translate(-50%, -50%)';
+                    completeMessage.style.background = 'rgba(40, 167, 69, 0.9)';
+                    completeMessage.style.color = 'white';
+                    completeMessage.style.padding = '20px';
+                    completeMessage.style.borderRadius = '10px';
+                    completeMessage.style.zIndex = '20000'; // Higher than other overlays
+                    completeMessage.innerHTML = '<h3>Congratulations!</h3><p>You\'ve completed all questions!</p><p>Redirecting to results page...</p>';
+                    document.body.appendChild(completeMessage);
+                    
+                    // Redirect after a short delay (2 seconds)
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 2000);
+                    
+                    // Don't do any more processing
+                    return;
+                }
+                
+                // Automatic navigation after 5 seconds if user doesn't click the Next button
+                if (redirectUrl) {
+                    // Show auto-navigation countdown message
+                    const autoNavMessage = document.createElement('div');
+                    autoNavMessage.id = 'auto-nav-message';
+                    autoNavMessage.style.position = 'fixed';
+                    autoNavMessage.style.bottom = '20px';
+                    autoNavMessage.style.left = '50%';
+                    autoNavMessage.style.transform = 'translateX(-50%)';
+                    autoNavMessage.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                    autoNavMessage.style.color = 'white';
+                    autoNavMessage.style.padding = '10px 20px';
+                    autoNavMessage.style.borderRadius = '5px';
+                    autoNavMessage.style.zIndex = '10001';
+                    autoNavMessage.style.fontWeight = 'bold';
+                    autoNavMessage.innerHTML = 'Auto-navigating to next question in <span id="auto-nav-countdown">5</span> seconds...';
+                    document.body.appendChild(autoNavMessage);
+                    
+                    // Countdown timer for auto-navigation
+                    let autoNavCountdown = 5; // 5 seconds
+                    const autoNavCountdownEl = document.getElementById('auto-nav-countdown');
+                    const autoNavInterval = setInterval(() => {
+                        autoNavCountdown--;
+                        if (autoNavCountdownEl) {
+                            autoNavCountdownEl.textContent = autoNavCountdown;
+                        }
+                        
+                        if (autoNavCountdown <= 0) {
+                            clearInterval(autoNavInterval);
+                            if (document.body.contains(autoNavMessage)) {
+                                document.body.removeChild(autoNavMessage);
+                            }
+                            
+                            // Navigate to the next question
+                            console.log("Auto-navigating to next question:", redirectUrl);
+                            window.location.href = redirectUrl;
+                        }
+                    }, 1000);
+                    
+                    // If user clicks the Next button, cancel auto-navigation
+                    const nextButton = document.getElementById('next-question');
+                    if (nextButton) {
+                        nextButton.addEventListener('click', function() {
+                            // Cancel auto-navigation
+                            clearInterval(autoNavInterval);
+                            if (document.body.contains(autoNavMessage)) {
+                                document.body.removeChild(autoNavMessage);
+                            }
+                        });
+                    }
+                    
+                    // Store the redirect URL on the Next button so clicking it works even if event listener fails
+                    if (nextButton && !nextButton.hasAttribute('data-next-url')) {
+                        nextButton.setAttribute('data-next-url', redirectUrl);
+                        nextButton.addEventListener('click', function() {
+                            window.location.href = this.getAttribute('data-next-url');
+                        });
+                    }
+                } else {
+                    console.warn("No redirect URL provided by server after photo upload");
+                    
+                    // Create a fallback mechanism: if no URL provided, try to use the "next" button's normal mechanism
+                    setTimeout(() => {
+                        const nextButton = document.getElementById('next-question');
+                        if (nextButton) {
+                            console.log("Auto-clicking next button as fallback");
+                            nextButton.click();
+                        }
+                    }, 5000);
+                }
+                
+                // Also update the existing display
+                const nextButton = document.getElementById('next-question');
+                if (nextButton) {
+                    // Make it stand out
+                    nextButton.classList.add('ready');
+                    nextButton.style.backgroundColor = '#90C83C';
+                    nextButton.style.color = 'white';
+                    nextButton.style.fontSize = '1.3rem';
+                    nextButton.style.boxShadow = '0 0 20px rgba(144, 200, 60, 0.8)';
+                    
+                    // Ensure it's enabled
+                    nextButton.disabled = false;
+                }
+            } else {
+                alert('Error uploading photo: ' + (data.error || 'Unknown error'));
+                
+                // Re-enable upload button on error
+                if (uploadButton) {
+                    uploadButton.disabled = false;
+                    uploadButton.textContent = "Upload Photo";
+                }
+                
+                // Make sure navigation buttons remain hidden on error
+                document.getElementById('navigation-buttons').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error uploading photo:', error);
+            alert('Error uploading photo. Please try again.');
             
-            // Save current state to server before redirecting
-            const teamCode = '{{ team.code }}';
-            fetch('/api/save-question-index/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({
-                    team_code: teamCode,
-                    race_id: '{{ race.id }}',
-                    question_index: nextQuestionIndex
-                })
-            }).then(() => {
-                // HARD REFRESH WITH FORCE PARAMETER
-                // This completely reloads the page with the next question
-                window.location.href = `?team_code={{ team.code }}&player_name={{ team_member.role }}&force_question_id=${nextQuestionId}`;
-            });
-        } else {
-            // Last question - redirect to completion
-            window.location.href = '/race-complete/';
-        }
-        
-        return;
+            // Re-enable upload button on error
+            if (uploadButton) {
+                uploadButton.disabled = false;
+                uploadButton.textContent = "Upload Photo";
+            }
+            
+            // Make sure navigation buttons remain hidden on error
+            document.getElementById('navigation-buttons').style.display = 'none';
+        });
     }
 
     // Add a new function to periodically update the score from the server
@@ -1012,21 +1169,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize all periodic updates
     initializePeriodicUpdates();
-
-    // Fix nested forms issue
-    const nestedForms = document.querySelectorAll('form form');
-    if (nestedForms.length > 0) {
-        nestedForms.forEach(nestedForm => {
-            const parent = nestedForm.parentElement;
-            parent.parentElement.insertBefore(nestedForm, parent.nextSibling);
-        });
-    }
-    
-    // Force photo upload section to be visible for question 0
-    const photoUploadQ0 = document.getElementById('photo-upload-0');
-    if (photoUploadQ0) {
-        photoUploadQ0.style.display = 'block';
-    }
 });
 
 // Helper function to get cookies for CSRF token

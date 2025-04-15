@@ -1889,28 +1889,19 @@ def upload_photo(request, lobby_id, question_id):
             next_q_id = None
             try:
                 current_index = question_ids.index(int(question_id))
-                logger.info(f"Upload_photo: Current question index: {current_index} out of {len(question_ids)-1} questions")
-                
                 if current_index < len(question_ids) - 1:
                     next_q_id = question_ids[current_index + 1]
                     logger.info(f"Upload_photo: Found next question ID: {next_q_id}")
                 else:
-                    logger.info("Upload_photo: This is the last question - no next question ID")
+                    logger.info("Upload_photo: This is the last question")
             except (ValueError, IndexError) as e:
                 logger.error(f"Upload_photo: Error finding question index: {str(e)}")
                 
-            # Set absolute paths for navigation
+            next_url = ""
             if next_q_id:
-                # Determine the appropriate next URL - using race_questions endpoint
-                player_name = request.session.get('player_name')
-                if player_name:
-                    # Use the race_questions URL instead of studentQuestion
-                    next_url = f"{request.build_absolute_uri('/').rstrip('/')}/race/{lobby.race.id}/questions/?team_code={team.code}&player_name={player_name}"
-                    logger.info(f"Upload_photo: Setting direct race_questions URL: {next_url}")
-                else:
-                    # Fallback to studentQuestion URL
-                    next_url = f"{request.build_absolute_uri('/').rstrip('/')}/studentQuestion/{lobby_id}/{next_q_id}/"
-                    logger.info(f"Upload_photo: Setting studentQuestion URL: {next_url}")
+                # Use direct URL path instead of reverse
+                next_url = f"/studentQuestion/{lobby_id}/{next_q_id}/"
+                logger.info(f"Upload_photo: Setting direct next_url to: {next_url}")
             else:
                 # No next question, this is the last one - go to race complete with total score
                 try:
@@ -1934,9 +1925,8 @@ def upload_photo(request, lobby_id, question_id):
                 except Exception as e:
                     logger.error(f"Upload_photo: Error calculating total score: {str(e)}")
                 
-                # Use absolute URL for race completion page
-                next_url = f"{request.build_absolute_uri('/').rstrip('/')}/race-complete/"
-                logger.info(f"Upload_photo: No next question, setting absolute next_url to: {next_url}")
+                next_url = "/race-complete/"
+                logger.info(f"Upload_photo: No next question, setting next_url to: {next_url}")
             
             return JsonResponse({
                 'success': True,
@@ -1948,9 +1938,7 @@ def upload_photo(request, lobby_id, question_id):
                 # Add explicit flags for last question case
                 'is_last_question': next_q_id is None,
                 'is_race_complete': next_q_id is None,
-                'total_score': request.session.get('total_score', 0) if next_q_id is None else 0,
-                'current_question_id': question_id,
-                'next_question_id': next_q_id
+                'total_score': request.session.get('total_score', 0) if next_q_id is None else 0
             })
             
         except TeamMember.DoesNotExist:
@@ -1991,10 +1979,6 @@ def race_questions(request, race_id):
     # Process query parameters first
     team_code = request.GET.get('team_code')
     player_name_param = request.GET.get('player_name')
-    force_question_id = request.GET.get('force_question_id')  # New parameter to force showing a specific question
-    
-    if force_question_id:
-        logger.info(f"Force question ID requested: {force_question_id}")
     
     # Get player name from session or query parameter
     player_name = request.session.get('player_name') or player_name_param
@@ -2234,129 +2218,205 @@ def get_team_race(request, team_id):
         return JsonResponse({'success': False, 'error': str(e)})
 
 def upload_photo_api(request):
-    """API endpoint for uploading photos"""
+    """API to handle photo uploads from the race questions page"""
     if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Method not allowed'})
+        return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=405)
     
-    # Get parameters
-    team_code = request.POST.get('team_code')
+    # Check if a photo was uploaded
+    if 'photo' not in request.FILES:
+        return JsonResponse({'success': False, 'error': 'No photo uploaded'}, status=400)
+    
+    # Get question ID from POST data
     question_id = request.POST.get('question_id')
-    
-    if not all([team_code, question_id]):
-        return JsonResponse({'success': False, 'error': 'Missing required parameters'})
+    if not question_id:
+        return JsonResponse({'success': False, 'error': 'Missing question ID'}, status=400)
     
     try:
-        team = Team.objects.get(code=team_code)
+        # Get the question
         question = Question.objects.get(id=question_id)
-        race = question.zone.race
         
-        logger.info(f"Photo upload API: team={team_code}, question={question_id}, race={race.id if race else 'None'}")
+        # Get the team from the session or team code in POST
+        team_code = request.POST.get('team_code', None)
+        team_id = request.session.get('team_id', None)
+        player_name = request.session.get('player_name')
         
-        # This is critical to verify: find the lobby for this team and race
-        lobby = team.participating_lobbies.filter(race=race).first()
+        if not player_name:
+            return JsonResponse({'success': False, 'error': 'No player name found'}, status=400)
         
-        if not lobby:
-            # Fall back to any lobby for this team
-            lobby = team.participating_lobbies.first()
-            if not lobby:
-                return JsonResponse({'success': False, 'error': 'No lobby found for team'})
-            
-            logger.warning(f"Had to fall back to any lobby for team: {lobby.id}")
+        # Try to get the team
+        if team_code:
+            try:
+                team = Team.objects.get(code=team_code)
+            except Team.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Team not found with provided code'}, status=404)
+        elif team_id:
+            try:
+                team = Team.objects.get(id=team_id)
+            except Team.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Team not found with session ID'}, status=404)
+        else:
+            # Try to find the team based on player name
+            try:
+                team_member = TeamMember.objects.get(role=player_name)
+                team = team_member.team
+            except TeamMember.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Team not found for player'}, status=404)
         
-        # Check if a photo was uploaded
-        if 'photo' not in request.FILES:
-            return JsonResponse({'success': False, 'error': 'No photo uploaded'})
-        
-        photo = request.FILES['photo']
-        
-        # Find or create a TeamAnswer for this team and question
+        # Get or create a team answer record
         team_answer, created = TeamAnswer.objects.get_or_create(
             team=team,
             question=question,
             defaults={
                 'answered_correctly': False,
-                'attempts': 3,  # Default to max attempts used
+                'attempts': 3,  # Assume they've used all attempts if they're uploading a photo
                 'requires_photo': True,
-                'photo_uploaded': False
+                'photo_uploaded': True,  # Mark that photo is uploaded
+                'points_awarded': 0  # Explicitly set to 0 points for photo uploads
             }
         )
         
-        # Update the answer with the photo
+        # Update the team answer with the photo
+        photo = request.FILES['photo']
         team_answer.photo = photo
-        team_answer.photo_uploaded = True
+        team_answer.photo_uploaded = True  # Ensure this flag is set
+        team_answer.points_awarded = 0  # Always ensure 0 points for photo uploads
         team_answer.save()
         
-        # Add logic to determine the next question ID
-        all_questions = list(Question.objects.filter(zone__race=race).order_by('zone__created_at', 'id').values_list('id', flat=True))
-        current_index = -1
+        # Also update/create team progress
+        team_progress, created = TeamProgress.objects.get_or_create(
+            team=team,
+            question=question,
+            defaults={
+                'completed': True,
+                'completion_time': timezone.now(),
+                'photo': photo
+            }
+        )
         
+        if not created:
+            team_progress.completed = True
+            team_progress.completion_time = timezone.now()
+            team_progress.photo = photo
+            team_progress.photo_uploaded = True
+            team_progress.save()
+        
+        # Get the race ID from question for progress tracking
+        race = None
+        race_id = None
+        
+        # If question is in a zone, get the race from the zone
+        if hasattr(question, 'zone') and question.zone:
+            race = question.zone.race
+            race_id = race.id
+        
+        # If race found, update team race progress
+        if race_id:
+            try:
+                race_progress = TeamRaceProgress.objects.get(team=team, race=race)
+                if not hasattr(race_progress, 'photo_questions_completed'):
+                    race_progress.photo_questions_completed = []
+                
+                photo_completed = race_progress.photo_questions_completed or []
+                if str(question.id) not in photo_completed:
+                    photo_completed.append(str(question.id))
+                    race_progress.photo_questions_completed = photo_completed
+                    race_progress.save()
+                    
+                    # Also update total points in TeamRaceProgress to ensure consistency
+                    # (this triggers the post_save signal that will update the leaderboard)
+                    try:
+                        total_points = TeamAnswer.objects.filter(
+                            team=team,
+                            question__zone__race=race,
+                            answered_correctly=True
+                        ).aggregate(Sum('points_awarded'))['points_awarded__sum'] or 0
+                        
+                        race_progress.total_points = total_points
+                        race_progress.save()
+                        
+                        logger.info(f"Updated TeamRaceProgress for team {team.name} after photo upload, total points: {total_points}")
+                    except Exception as e:
+                        logger.error(f"Error updating total points: {str(e)}")
+                    
+                # Send leaderboard update via WebSocket
+                try:
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        'leaderboard',
+                        {
+                            'type': 'leaderboard_update',
+                            'team_id': team.id,
+                            'team_name': team.name,
+                            'race_id': race_id,
+                            'action': 'update'
+                        }
+                    )
+                    logger.info(f"Sent leaderboard update for team {team.id} in race {race_id} after photo upload")
+                    
+                    # Also trigger a complete leaderboard refresh for all clients
+                    trigger_leaderboard_update_internal(race_id)
+                except Exception as e:
+                    logger.error(f"Error sending leaderboard update: {str(e)}")
+                    
+            except Exception as e:
+                logger.error(f"Error updating race progress: {str(e)}")
+        
+        # Calculate next_url for navigation
+        next_url = ""
+        next_question_url = ""
+        
+        # Get the lobby that matches this race
         try:
-            current_index = all_questions.index(int(question_id))
-            logger.info(f"Current question index: {current_index} of {len(all_questions)-1}")
-        except (ValueError, IndexError) as e:
-            logger.error(f"Error finding question index: {e}")
-        
-        next_q_id = None
-        if current_index >= 0 and current_index < len(all_questions) - 1:
-            next_q_id = all_questions[current_index + 1]
-            logger.info(f"Next question ID: {next_q_id}")
-        else:
-            logger.info("This is the last question")
-            
-        # Get player name from session
-        player_name = request.session.get('player_name')
-        
-        # Prepare the redirect URL - this is the critical fix
-        # We need to force the URL to include the next question index
-        if next_q_id:
-            # Construct the URL to the race questions page with the specific question to show
-            next_url = f"{request.build_absolute_uri('/').rstrip('/')}/race/{race.id}/questions/?team_code={team.code}&player_name={player_name}&force_question_id={next_q_id}"
-            logger.info(f"Set next URL with explicit question ID: {next_url}")
-        else:
-            # No more questions, redirect to race complete
-            total_points = TeamAnswer.objects.filter(
-                team=team,
-                question__zone__race=race,
-                answered_correctly=True
-            ).aggregate(Sum('points_awarded'))['points_awarded__sum'] or 0
-            
-            # Store total score in session
-            request.session['total_score'] = total_points
-            next_url = f"{request.build_absolute_uri('/').rstrip('/')}/race-complete/"
-            logger.info(f"Set next URL to race complete: {next_url}")
-        
-        # Send a WebSocket update if available
-        try:
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f'team_{team.id}',
-                {
-                    'type': 'team_update',
-                    'message': 'photo_uploaded',
-                    'question_id': question_id,
-                    'next_url': next_url
-                }
-            )
+            lobby = team.participating_lobbies.filter(race=race).first()
+            if lobby:
+                # Get next question if any
+                questions = Question.objects.filter(zone__race=race).order_by('zone__created_at')
+                question_ids = list(questions.values_list('id', flat=True))
+                
+                next_q_id = None
+                try:
+                    current_index = question_ids.index(int(question_id))
+                    if current_index < len(question_ids) - 1:
+                        next_q_id = question_ids[current_index + 1]
+                except (ValueError, IndexError):
+                    pass
+                    
+                if next_q_id:
+                    # Create two URLs - one for student_question and one for race_questions
+                    next_url = reverse('student_question', kwargs={
+                        'lobby_id': lobby.id,
+                        'question_id': next_q_id
+                    })
+                    
+                    # Also create a direct URL to race_questions for the same team/player
+                    next_question_url = f"/race/{race.id}/questions/?team_code={team.code}"
+                    if player_name:
+                        next_question_url += f"&player_name={player_name}"
+                else:
+                    next_url = reverse('race_complete')
+                    next_question_url = reverse('race_complete')
         except Exception as e:
-            logger.error(f"Error sending WebSocket update: {e}")
+            logger.error(f"Error calculating next URL: {str(e)}")
+            # Fallback: if we can't determine next question, go to race complete
+            next_url = reverse('race_complete')
+            next_question_url = reverse('race_complete')
         
-        # Return a success response with the URL to the next question
+        # Return success response with navigation info
         return JsonResponse({
             'success': True,
-            'message': 'Photo uploaded successfully',
-            'next_url': next_url,
-            'is_last_question': next_q_id is None,
-            'next_question_id': next_q_id,
-            'current_question_id': question_id,
+            'message': 'Photo uploaded successfully!',
+            'show_next_button': True,  # Tell the client to show the next button
+            'photo_uploaded': True,    # Confirm photo is recorded as uploaded
+            'question_completed': True, # Mark question as completed for progress tracking
+            'next_url': next_question_url,  # Use the race_questions URL as primary
+            'legacy_next_url': next_url     # Keep the student_question URL as backup
         })
-    
-    except Team.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Team not found'})
+        
     except Question.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Question not found'})
+        return JsonResponse({'success': False, 'error': 'Question not found'}, status=404)
     except Exception as e:
-        logger.error(f"Error in upload_photo_api: {e}")
-        return JsonResponse({'success': False, 'error': str(e)})
+        logger.error(f"Error uploading photo: {str(e)}", exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @csrf_exempt
 def save_question_index(request):
