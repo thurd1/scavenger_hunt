@@ -73,14 +73,14 @@
                                                             <div class="mt-2">
                                                                 <span class="attempts-info">Attempts: <span id="attempts-{{ forloop.counter0 }}">0</span></span>
                                                             </div>
-                                                            <div class="photo-upload mt-4" id="photo-upload-{{ forloop.counter0 }}" style="display: none;">
+                                                            <div class="photo-upload mt-4" id="photo-upload-{{ forloop.counter0 }}" style="{% if forloop.counter0 == 0 %}display: block;{% else %}display: none;{% endif %}">
                                                                 <h4>Maximum attempts reached. Upload a photo instead:</h4>
                                                                 <form method="post" action="/api/upload-photo/" enctype="multipart/form-data" class="direct-upload-form">
                                                                     {% csrf_token %}
                                                                     <input type="hidden" name="team_code" value="{{ team.code }}">
                                                                     <input type="hidden" name="question_id" value="{{ question.id }}">
                                                                     <input type="file" name="photo" id="photo-{{ forloop.counter0 }}" class="form-control mt-3" required>
-                                                                    <button type="submit" class="btn btn-primary mt-3">Upload Photo</button>
+                                                                    <button type="submit" class="btn btn-primary mt-3" style="background-color: #FF5722; border-color: #FF5722; font-weight: bold;">UPLOAD PHOTO AND CONTINUE →</button>
                                                                 </form>
                                                             </div>
                                                         </form>
@@ -1011,6 +1011,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize all periodic updates
     initializePeriodicUpdates();
+
+    // Fix nested forms issue
+    const nestedForms = document.querySelectorAll('form form');
+    if (nestedForms.length > 0) {
+        nestedForms.forEach(nestedForm => {
+            const parent = nestedForm.parentElement;
+            parent.parentElement.insertBefore(nestedForm, parent.nextSibling);
+        });
+    }
+    
+    // Force photo upload section to be visible for question 0
+    const photoUploadQ0 = document.getElementById('photo-upload-0');
+    if (photoUploadQ0) {
+        photoUploadQ0.style.display = 'block';
+    }
 });
 
 // Helper function to get cookies for CSRF token
