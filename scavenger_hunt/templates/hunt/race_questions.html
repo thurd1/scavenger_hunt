@@ -1174,6 +1174,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize all periodic updates
     initializePeriodicUpdates();
+    
+    // ADD THE NEW TIMER CODE RIGHT HERE, BEFORE THE CLOSING BRACKET
+    const startTime = new Date("{{ start_time|safe }}");
+    const timeLimitMinutes = {{ time_limit_minutes|default:20 }};
 });
 
 // Helper function to get cookies for CSRF token
@@ -1191,42 +1195,5 @@ function getCookie(name) {
     }
     return cookieValue;
 }
-
-// Add this at the end of your script section before the closing </script> tag
-document.addEventListener("DOMContentLoaded", function () {
-    const startTime = new Date("{{ start_time|safe }}");
-    const timeLimitMinutes = {{ time_limit_minutes|default:20 }};
-    const endTime = new Date(startTime.getTime() + timeLimitMinutes * 60000);
-    const timerDisplay = document.getElementById("race-timer");
-    let fiveMinuteWarningShown = false;
-
-    function updateTimer() {
-        const now = new Date();
-        const remainingMs = endTime - now;
-        const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
-        const minutes = Math.floor(remainingSeconds / 60);
-        const seconds = remainingSeconds % 60;
-
-        // 🕒 Update timer on page
-        timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-        // ⚠️ Popup warning at 5 minutes
-        if (!fiveMinuteWarningShown && remainingSeconds <= 300 && remainingSeconds > 0) {
-            alert("⏳ Only 5 minutes left! Finish strong!");
-            fiveMinuteWarningShown = true;
-        }
-
-        // ⏰ Redirect when time runs out
-        if (remainingSeconds <= 0) {
-            clearInterval(timerInterval);
-            alert("⏰ Time's up! Redirecting to race completion page...");
-            window.location.href = "{% url 'race_complete' %}";
-        }
-    }
-
-    // Start ticking
-    updateTimer();
-    const timerInterval = setInterval(updateTimer, 1000);
-});
 </script>
 {% endblock %} 
