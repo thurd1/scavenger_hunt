@@ -1203,6 +1203,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const endTime = new Date(startTime.getTime() + (timeLimitMinutes * 60 * 1000));
         console.log("Race end time:", endTime);
         
+        // Flag to ensure 5-minute warning only shows once
+        let fiveMinuteWarningShown = false;
+        
         // Update timer immediately once
         updateTimer();
         
@@ -1211,38 +1214,31 @@ document.addEventListener('DOMContentLoaded', function() {
         
         function updateTimer() {
             const now = new Date();
-            const timeRemaining = endTime - now;
+            const remainingMs = endTime - now;
+            const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+
+            // 🕒 Update timer on page
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             
-            if (timeRemaining <= 0) {
-                // Time's up
-                clearInterval(timerInterval);
-                timerDisplay.textContent = "00:00";
-                timerDisplay.style.color = "red";
-                
-                // Show alert and redirect
-                alert("Time's up! Redirecting to results page...");
-                window.location.href = "/race-complete/";
-                return;
-            }
-            
-            // Calculate minutes and seconds
-            const minutes = Math.floor(timeRemaining / (60 * 1000));
-            const seconds = Math.floor((timeRemaining % (60 * 1000)) / 1000);
-            
-            // Format and display
-            timerDisplay.textContent = 
-                (minutes < 10 ? "0" + minutes : minutes) + ":" + 
-                (seconds < 10 ? "0" + seconds : seconds);
-            
-            // Change color to red when time is running low
-            if (timeRemaining <= 5 * 60 * 1000) { // 5 minutes or less
+            // Set timer color to red when time is running low
+            if (remainingSeconds <= 300) { // 5 minutes or less
                 timerDisplay.style.color = "red";
                 timerDisplay.style.fontWeight = "bold";
-                
-                // Show 5-minute warning once
-                if (Math.floor(timeRemaining / 1000) === 5 * 60) {
-                    alert("5 minutes remaining!");
-                }
+            }
+
+            // ⚠️ Popup warning at 5 minutes
+            if (!fiveMinuteWarningShown && remainingSeconds <= 300 && remainingSeconds > 0) {
+                alert("⏳ Only 5 minutes left! Finish strong!");
+                fiveMinuteWarningShown = true;
+            }
+
+            // ⏰ Redirect when time runs out
+            if (remainingSeconds <= 0) {
+                clearInterval(timerInterval);
+                alert("⏰ Time's up! Redirecting to race completion page...");
+                window.location.href = "{% url 'race_complete' %}";
             }
         }
     }
