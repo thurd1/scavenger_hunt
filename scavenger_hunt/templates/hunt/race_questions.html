@@ -106,6 +106,21 @@
     </div>
 </div>
 
+<!-- Custom popup modal for timer notifications -->
+<div id="custom-popup" class="custom-popup" style="display: none;">
+    <div class="custom-popup-content">
+        <div class="custom-popup-header">
+            <span id="popup-title">Notification</span>
+        </div>
+        <div class="custom-popup-body">
+            <p id="popup-message"></p>
+        </div>
+        <div class="custom-popup-footer">
+            <button id="popup-button" class="btn btn-success">OK</button>
+        </div>
+    </div>
+</div>
+
 <style>
 .dashboard-box {
     background-color: rgba(33, 37, 41, 0.9);
@@ -310,6 +325,129 @@ input.max-attempts-reached {
         transform: scale(1);
         box-shadow: 0 0 0 0 rgba(144, 200, 60, 0.7);
     }
+}
+
+/* Add custom popup styling */
+.custom-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.custom-popup.show {
+    opacity: 1;
+}
+
+.custom-popup-content {
+    background-color: rgba(33, 37, 41, 0.95);
+    border-radius: 15px;
+    border: 2px solid rgba(144, 200, 60, 0.6);
+    width: 85%;
+    max-width: 500px;
+    box-shadow: 0 0 30px rgba(144, 200, 60, 0.3);
+    overflow: hidden;
+    transform: scale(0.8);
+    transition: transform 0.3s ease;
+}
+
+.custom-popup.show .custom-popup-content {
+    transform: scale(1);
+}
+
+.custom-popup-header {
+    background-color: rgba(144, 200, 60, 0.3);
+    padding: 15px 20px;
+    color: #90C83C;
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-align: center;
+    border-bottom: 1px solid rgba(144, 200, 60, 0.3);
+}
+
+.custom-popup-body {
+    padding: 30px 20px;
+    text-align: center;
+}
+
+.custom-popup-body p {
+    color: white;
+    font-size: 1.3rem;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.custom-popup-footer {
+    padding: 15px 20px;
+    text-align: center;
+    border-top: 1px solid rgba(144, 200, 60, 0.3);
+}
+
+.custom-popup-footer button {
+    min-width: 120px;
+    padding: 10px 25px;
+    font-size: 1.1rem;
+    background-color: #90C83C;
+    border-color: #90C83C;
+}
+
+.custom-popup-footer button:hover {
+    background-color: #7ab32f;
+    border-color: #7ab32f;
+}
+
+/* Animation for warning popups */
+@keyframes pulse-border {
+    0% {
+        border-color: rgba(144, 200, 60, 0.6);
+        box-shadow: 0 0 30px rgba(144, 200, 60, 0.3);
+    }
+    50% {
+        border-color: rgba(255, 193, 7, 0.8);
+        box-shadow: 0 0 50px rgba(255, 193, 7, 0.5);
+    }
+    100% {
+        border-color: rgba(144, 200, 60, 0.6);
+        box-shadow: 0 0 30px rgba(144, 200, 60, 0.3);
+    }
+}
+
+/* Animation for time's up popup */
+@keyframes pulse-border-danger {
+    0% {
+        border-color: rgba(144, 200, 60, 0.6);
+        box-shadow: 0 0 30px rgba(144, 200, 60, 0.3);
+    }
+    50% {
+        border-color: rgba(220, 53, 69, 0.8);
+        box-shadow: 0 0 50px rgba(220, 53, 69, 0.5);
+    }
+    100% {
+        border-color: rgba(144, 200, 60, 0.6);
+        box-shadow: 0 0 30px rgba(144, 200, 60, 0.3);
+    }
+}
+
+.custom-popup.warning .custom-popup-content {
+    animation: pulse-border 2s infinite;
+}
+
+.custom-popup.danger .custom-popup-content {
+    animation: pulse-border-danger 1.5s infinite;
+    border-color: rgba(220, 53, 69, 0.8);
+}
+
+.custom-popup.danger .custom-popup-header {
+    background-color: rgba(220, 53, 69, 0.3);
+    color: #ff6b6b;
 }
 </style>
 
@@ -1206,6 +1344,43 @@ document.addEventListener('DOMContentLoaded', function() {
         // Flag to ensure 5-minute warning only shows once
         let fiveMinuteWarningShown = false;
         
+        // Function to show custom popup
+        function showCustomPopup(title, message, type, callback) {
+            const popup = document.getElementById('custom-popup');
+            const popupTitle = document.getElementById('popup-title');
+            const popupMessage = document.getElementById('popup-message');
+            const popupButton = document.getElementById('popup-button');
+            
+            // Set content
+            popupTitle.textContent = title;
+            popupMessage.innerHTML = message;
+            
+            // Clear previous classes
+            popup.classList.remove('warning', 'danger');
+            
+            // Add type class if specified
+            if (type) {
+                popup.classList.add(type);
+            }
+            
+            // Handle button click
+            popupButton.onclick = function() {
+                popup.classList.remove('show');
+                setTimeout(() => {
+                    popup.style.display = 'none';
+                    if (callback && typeof callback === 'function') {
+                        callback();
+                    }
+                }, 300);
+            };
+            
+            // Show popup with animation
+            popup.style.display = 'flex';
+            setTimeout(() => {
+                popup.classList.add('show');
+            }, 10);
+        }
+        
         // Update timer immediately once
         updateTimer();
         
@@ -1230,15 +1405,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // ⚠️ Popup warning at 5 minutes
             if (!fiveMinuteWarningShown && remainingSeconds <= 300 && remainingSeconds > 0) {
-                alert("⏳ Only 5 minutes left! Finish strong!");
+                showCustomPopup(
+                    "⏳ Time Warning", 
+                    "Only 5 minutes left!<br><br>Finish strong and complete all your questions!",
+                    "warning"
+                );
                 fiveMinuteWarningShown = true;
             }
 
             // ⏰ Redirect when time runs out
             if (remainingSeconds <= 0) {
                 clearInterval(timerInterval);
-                alert("⏰ Time's up! Redirecting to race completion page...");
-                window.location.href = "{% url 'race_complete' %}";
+                showCustomPopup(
+                    "⏰ Time's Up!", 
+                    "Your race time has ended.<br><br>Redirecting to the race completion page...",
+                    "danger",
+                    function() {
+                        window.location.href = "{% url 'race_complete' %}";
+                    }
+                );
             }
         }
     }
