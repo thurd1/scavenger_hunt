@@ -920,16 +920,20 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Function to display success and move on to next question
     function displaySuccessAndMoveOn(questionId, nextQuestionId) {
+        console.log("IMMEDIATE NAVIGATION: Moving to next question");
+        
         // Mark current question as completed with photo
         const feedbackElement = document.getElementById(`feedback-${questionId}`);
-        feedbackElement.className = 'feedback correct';
-        feedbackElement.style.display = 'block';
-        feedbackElement.textContent = 'Photo uploaded successfully!';
+        if (feedbackElement) {
+            feedbackElement.className = 'feedback correct';
+            feedbackElement.style.display = 'block';
+            feedbackElement.textContent = 'Photo uploaded successfully!';
+        }
         
         // Mark question as having photo uploaded in our data
         questionData[questionId].photoUploaded = true;
         
-        // Hide the "Maximum attempts reached" message
+        // IMMEDIATELY hide the "Maximum attempts reached" message and upload form
         const photoUploadSection = document.getElementById(`photo-upload-${questionId}`);
         if (photoUploadSection) {
             photoUploadSection.style.display = 'none';
@@ -942,61 +946,64 @@ document.addEventListener('DOMContentLoaded', function() {
         // Find current question index
         let currentQuestionIndex = Array.from(questions).findIndex(q => q.style.display === 'block');
         
-        // Set a small delay to allow the user to see the success message before moving on
-        setTimeout(() => {
-            if (currentQuestionIndex >= 0 && currentQuestionIndex < totalQuestions - 1) {
-                // DIRECT NAVIGATION: explicitly move to next question in DOM
-                console.log("Moving directly to next question in sequence");
-                
-                // Hide all questions
-                questions.forEach(q => q.style.display = 'none');
-                
-                // Show next question
-                const nextQuestionIndex = currentQuestionIndex + 1;
-                questions[nextQuestionIndex].style.display = 'block';
-                
-                // Scroll to top to ensure user sees the new question
-                window.scrollTo(0, 0);
-                
-                // Update question data
-                saveCurrentQuestionIndex(nextQuestionIndex);
-                
-                // Reset the next question's state to ensure it's usable
-                const nextId = questions[nextQuestionIndex].id.split('-')[1];
-                const nextInput = document.getElementById(`answer-${nextId}`);
-                const nextSubmitButton = document.querySelector(`.submit-answer[data-question-id="${nextId}"]`);
-                
-                // Clear any feedback for the next question
-                const nextFeedback = document.getElementById(`feedback-${nextId}`);
-                if (nextFeedback) {
-                    nextFeedback.style.display = 'none';
-                    nextFeedback.className = '';
-                    nextFeedback.textContent = '';
-                }
-                
-                // Reset input field for the next question
-                if (nextInput) {
-                    nextInput.readOnly = false;
-                    nextInput.value = '';
-                    nextInput.classList.remove('max-attempts-reached');
-                    nextInput.placeholder = 'Type your answer';
-                }
-                
-                if (nextSubmitButton) {
-                    nextSubmitButton.disabled = false;
-                }
-                
-                // Hide photo upload section for next question until needed
-                const nextPhotoUpload = document.getElementById(`photo-upload-${nextId}`);
-                if (nextPhotoUpload) {
-                    nextPhotoUpload.style.display = 'none';
-                }
-            } else {
-                // This was the last question, go to completion page
-                console.log("Last question completed, redirecting to race completion");
-                window.location.href = '/race-complete/';
+        // DIRECT NAVIGATION WITH NO DELAY
+        if (currentQuestionIndex >= 0 && currentQuestionIndex < totalQuestions - 1) {
+            // DIRECT NAVIGATION: explicitly move to next question in DOM
+            console.log("Moving directly to next question in sequence - index:", currentQuestionIndex + 1);
+            
+            // Hide all questions
+            questions.forEach(q => q.style.display = 'none');
+            
+            // Show next question
+            const nextQuestionIndex = currentQuestionIndex + 1;
+            const nextQuestion = questions[nextQuestionIndex];
+            nextQuestion.style.display = 'block';
+            
+            // Scroll to top to ensure user sees the new question
+            window.scrollTo(0, 0);
+            
+            // Update question data
+            saveCurrentQuestionIndex(nextQuestionIndex);
+            
+            // Reset the next question's state to ensure it's usable
+            const nextId = nextQuestion.id.split('-')[1];
+            
+            console.log("Next question ID:", nextId);
+            
+            // RESET EVERYTHING FOR NEXT QUESTION
+            // Clear any feedback for the next question
+            const nextFeedback = document.getElementById(`feedback-${nextId}`);
+            if (nextFeedback) {
+                nextFeedback.style.display = 'none';
+                nextFeedback.className = '';
+                nextFeedback.textContent = '';
             }
-        }, 1500);  // 1.5 second delay
+            
+            // Reset input field for the next question
+            const nextInput = document.getElementById(`answer-${nextId}`);
+            if (nextInput) {
+                nextInput.readOnly = false;
+                nextInput.value = '';
+                nextInput.classList.remove('max-attempts-reached');
+                nextInput.placeholder = 'Type your answer';
+            }
+            
+            // Enable submit button for next question
+            const nextSubmitButton = document.querySelector(`.submit-answer[data-question-id="${nextId}"]`);
+            if (nextSubmitButton) {
+                nextSubmitButton.disabled = false;
+            }
+            
+            // Hide photo upload section for next question until needed
+            const nextPhotoUpload = document.getElementById(`photo-upload-${nextId}`);
+            if (nextPhotoUpload) {
+                nextPhotoUpload.style.display = 'none';
+            }
+        } else {
+            // This was the last question, go to completion page
+            console.log("Last question completed, redirecting to race completion");
+            window.location.href = '/race-complete/';
+        }
     }
 
     // Add a new function to periodically update the score from the server
