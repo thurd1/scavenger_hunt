@@ -1178,6 +1178,51 @@ document.addEventListener('DOMContentLoaded', function() {
     // ADD THE NEW TIMER CODE RIGHT HERE, BEFORE THE CLOSING BRACKET
     const startTime = new Date("{{ start_time|safe }}");
     const timeLimitMinutes = {{ time_limit_minutes|default:20 }};
+    
+    // Initialize timer functionality
+    const timerDisplay = document.getElementById('race-timer');
+    if (timerDisplay) {
+        // Calculate end time
+        const endTime = new Date(startTime.getTime() + (timeLimitMinutes * 60 * 1000));
+        
+        // Update timer every second
+        const timerInterval = setInterval(function() {
+            const now = new Date();
+            const timeRemaining = endTime - now;
+            
+            if (timeRemaining <= 0) {
+                // Time's up
+                clearInterval(timerInterval);
+                timerDisplay.textContent = "00:00";
+                timerDisplay.style.color = "red";
+                
+                // Show alert and redirect
+                alert("Time's up! Redirecting to results page...");
+                window.location.href = "/race-complete/";
+                return;
+            }
+            
+            // Calculate minutes and seconds
+            const minutes = Math.floor(timeRemaining / (60 * 1000));
+            const seconds = Math.floor((timeRemaining % (60 * 1000)) / 1000);
+            
+            // Format and display
+            timerDisplay.textContent = 
+                (minutes < 10 ? "0" + minutes : minutes) + ":" + 
+                (seconds < 10 ? "0" + seconds : seconds);
+            
+            // Change color to red when time is running low
+            if (timeRemaining <= 5 * 60 * 1000) { // 5 minutes or less
+                timerDisplay.style.color = "red";
+                timerDisplay.style.fontWeight = "bold";
+                
+                // Show 5-minute warning once
+                if (Math.floor(timeRemaining / 1000) === 5 * 60) {
+                    alert("5 minutes remaining!");
+                }
+            }
+        }, 1000);
+    }
 });
 
 // Helper function to get cookies for CSRF token
