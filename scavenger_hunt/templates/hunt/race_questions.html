@@ -73,15 +73,16 @@
                                                             <div class="mt-2">
                                                                 <span class="attempts-info">Attempts: <span id="attempts-{{ forloop.counter0 }}">0</span></span>
                                                             </div>
-                                                            <div class="photo-upload mt-4" id="photo-upload-{{ forloop.counter0 }}" style="{% if forloop.counter0 == 0 %}display: block;{% else %}display: none;{% endif %}">
+                                                            <div class="photo-upload mt-4" id="photo-upload-{{ forloop.counter0 }}" style="display: none;">
                                                                 <h4>Maximum attempts reached. Upload a photo instead:</h4>
-                                                                <form method="post" action="/api/upload-photo/" enctype="multipart/form-data" class="direct-upload-form">
-                                                                    {% csrf_token %}
-                                                                    <input type="hidden" name="team_code" value="{{ team.code }}">
-                                                                    <input type="hidden" name="question_id" value="{{ question.id }}">
-                                                                    <input type="file" name="photo" id="photo-{{ forloop.counter0 }}" class="form-control mt-3" required>
-                                                                    <button type="submit" class="btn btn-primary mt-3" style="background-color: #FF5722; border-color: #FF5722; font-weight: bold;">UPLOAD PHOTO AND CONTINUE →</button>
-                                                                </form>
+                                                                <input type="file" id="photo-{{ forloop.counter0 }}" class="form-control mt-3">
+                                                                <button type="button" class="btn btn-primary mt-3 upload-photo" data-question-id="{{ forloop.counter0 }}" data-db-question-id="{{ question.id }}">Upload Photo</button>
+                                                                
+                                                                <!-- EMERGENCY OVERRIDE - Direct link to the next question -->
+                                                                <a href="?team_code={{ team.code }}&player_name={{ team_member.role }}&force_question_id={% if not forloop.last %}{{ questions.1.id }}{% endif %}" 
+                                                                   class="btn btn-danger mt-3" style="display: block; width: 100%; font-weight: bold;">
+                                                                    BYPASS - GO TO NEXT QUESTION →
+                                                                </a>
                                                             </div>
                                                         </form>
                                                     </div>
