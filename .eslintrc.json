@@ -1,0 +1,16 @@
+{
+  "plugins": ["html"],
+  "settings": {
+    "html/html-extensions": [".html"],
+    "html/javascript-mime-types": ["text/javascript", "text/worker"],
+    "html/report-bad-indent": "warn"
+  },
+  "env": {
+    "browser": true,
+    "es6": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": 2020
+  }
+} 

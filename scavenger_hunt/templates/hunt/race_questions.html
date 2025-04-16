@@ -43,6 +43,15 @@
                             <h3>Team: {{ team.name }}</h3>
                             <h3>Player: {{ team_member.role }}</h3>
                             <h3>Score: <span id="total-score">0</span> points</h3>
+                            <!-- Manual refresh button will be added after team members list -->
+                        </div>
+                        
+                        <!-- Add manual refresh button -->
+                        <div class="text-center mb-4">
+                            <button id="manual-refresh" class="btn btn-success">
+                                <i class="fas fa-sync-alt"></i> Refresh Team Data
+                            </button>
+                            <div id="last-refreshed" class="small text-muted mt-1">Last refreshed: Never</div>
                         </div>
                         
                         <!-- Add the timer container here -->
@@ -332,15 +341,14 @@ input.max-attempts-reached {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    transition: all 0.3s;
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 10000;
-    opacity: 0;
-    transition: opacity 0.3s ease;
 }
 
 .custom-popup.show {
@@ -473,6 +481,32 @@ let raceSocket = null;
 let raceReconnectAttempts = 0;
 const MAX_RACE_RECONNECT_ATTEMPTS = 5;
 const RACE_RECONNECT_DELAY = 3000; // 3 seconds
+let lastRefreshTime = Date.now();
+let lastWebSocketActivity = Date.now();
+let refreshInterval = null;
+
+function setupAutoRefresh() {
+    console.log("Setting up auto-refresh mechanism");
+    
+    // Check periodically if we need to refresh
+    setInterval(function() {
+        const now = Date.now();
+        const timeSinceLastActivity = now - lastWebSocketActivity;
+        
+        console.log(`Time since last WebSocket activity: ${Math.round(timeSinceLastActivity/1000)}s`);
+        
+        // If no WebSocket activity for 30 seconds, refresh the page
+        if (timeSinceLastActivity > 30000) {
+            console.log("No WebSocket updates detected for too long, refreshing page");
+            showRaceConnectionStatus('updating', 'No updates received. Refreshing page...');
+            
+            // Wait a moment for the notification to be visible
+            setTimeout(function() {
+                location.reload();
+            }, 1000);
+        }
+    }, 10000); // Check every 10 seconds
+}
 
 function setupRaceWebSocket() {
     // Close any existing connection
@@ -505,9 +539,9 @@ function setupRaceWebSocket() {
             
             // Request initial state
             sendRaceMessage({
-                'type': 'request_race_update',
-                'team_code': teamCode,
-                'race_id': raceId
+                type: 'request_race_update',
+                team_code: teamCode,
+                race_id: raceId
             });
             
             // Show connected status briefly
@@ -515,12 +549,19 @@ function setupRaceWebSocket() {
             
             // Setup heartbeat for race socket
             startRaceHeartbeat();
+            
+            // Initialize auto-refresh as fallback
+            setupAutoRefresh();
         };
         
         raceSocket.onmessage = function(e) {
             try {
                 const data = JSON.parse(e.data);
                 console.log("Race WebSocket message received:", data);
+                
+                // Update last refresh time and WebSocket activity time
+                lastRefreshTime = Date.now();
+                lastWebSocketActivity = Date.now();
                 
                 if (data.type === 'score_update') {
                     // Update score without page refresh
@@ -561,6 +602,7 @@ function setupRaceWebSocket() {
                 } else if (data.type === 'team_members_update') {
                     // Update team members display if needed
                     if (data.members) {
+                        console.log("Team members update received:", data.members);
                         updateTeamMembersDisplay(data.members);
                     }
                 }
@@ -593,12 +635,16 @@ function setupRaceWebSocket() {
                     }, RACE_RECONNECT_DELAY);
                 } else {
                     showRaceConnectionStatus('failed', 'Failed to reconnect. Please refresh the page.');
+                    // Enable auto refresh if WebSocket fails
+                    setupAutoRefresh();
                 }
             }
         };
     } catch (error) {
         console.error("Failed to create race WebSocket connection:", error);
         showRaceConnectionStatus('error', 'Failed to establish connection');
+        // Enable auto refresh if WebSocket fails
+        setupAutoRefresh();
     }
 }
 
@@ -847,14 +893,20 @@ function handleRaceStatusUpdate(status, message) {
 
 // Update team members display
 function updateTeamMembersDisplay(members) {
+    console.log("Updating team members display:", members);
+    
     // Create or update team members list in stats section
     const statsSection = document.querySelector('.stats');
-    if (!statsSection) return;
+    if (!statsSection) {
+        console.error("Stats section not found in the DOM");
+        return;
+    }
     
     // Check if we already have a members list
     let membersList = document.getElementById('team-members-list');
     
     if (!membersList) {
+        console.log("Creating new team members list");
         // Create new members list
         const membersHeading = document.createElement('h3');
         membersHeading.textContent = 'Team Members:';
@@ -872,59 +924,75 @@ function updateTeamMembersDisplay(members) {
         statsSection.appendChild(membersHeading);
         statsSection.appendChild(membersList);
     } else {
+        console.log("Updating existing team members list");
         // Clear existing list
         membersList.innerHTML = '';
     }
     
     // Add members to the list
-    members.forEach(member => {
-        const memberItem = document.createElement('li');
-        memberItem.innerHTML = `<span style="background: rgba(144, 200, 60, 0.2); padding: 5px 10px; border-radius: 20px; display: inline-block;"><i class="fas fa-user"></i> ${member.role}</span>`;
-        membersList.appendChild(memberItem);
-    });
+    if (Array.isArray(members)) {
+        console.log(`Adding ${members.length} members to the list`);
+        members.forEach((member, index) => {
+            console.log(`Adding member ${index}:`, member);
+            const memberItem = document.createElement('li');
+            const role = member.role || "Unknown";
+            memberItem.innerHTML = `<span style="background: rgba(144, 200, 60, 0.2); padding: 5px 10px; border-radius: 20px; display: inline-block;"><i class="fas fa-user"></i> ${role}</span>`;
+            membersList.appendChild(memberItem);
+        });
+    } else {
+        console.error("Members is not an array:", members);
+    }
+    
+    // Update last refreshed time
+    updateLastRefreshedText();
 }
 
 // Show race connection status
 function showRaceConnectionStatus(status, message) {
-    console.log(`Race connection status: ${status} - ${message}`);
+    console.log(`Connection status: ${status} - ${message}`);
     
-    let statusElement = document.getElementById('race-ws-status');
-    
-    if (!statusElement) {
-        statusElement = document.createElement('div');
-        statusElement.id = 'race-ws-status';
-        statusElement.style.position = 'fixed';
-        statusElement.style.bottom = '10px';
-        statusElement.style.left = '10px';
-        statusElement.style.padding = '5px 10px';
-        statusElement.style.borderRadius = '5px';
-        statusElement.style.fontSize = '12px';
-        statusElement.style.zIndex = '1000';
-        document.body.appendChild(statusElement);
-    }
-    
-    statusElement.textContent = message;
-    
-    switch (status) {
-        case 'connected':
-            statusElement.style.backgroundColor = 'rgba(40, 167, 69, 0.8)';
-            statusElement.style.color = 'white';
+    // Only show status for errors or important messages to avoid UI clutter
+    if (['error', 'closed', 'failed', 'updating'].includes(status)) {
+        const statusEl = document.createElement('div');
+        statusEl.id = 'connection-status';
+        statusEl.style.position = 'fixed';
+        statusEl.style.bottom = '20px';
+        statusEl.style.right = '20px';
+        statusEl.style.padding = '10px 15px';
+        statusEl.style.borderRadius = '5px';
+        statusEl.style.zIndex = '1000';
+        statusEl.style.maxWidth = '300px';
+        
+        // Style based on status
+        if (status === 'error' || status === 'closed' || status === 'failed') {
+            statusEl.style.backgroundColor = 'rgba(220, 53, 69, 0.9)';
+        } else if (status === 'reconnecting') {
+            statusEl.style.backgroundColor = 'rgba(255, 193, 7, 0.9)';
+        } else if (status === 'connected') {
+            statusEl.style.backgroundColor = 'rgba(40, 167, 69, 0.9)';
+        } else if (status === 'updating') {
+            statusEl.style.backgroundColor = 'rgba(0, 123, 255, 0.9)';
+        }
+        
+        statusEl.style.color = 'white';
+        statusEl.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
+        statusEl.innerHTML = message;
+        
+        // Remove any existing status
+        const existingStatus = document.getElementById('connection-status');
+        if (existingStatus) {
+            existingStatus.remove();
+        }
+        
+        // Add to DOM
+        document.body.appendChild(statusEl);
+        
+        // Auto-remove after delay for non-error messages
+        if (status !== 'error' && status !== 'failed') {
             setTimeout(() => {
-                statusElement.style.display = 'none';
+                statusEl.remove();
             }, 3000);
-            break;
-        case 'reconnecting':
-            statusElement.style.backgroundColor = 'rgba(255, 193, 7, 0.8)';
-            statusElement.style.color = 'black';
-            statusElement.style.display = 'block';
-            break;
-        case 'error':
-        case 'closed':
-        case 'failed':
-            statusElement.style.backgroundColor = 'rgba(220, 53, 69, 0.8)';
-            statusElement.style.color = 'white';
-            statusElement.style.display = 'block';
-            break;
+        }
     }
 }
 
@@ -953,14 +1021,50 @@ function showRaceCompleteNotification(redirectUrl) {
 document.addEventListener('DOMContentLoaded', function() {
     // Other existing initialization code
     
-    // Only initialize if we're on the question view (not the join form)
-    if (document.getElementById('race-questions')) {
-        console.log("Initializing race WebSocket connection...");
-        setupRaceWebSocket();
-    } else {
-        console.log("Race questions not found, not initializing WebSocket");
+    // Setup manual refresh button
+    const manualRefreshButton = document.getElementById('manual-refresh');
+    if (manualRefreshButton) {
+        manualRefreshButton.addEventListener('click', function() {
+            console.log("Manual refresh button clicked");
+            
+            // Update last refresh time
+            lastRefreshTime = Date.now();
+            updateLastRefreshedText();
+            
+            // First try to request update via WebSocket if it's connected
+            if (raceSocket && raceSocket.readyState === WebSocket.OPEN) {
+                console.log("Requesting race update via WebSocket");
+                sendRaceMessage({
+                    type: 'request_race_update', 
+                    team_code: '{{ team.code }}',
+                    race_id: '{{ race.id }}'
+                });
+                
+                // Show a temporary message
+                showRaceConnectionStatus('updating', 'Requesting latest data...');
+            } else {
+                console.log("WebSocket not available, reloading page");
+                // If WebSocket isn't connected, fall back to page reload
+                location.reload();
+            }
+        });
     }
+    
+    // Setup the race websocket connection
+    setupRaceWebSocket();
+    
+    // Initialize the last refreshed text
+    updateLastRefreshedText();
 });
+
+// Function to update last refreshed text
+function updateLastRefreshedText() {
+    const lastRefreshedEl = document.getElementById('last-refreshed');
+    if (lastRefreshedEl) {
+        const now = new Date();
+        lastRefreshedEl.textContent = `Last refreshed: ${now.toLocaleTimeString()}`;
+    }
+}
 
 // Also add this to capture and log any general errors
 window.addEventListener('error', function(event) {
