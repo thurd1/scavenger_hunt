@@ -7,6 +7,7 @@ import logging
 from django.db import transaction
 from django.db import connection
 from django.db import models
+from django.utils import timezone
 
 from .models import Team, TeamMember, Lobby, Race, TeamProgress, Question, Zone, TeamRaceProgress, TeamAnswer
 
@@ -53,10 +54,11 @@ def team_member_created(sender, instance, created, **kwargs):
     Signal handler to notify connected clients when a team member is created
     """
     if created and instance.team:
-        print(f"SIGNAL: New member {instance.role} joined team {instance.team.name}")
+        print(f"DEBUG SIGNAL: New member {instance.role} joined team {instance.team.name} (ID: {instance.team.id})")
         
         # Get the lobby this team belongs to
         lobbies = instance.team.participating_lobbies.all()
+        print(f"DEBUG SIGNAL: Team {instance.team.name} belongs to {lobbies.count()} lobbies")
         
         # Get channel layer once
         channel_layer = get_channel_layer()
@@ -64,10 +66,12 @@ def team_member_created(sender, instance, created, **kwargs):
         # Format the member data
         member_data = {
             'role': instance.role,
+            'id': instance.id,
             'team_name': instance.team.name
         }
         
         # First, notify the team channel directly
+        print(f"DEBUG SIGNAL: Notifying team_{instance.team.id} that player {instance.role} joined")
         async_to_sync(channel_layer.group_send)(
             f'team_{instance.team.id}',
             {
@@ -80,6 +84,7 @@ def team_member_created(sender, instance, created, **kwargs):
         # For each lobby, send a WebSocket message
         for lobby in lobbies:
             # Send to the lobby group
+            print(f"DEBUG SIGNAL: Notifying lobby_{lobby.id} that player {instance.role} joined team {instance.team.name}")
             async_to_sync(channel_layer.group_send)(
                 f'lobby_{lobby.id}',
                 {
@@ -92,15 +97,19 @@ def team_member_created(sender, instance, created, **kwargs):
             
             # Now also notify the available_teams channel
             # This is critical to keep the available teams list in sync
+            print(f"DEBUG SIGNAL: Notifying available_teams channel with lobby_code {lobby.code}")
             async_to_sync(channel_layer.group_send)(
                 'available_teams',
                 {
                     'type': 'teams_update',
-                    'lobby_code': lobby.code
+                    'lobby_code': lobby.code,
+                    'timestamp': timezone.now().isoformat(),
+                    'debug_source': f'team_member_created signal for {instance.role}'
                 }
             )
             
             # Force refresh the lobby data
+            print(f"DEBUG SIGNAL: Forcing lobby_{lobby.id} to refresh team data")
             async_to_sync(channel_layer.group_send)(
                 f'lobby_{lobby.id}',
                 {
@@ -108,10 +117,13 @@ def team_member_created(sender, instance, created, **kwargs):
                     'lobby': {
                         'id': lobby.id,
                         'teams_updated': True,
-                        'timestamp': str(instance.team.created_at)
+                        'timestamp': str(instance.team.created_at),
+                        'debug_source': f'team_member_created signal for {instance.role}'
                     }
                 }
             )
+        
+        print(f"DEBUG SIGNAL: Completed all notifications for new member {instance.role} in team {instance.team.name}")
 
 @receiver(post_save, sender=Lobby)
 def lobby_status_changed(sender, instance, created, **kwargs):
@@ -150,49 +162,74 @@ def team_lobby_association_changed(sender, instance, action, reverse, model, pk_
     Signal handler to notify connected clients when a team joins or leaves a lobby
     """
     try:
+        print(f"DEBUG SIGNAL: team_lobby_association_changed triggered with action={action}, reverse={reverse}")
+        print(f"DEBUG SIGNAL: instance={instance}, pk_set={pk_set}")
+        
         if action == 'post_add':
             channel_layer = get_channel_layer()
             
             if not reverse:
                 # A team was added to lobbies (from Team side)
                 if not isinstance(instance, Team):
-                    print(f"WARNING: Expected Team instance but got {type(instance).__name__}")
+                    print(f"DEBUG SIGNAL WARNING: Expected Team instance but got {type(instance).__name__}")
                     return
                 
                 team = instance
                 lobby_ids = pk_set
+                print(f"DEBUG SIGNAL: Team {team.name} (ID: {team.id}) added to lobbies: {lobby_ids}")
                 
                 for lobby_id in lobby_ids:
                     try:
                         # Format the team data
+                        members = list(team.members.all())
+                        member_details = [{'role': member.role, 'id': member.id} for member in members]
+                        
                         team_data = {
                             'id': team.id,
                             'name': team.name,
                             'code': team.code,
-                            'members_count': team.members.count(),
-                            'members': [{'role': member.role} for member in team.members.all()]
+                            'members_count': len(members),
+                            'members': member_details
                         }
                         
-                        print(f"SIGNAL: Team {team.name} joined lobby {lobby_id}")
+                        print(f"DEBUG SIGNAL: Team {team.name} joined lobby {lobby_id} with {len(members)} members: {[m.role for m in members]}")
                         
                         # Send to the lobby group
                         async_to_sync(channel_layer.group_send)(
                             f'lobby_{lobby_id}',
                             {
                                 'type': 'team_joined',
-                                'team': team_data
+                                'team': team_data,
+                                'debug_source': 'team_lobby_association_changed'
                             }
                         )
+                        print(f"DEBUG SIGNAL: Sent team_joined event to lobby_{lobby_id}")
+                        
+                        # Also notify available_teams channel
+                        try:
+                            lobby = Lobby.objects.get(id=lobby_id)
+                            print(f"DEBUG SIGNAL: Notifying available_teams channel for lobby code {lobby.code}")
+                            async_to_sync(channel_layer.group_send)(
+                                'available_teams',
+                                {
+                                    'type': 'teams_update',
+                                    'lobby_code': lobby.code,
+                                    'debug_source': 'team_lobby_association_changed'
+                                }
+                            )
+                        except Lobby.DoesNotExist:
+                            print(f"DEBUG SIGNAL ERROR: Lobby with ID {lobby_id} not found")
                     except Exception as e:
-                        print(f"ERROR in team_lobby_association_changed (forward direction): {str(e)}")
+                        print(f"DEBUG SIGNAL ERROR in team_lobby_association_changed (forward direction): {str(e)}")
             else:
                 # A lobby was added to teams (from Lobby side)
                 if not isinstance(instance, Lobby):
-                    print(f"WARNING: Expected Lobby instance but got {type(instance).__name__}")
+                    print(f"DEBUG SIGNAL WARNING: Expected Lobby instance but got {type(instance).__name__}")
                     return
                 
                 lobby = instance
                 team_ids = pk_set
+                print(f"DEBUG SIGNAL: Lobby {lobby.name} (ID: {lobby.id}, code: {lobby.code}) added teams: {team_ids}")
                 
                 for team_id in team_ids:
                     try:
@@ -200,28 +237,44 @@ def team_lobby_association_changed(sender, instance, action, reverse, model, pk_
                         team = Team.objects.get(id=team_id)
                         
                         # Format the team data
+                        members = list(team.members.all())
+                        member_details = [{'role': member.role, 'id': member.id} for member in members]
+                        
                         team_data = {
                             'id': team.id,
                             'name': team.name,
                             'code': team.code,
-                            'members_count': team.members.count(),
-                            'members': [{'role': member.role} for member in team.members.all()]
+                            'members_count': len(members),
+                            'members': member_details
                         }
                         
-                        print(f"SIGNAL: Team {team.name} joined lobby {lobby.id}")
+                        print(f"DEBUG SIGNAL: Team {team.name} (ID: {team.id}) joined lobby {lobby.id} with {len(members)} members: {[m.role for m in members]}")
                         
                         # Send to the lobby group
                         async_to_sync(channel_layer.group_send)(
                             f'lobby_{lobby.id}',
                             {
                                 'type': 'team_joined',
-                                'team': team_data
+                                'team': team_data,
+                                'debug_source': 'team_lobby_association_changed (reverse)'
+                            }
+                        )
+                        print(f"DEBUG SIGNAL: Sent team_joined event to lobby_{lobby.id}")
+                        
+                        # Also notify available_teams channel
+                        print(f"DEBUG SIGNAL: Notifying available_teams channel for lobby code {lobby.code}")
+                        async_to_sync(channel_layer.group_send)(
+                            'available_teams',
+                            {
+                                'type': 'teams_update',
+                                'lobby_code': lobby.code,
+                                'debug_source': 'team_lobby_association_changed (reverse)'
                             }
                         )
                     except Team.DoesNotExist:
-                        print(f"SIGNAL ERROR: Team with ID {team_id} not found")
+                        print(f"DEBUG SIGNAL ERROR: Team with ID {team_id} not found")
                     except Exception as e:
-                        print(f"SIGNAL ERROR in team_joined: {str(e)}")
+                        print(f"DEBUG SIGNAL ERROR in team_joined (reverse): {str(e)}")
                 
         elif action == 'post_remove':
             channel_layer = get_channel_layer()
@@ -229,51 +282,83 @@ def team_lobby_association_changed(sender, instance, action, reverse, model, pk_
             if not reverse:
                 # A team was removed from lobbies
                 if not isinstance(instance, Team):
-                    print(f"WARNING: Expected Team instance but got {type(instance).__name__}")
+                    print(f"DEBUG SIGNAL WARNING: Expected Team instance but got {type(instance).__name__}")
                     return
                     
                 team = instance
                 lobby_ids = pk_set
+                print(f"DEBUG SIGNAL: Team {team.name} (ID: {team.id}) removed from lobbies: {lobby_ids}")
                 
                 for lobby_id in lobby_ids:                
                     try:
-                        print(f"SIGNAL: Team {team.name} left lobby {lobby_id}")
+                        print(f"DEBUG SIGNAL: Team {team.name} left lobby {lobby_id}")
                         
                         # Send to the lobby group
                         async_to_sync(channel_layer.group_send)(
                             f'lobby_{lobby_id}',
                             {
                                 'type': 'team_left',
-                                'team_id': team.id
+                                'team_id': team.id,
+                                'debug_source': 'team_lobby_association_changed (post_remove)'
                             }
                         )
+                        print(f"DEBUG SIGNAL: Sent team_left event to lobby_{lobby_id}")
+                        
+                        # Also notify available_teams channel
+                        try:
+                            lobby = Lobby.objects.get(id=lobby_id)
+                            print(f"DEBUG SIGNAL: Notifying available_teams channel for lobby code {lobby.code}")
+                            async_to_sync(channel_layer.group_send)(
+                                'available_teams',
+                                {
+                                    'type': 'teams_update',
+                                    'lobby_code': lobby.code,
+                                    'debug_source': 'team_lobby_association_changed (post_remove)'
+                                }
+                            )
+                        except Lobby.DoesNotExist:
+                            print(f"DEBUG SIGNAL ERROR: Lobby with ID {lobby_id} not found")
                     except Exception as e:
-                        print(f"ERROR in team_left (forward direction): {str(e)}")
+                        print(f"DEBUG SIGNAL ERROR in team_left (forward direction): {str(e)}")
             else:
                 # A lobby was removed from teams
                 if not isinstance(instance, Lobby):
-                    print(f"WARNING: Expected Lobby instance but got {type(instance).__name__}")
+                    print(f"DEBUG SIGNAL WARNING: Expected Lobby instance but got {type(instance).__name__}")
                     return
                     
                 lobby = instance
                 team_ids = pk_set
+                print(f"DEBUG SIGNAL: Lobby {lobby.name} (ID: {lobby.id}, code: {lobby.code}) removed teams: {team_ids}")
                 
                 for team_id in team_ids:
                     try:
-                        print(f"SIGNAL: Team {team_id} left lobby {lobby.id}")
+                        print(f"DEBUG SIGNAL: Team {team_id} left lobby {lobby.id}")
                         
                         # Send to the lobby group
                         async_to_sync(channel_layer.group_send)(
                             f'lobby_{lobby.id}',
                             {
                                 'type': 'team_left',
-                                'team_id': team_id
+                                'team_id': team_id,
+                                'debug_source': 'team_lobby_association_changed (post_remove, reverse)'
+                            }
+                        )
+                        print(f"DEBUG SIGNAL: Sent team_left event to lobby_{lobby.id}")
+                        
+                        # Also notify available_teams channel
+                        print(f"DEBUG SIGNAL: Notifying available_teams channel for lobby code {lobby.code}")
+                        async_to_sync(channel_layer.group_send)(
+                            'available_teams',
+                            {
+                                'type': 'teams_update',
+                                'lobby_code': lobby.code,
+                                'debug_source': 'team_lobby_association_changed (post_remove, reverse)'
                             }
                         )
                     except Exception as e:
-                        print(f"ERROR in team_left (reverse direction): {str(e)}")
+                        print(f"DEBUG SIGNAL ERROR in team_left (reverse direction): {str(e)}")
     except Exception as e:
-        print(f"CRITICAL ERROR in team_lobby_association_changed: {str(e)}") 
+        print(f"DEBUG SIGNAL CRITICAL ERROR in team_lobby_association_changed: {str(e)}")
 
 @receiver(post_save, sender=TeamRaceProgress)
 def team_score_changed(sender, instance, created, **kwargs):

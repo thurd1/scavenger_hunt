@@ -19,25 +19,28 @@ class TeamConsumer(AsyncWebsocketConsumer):
         self.team_id = self.scope['url_route']['kwargs']['team_id']
         self.team_group_name = f'team_{self.team_id}'
         self.player_name = self.scope.get('session', {}).get('player_name')
-        logger.info(f"WebSocket connecting for team {self.team_id} with player {self.player_name}")
+        logger.info(f"DEBUG: WebSocket connecting for team {self.team_id} with player {self.player_name}")
 
         await self.channel_layer.group_add(
             self.team_group_name,
             self.channel_name
         )
         await self.accept()
+        logger.info(f"DEBUG: WebSocket connection accepted for team {self.team_id}, player {self.player_name}")
 
         # Send initial state
         await self.send_team_state()
 
     async def disconnect(self, close_code):
-        logger.info(f"WebSocket disconnected for team {self.team_id} with player {self.player_name}")
+        logger.info(f"DEBUG: WebSocket disconnecting for team {self.team_id} with player {self.player_name}, code: {close_code}")
         
         if self.player_name:
             # Remove the team member
+            logger.info(f"DEBUG: Removing player {self.player_name} from team {self.team_id} due to disconnect")
             await self.remove_team_member()
             
             # Broadcast the update to all connected clients
+            logger.info(f"DEBUG: Broadcasting leave event for player {self.player_name} from team {self.team_id}")
             await self.channel_layer.group_send(
                 self.team_group_name,
                 {
@@ -51,22 +54,36 @@ class TeamConsumer(AsyncWebsocketConsumer):
             self.team_group_name,
             self.channel_name
         )
+        logger.info(f"DEBUG: Channel {self.channel_name} removed from group {self.team_group_name}")
 
     @database_sync_to_async
     def remove_team_member(self):
         try:
             team = Team.objects.get(id=self.team_id)
-            TeamMember.objects.filter(
+            count, _ = TeamMember.objects.filter(
                 team=team,
                 role=self.player_name
             ).delete()
-            logger.info(f"Removed player {self.player_name} from team {self.team_id}")
+            logger.info(f"DEBUG: Removed {count} instances of player {self.player_name} from team {self.team_id} - {team.name}")
             
             # Get the lobby code to include in the broadcast
             lobby_code = None
-            lobby = team.participating_lobbies.first()
-            if lobby:
+            lobbies = team.participating_lobbies.all()
+            for lobby in lobbies:
                 lobby_code = lobby.code
+                logger.info(f"DEBUG: Broadcasting team update to lobby {lobby.id} with code {lobby_code}")
+                
+                # Broadcast directly to lobby
+                lobby_group_name = f'lobby_{lobby.id}'
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    lobby_group_name,
+                    {
+                        'type': 'team_member_left',
+                        'member_id': self.player_name,
+                        'team_id': team.id
+                    }
+                )
             
             # Also broadcast to available teams
             channel_layer = get_channel_layer()
@@ -77,8 +94,9 @@ class TeamConsumer(AsyncWebsocketConsumer):
                     'lobby_code': lobby_code
                 }
             )
+            logger.info(f"DEBUG: Broadcasted team update to available_teams with lobby_code {lobby_code}")
         except Exception as e:
-            logger.error(f"Error removing team member: {e}")
+            logger.error(f"DEBUG ERROR: Error removing team member: {e}")
 
     @database_sync_to_async
     def get_team_members(self):
@@ -141,16 +159,19 @@ class TeamConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         try:
             data = json.loads(text_data)
-            logger.info(f"WebSocket received data: {data}")
+            logger.info(f"DEBUG: WebSocket received data for team {self.team_id}: {data}")
             
             if data.get('action') == 'join':
                 self.player_name = data.get('player_name')
+                logger.info(f"DEBUG: Join request from player {self.player_name} for team {self.team_id}")
+                
                 if self.player_name:
                     # Try to create team member, which returns success/failure
                     creation_success = await self.create_team_member()
                     
                     if creation_success:
                         # Only broadcast if successfully created
+                        logger.info(f"DEBUG: Successfully added {self.player_name} to team {self.team_id}, broadcasting join event")
                         await self.channel_layer.group_send(
                             self.team_group_name,
                             {
@@ -161,6 +182,7 @@ class TeamConsumer(AsyncWebsocketConsumer):
                         )
                     else:
                         # Send error response back to this client only
+                        logger.info(f"DEBUG: Failed to add {self.player_name} to team {self.team_id} (already exists), sending error")
                         await self.send(text_data=json.dumps({
                             'type': 'error',
                             'action': 'join',
@@ -168,6 +190,7 @@ class TeamConsumer(AsyncWebsocketConsumer):
                         }))
             elif data.get('action') == 'leave':
                 if self.player_name:
+                    logger.info(f"DEBUG: Leave request from player {self.player_name} for team {self.team_id}")
                     await self.remove_team_member()
                     await self.channel_layer.group_send(
                         self.team_group_name,
@@ -178,12 +201,13 @@ class TeamConsumer(AsyncWebsocketConsumer):
                         }
                     )
             elif data.get('action') == 'get_state':
+                logger.info(f"DEBUG: State request for team {self.team_id}")
                 await self.send_team_state()
                 
         except json.JSONDecodeError:
-            logger.error("Invalid JSON received")
+            logger.error(f"DEBUG ERROR: Invalid JSON received for team {self.team_id}")
         except Exception as e:
-            logger.error(f"Error in receive: {e}")
+            logger.error(f"DEBUG ERROR: Error in receive for team {self.team_id}: {e}")
             # Send error response
             await self.send(text_data=json.dumps({
                 'type': 'error',
@@ -196,24 +220,26 @@ class TeamConsumer(AsyncWebsocketConsumer):
             # Use a transaction to ensure atomic operation
             with transaction.atomic():
                 team = Team.objects.get(id=self.team_id)
+                logger.info(f"DEBUG: Attempting to add player {self.player_name} to team {self.team_id} - {team.name}")
                 
                 # Check if this player name already exists in the team - use select_for_update to lock the row
                 existing_member = TeamMember.objects.select_for_update().filter(team=team, role=self.player_name).first()
                 
                 if existing_member:
                     # Already exists - don't create a duplicate
-                    logger.info(f"Player {self.player_name} already exists in team {self.team_id}, not creating duplicate")
+                    logger.info(f"DEBUG: Player {self.player_name} already exists in team {self.team_id}, not creating duplicate")
                     return False
                 
                 # Create new team member
-                TeamMember.objects.create(team=team, role=self.player_name)
-                logger.info(f"Created team member {self.player_name} for team {self.team_id}")
+                member = TeamMember.objects.create(team=team, role=self.player_name)
+                logger.info(f"DEBUG: Created team member {self.player_name} (ID: {member.id}) for team {self.team_id} - {team.name}")
                 
                 # Get the lobby code to include in the broadcast
                 lobby_code = None
-                lobby = team.participating_lobbies.first()
-                if lobby:
+                lobbies = team.participating_lobbies.all()
+                for lobby in lobbies:
                     lobby_code = lobby.code
+                    logger.info(f"DEBUG: Team {team.id} belongs to lobby {lobby.id} with code {lobby_code}")
                     
                     # Send team_member_joined event to the lobby
                     lobby_group_name = f'lobby_{lobby.id}'
@@ -224,11 +250,12 @@ class TeamConsumer(AsyncWebsocketConsumer):
                         lobby_group_name,
                         {
                             'type': 'team_member_joined',
-                            'member': {'role': self.player_name},
+                            'member': {'role': self.player_name, 'id': member.id},
                             'team_id': str(team.id),
                             'team_name': team.name
                         }
                     )
+                    logger.info(f"DEBUG: Sent team_member_joined event to lobby {lobby.id}")
                 
                 # Also broadcast to available teams
                 channel_layer = get_channel_layer()
@@ -239,10 +266,11 @@ class TeamConsumer(AsyncWebsocketConsumer):
                         'lobby_code': lobby_code
                     }
                 )
+                logger.info(f"DEBUG: Sent teams_update event to available_teams channel with lobby_code {lobby_code}")
                 
                 return True
         except Exception as e:
-            logger.error(f"Error creating team member: {e}")
+            logger.error(f"DEBUG ERROR: Error creating team member: {e}")
             return False
 
 
@@ -253,47 +281,56 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         self.player_name = self.scope.get('session', {}).get('player_name')
         self.lobby_code = None  # Will be set when receiving a request
         
-        logger.info(f"WebSocket connecting for available teams with player {self.player_name}")
+        logger.info(f"DEBUG: WebSocket connecting for available teams with player {self.player_name}, channel: {self.channel_name}")
         
         # Join the group
         await self.channel_layer.group_add(
             self.group_name,
             self.channel_name
         )
+        logger.info(f"DEBUG: Added channel {self.channel_name} to group {self.group_name}")
         
         # Accept the connection
         await self.accept()
-        logger.info(f"WebSocket connection accepted for available teams")
+        logger.info(f"DEBUG: WebSocket connection accepted for available teams, channel: {self.channel_name}")
         
         # Send a heartbeat immediately to ensure connection
         await self.send(text_data=json.dumps({
             'type': 'connection_established',
-            'message': 'Connected to available teams WebSocket'
+            'message': 'Connected to available teams WebSocket',
+            'channel': self.channel_name
         }))
+        logger.info(f"DEBUG: Sent connection confirmation to client")
 
     async def disconnect(self, close_code):
         """Handle disconnection"""
-        logger.info(f"WebSocket disconnected from available teams for player {self.player_name}")
+        logger.info(f"DEBUG: WebSocket disconnecting from available teams for player {self.player_name}, code: {close_code}, channel: {self.channel_name}")
         
         # Only remove player from teams if explicit disconnect is intended
         if close_code == 1000 and self.player_name:
+            logger.info(f"DEBUG: Clean disconnect detected for player {self.player_name}, removing from teams")
             # Remove player from all teams they're in
             await self.remove_player_from_all_teams()
+        else:
+            logger.info(f"DEBUG: Non-clean disconnect (code {close_code}) for player {self.player_name}, not removing from teams")
         
         # Leave the group
         await self.channel_layer.group_discard(
             self.group_name,
             self.channel_name
         )
+        logger.info(f"DEBUG: Removed channel {self.channel_name} from group {self.group_name}")
 
     @database_sync_to_async
     def remove_player_from_all_teams(self):
         """Remove the player from all teams they're in"""
         try:
             deleted_count = TeamMember.objects.filter(role=self.player_name).delete()[0]
-            logger.info(f"Removed player {self.player_name} from {deleted_count} teams")
+            logger.info(f"DEBUG: Removed player {self.player_name} from {deleted_count} teams")
+            return deleted_count
         except Exception as e:
-            logger.error(f"Error removing player from teams: {e}")
+            logger.error(f"DEBUG ERROR: Error removing player from teams: {e}")
+            return 0
 
     @database_sync_to_async
     def get_available_teams(self, lobby_code=None):
@@ -303,17 +340,24 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         try:
             # Filter teams by lobby code if provided
             if lobby_code:
-                logger.info(f"Filtering teams by lobby code: {lobby_code}")
+                logger.info(f"DEBUG: Filtering teams by lobby code: {lobby_code}")
                 try:
                     lobby = Lobby.objects.get(code=lobby_code)
                     teams = lobby.teams.prefetch_related('members').all()
-                    logger.info(f"Found {teams.count()} teams in lobby {lobby.name}")
+                    logger.info(f"DEBUG: Found {teams.count()} teams in lobby {lobby.name} (ID: {lobby.id})")
+                    
+                    # Log team details
+                    for team in teams:
+                        member_count = team.members.count()
+                        member_roles = [m.role for m in team.members.all()]
+                        logger.info(f"DEBUG: Team {team.name} (ID: {team.id}) has {member_count} members: {member_roles}")
+                        
                 except Lobby.DoesNotExist:
-                    logger.warning(f"Lobby with code {lobby_code} not found")
+                    logger.warning(f"DEBUG: Lobby with code {lobby_code} not found")
                     return []
             else:
                 # Get all teams (fallback, should not happen with updated code)
-                logger.warning("No lobby code provided, fetching all teams")
+                logger.warning("DEBUG: No lobby code provided, fetching all teams")
                 teams = Team.objects.prefetch_related('members', 'participating_lobbies').all()
             
             for team in teams:
@@ -329,57 +373,79 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
                     'members_count': len(members),
                     'lobby_id': lobbies[0] if lobbies else None,
                 })
+                
+            logger.info(f"DEBUG: Processed {len(teams_data)} teams for available_teams consumer")
         except Exception as e:
-            logger.error(f"Error getting available teams: {e}")
+            logger.error(f"DEBUG ERROR: Error getting available teams: {e}")
             
         return teams_data
 
     async def send_teams_state(self, lobby_code=None):
         """Send the current state of teams filtered by lobby code"""
+        logger.info(f"DEBUG: Fetching team state for lobby {lobby_code}")
         teams = await self.get_available_teams(lobby_code)
+        logger.info(f"DEBUG: Sending {len(teams)} teams to client")
+        
         await self.send(text_data=json.dumps({
             'type': 'teams_update',
             'teams': teams,
             'lobby_code': lobby_code,
-            'timestamp': timezone.now().isoformat()  # Add timestamp to help clients detect stale data
+            'timestamp': timezone.now().isoformat(),  # Add timestamp to help clients detect stale data
+            'channel': self.channel_name
         }))
+        logger.info(f"DEBUG: Sent teams state to client for lobby {lobby_code}")
 
     async def teams_update(self, event):
         """Handle teams update event"""
+        logger.info(f"DEBUG: Received teams_update event: {event}")
+        
         # Forward the update to the WebSocket only if it matches our lobby
         if not self.lobby_code or not event.get('lobby_code') or self.lobby_code == event.get('lobby_code'):
+            logger.info(f"DEBUG: Processing teams_update for lobby {event.get('lobby_code')}, our lobby is {self.lobby_code}")
+            
             # If a full teams list is not provided, fetch it
             if not event.get('teams'):
+                logger.info(f"DEBUG: No teams data in event, fetching teams for lobby {event.get('lobby_code')}")
                 teams = await self.get_available_teams(event.get('lobby_code'))
                 event['teams'] = teams
                 event['full_refresh'] = True
+                logger.info(f"DEBUG: Added {len(teams)} teams to event")
+            
+            # Add channel info for debugging
+            event['channel'] = self.channel_name
             
             await self.send(text_data=json.dumps(event))
+            logger.info(f"DEBUG: Forwarded teams_update to client, channel: {self.channel_name}")
+        else:
+            logger.info(f"DEBUG: Ignoring teams_update for lobby {event.get('lobby_code')} as we're subscribed to {self.lobby_code}")
 
     async def receive(self, text_data):
         """Handle received messages"""
         try:
             data = json.loads(text_data)
-            logger.info(f"Received data in AvailableTeamsConsumer: {data}")
+            logger.info(f"DEBUG: Received data in AvailableTeamsConsumer, channel {self.channel_name}: {data}")
             
             if data.get('type') == 'request_update' or data.get('type') == 'ping':
                 # Store the lobby code for future updates
                 lobby_code = data.get('lobby_code', self.lobby_code)
                 if lobby_code:
+                    old_lobby = self.lobby_code
                     self.lobby_code = lobby_code
-                    logger.info(f"Setting lobby_code for this connection: {self.lobby_code}")
+                    logger.info(f"DEBUG: Setting lobby_code for this connection from {old_lobby} to {self.lobby_code}, channel: {self.channel_name}")
                 
                 # Send filtered teams based on lobby code
+                logger.info(f"DEBUG: Sending teams state for lobby {self.lobby_code}")
                 await self.send_teams_state(self.lobby_code)
             
         except json.JSONDecodeError:
-            logger.error("Failed to decode JSON in AvailableTeamsConsumer")
+            logger.error(f"DEBUG ERROR: Failed to decode JSON in AvailableTeamsConsumer, channel: {self.channel_name}")
         except Exception as e:
-            logger.error(f"Error in AvailableTeamsConsumer receive: {e}")
+            logger.error(f"DEBUG ERROR: Error in AvailableTeamsConsumer receive: {e}, channel: {self.channel_name}")
             # Send error response
             await self.send(text_data=json.dumps({
                 'type': 'error',
-                'message': f'An error occurred: {str(e)}'
+                'message': f'An error occurred: {str(e)}',
+                'channel': self.channel_name
             }))
 
 
