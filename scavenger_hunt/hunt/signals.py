@@ -58,16 +58,27 @@ def team_member_created(sender, instance, created, **kwargs):
         # Get the lobby this team belongs to
         lobbies = instance.team.participating_lobbies.all()
         
+        # Get channel layer once
+        channel_layer = get_channel_layer()
+        
+        # Format the member data
+        member_data = {
+            'role': instance.role,
+            'team_name': instance.team.name
+        }
+        
+        # First, notify the team channel directly
+        async_to_sync(channel_layer.group_send)(
+            f'team_{instance.team.id}',
+            {
+                'type': 'team_update',
+                'action': 'join',
+                'player_name': instance.role
+            }
+        )
+        
         # For each lobby, send a WebSocket message
         for lobby in lobbies:
-            channel_layer = get_channel_layer()
-            
-            # Format the member data
-            member_data = {
-                'role': instance.role,
-                'team_name': instance.team.name
-            }
-            
             # Send to the lobby group
             async_to_sync(channel_layer.group_send)(
                 f'lobby_{lobby.id}',
@@ -76,6 +87,29 @@ def team_member_created(sender, instance, created, **kwargs):
                     'member': member_data,
                     'team_id': instance.team.id,
                     'team_name': instance.team.name
+                }
+            )
+            
+            # Now also notify the available_teams channel
+            # This is critical to keep the available teams list in sync
+            async_to_sync(channel_layer.group_send)(
+                'available_teams',
+                {
+                    'type': 'teams_update',
+                    'lobby_code': lobby.code
+                }
+            )
+            
+            # Force refresh the lobby data
+            async_to_sync(channel_layer.group_send)(
+                f'lobby_{lobby.id}',
+                {
+                    'type': 'lobby_updated',
+                    'lobby': {
+                        'id': lobby.id,
+                        'teams_updated': True,
+                        'timestamp': str(instance.team.created_at)
+                    }
                 }
             )
 

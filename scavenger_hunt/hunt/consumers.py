@@ -90,8 +90,9 @@ class TeamConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_team_state(self):
         team = Team.objects.prefetch_related('members').get(id=self.team_id)
+        members = list(team.members.values('id', 'role'))
         return {
-            'members': list(team.members.values_list('role', flat=True)),
+            'members': members,
             'team_name': team.name,
             'team_code': team.code
         }
@@ -103,6 +104,35 @@ class TeamConsumer(AsyncWebsocketConsumer):
             'action': 'state',
             **state
         }))
+        
+        # Also notify the available_teams channel to stay in sync
+        # Get the lobby code
+        team = await database_sync_to_async(Team.objects.prefetch_related('participating_lobbies').get)(id=self.team_id)
+        lobbies = await database_sync_to_async(lambda: list(team.participating_lobbies.all()))()
+        
+        if lobbies:
+            for lobby in lobbies:
+                lobby_code = await database_sync_to_async(lambda: lobby.code)()
+                if lobby_code:
+                    await self.channel_layer.group_send(
+                        'available_teams',
+                        {
+                            'type': 'teams_update',
+                            'lobby_code': lobby_code
+                        }
+                    )
+                    
+                    # Also update the lobby group
+                    await self.channel_layer.group_send(
+                        f'lobby_{lobby.id}',
+                        {
+                            'type': 'lobby_updated',
+                            'lobby': {
+                                'id': lobby.id,
+                                'teams_updated': True
+                            }
+                        }
+                    )
 
     async def team_update(self, event):
         # Forward the update to the WebSocket
@@ -233,12 +263,20 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         
         # Accept the connection
         await self.accept()
+        logger.info(f"WebSocket connection accepted for available teams")
+        
+        # Send a heartbeat immediately to ensure connection
+        await self.send(text_data=json.dumps({
+            'type': 'connection_established',
+            'message': 'Connected to available teams WebSocket'
+        }))
 
     async def disconnect(self, close_code):
         """Handle disconnection"""
         logger.info(f"WebSocket disconnected from available teams for player {self.player_name}")
         
-        if self.player_name:
+        # Only remove player from teams if explicit disconnect is intended
+        if close_code == 1000 and self.player_name:
             # Remove player from all teams they're in
             await self.remove_player_from_all_teams()
         
@@ -280,13 +318,15 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
             
             for team in teams:
                 lobbies = list(team.participating_lobbies.values_list('id', flat=True))
-                members = list(team.members.all().values('role'))
+                # Get full member data to include IDs
+                members = list(team.members.values('id', 'role'))
                 
                 teams_data.append({
                     'id': team.id,
                     'name': team.name,
                     'code': team.code,
                     'members': members,
+                    'members_count': len(members),
                     'lobby_id': lobbies[0] if lobbies else None,
                 })
         except Exception as e:
@@ -300,13 +340,20 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'teams_update',
             'teams': teams,
-            'lobby_code': lobby_code
+            'lobby_code': lobby_code,
+            'timestamp': timezone.now().isoformat()  # Add timestamp to help clients detect stale data
         }))
 
     async def teams_update(self, event):
         """Handle teams update event"""
         # Forward the update to the WebSocket only if it matches our lobby
         if not self.lobby_code or not event.get('lobby_code') or self.lobby_code == event.get('lobby_code'):
+            # If a full teams list is not provided, fetch it
+            if not event.get('teams'):
+                teams = await self.get_available_teams(event.get('lobby_code'))
+                event['teams'] = teams
+                event['full_refresh'] = True
+            
             await self.send(text_data=json.dumps(event))
 
     async def receive(self, text_data):
@@ -315,10 +362,12 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
             data = json.loads(text_data)
             logger.info(f"Received data in AvailableTeamsConsumer: {data}")
             
-            if data.get('type') == 'request_update':
+            if data.get('type') == 'request_update' or data.get('type') == 'ping':
                 # Store the lobby code for future updates
-                self.lobby_code = data.get('lobby_code')
-                logger.info(f"Setting lobby_code for this connection: {self.lobby_code}")
+                lobby_code = data.get('lobby_code', self.lobby_code)
+                if lobby_code:
+                    self.lobby_code = lobby_code
+                    logger.info(f"Setting lobby_code for this connection: {self.lobby_code}")
                 
                 # Send filtered teams based on lobby code
                 await self.send_teams_state(self.lobby_code)
@@ -327,6 +376,11 @@ class AvailableTeamsConsumer(AsyncWebsocketConsumer):
             logger.error("Failed to decode JSON in AvailableTeamsConsumer")
         except Exception as e:
             logger.error(f"Error in AvailableTeamsConsumer receive: {e}")
+            # Send error response
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': f'An error occurred: {str(e)}'
+            }))
 
 
 class LobbyConsumer(AsyncWebsocketConsumer):
@@ -337,9 +391,10 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.lobby_id = self.scope['url_route']['kwargs']['lobby_id']
         self.lobby_group_name = f'lobby_{self.lobby_id}'
+        self.player_name = self.scope.get('session', {}).get('player_name')
         
         # Additional detailed logging for WebSocket connections
-        logger.info(f"WebSocket connecting for lobby {self.lobby_id}. Path: {self.scope['path']}")
+        logger.info(f"WebSocket connecting for lobby {self.lobby_id}. Path: {self.scope['path']}, Player: {self.player_name}")
         logger.info(f"Adding channel {self.channel_name} to group {self.lobby_group_name}")
         
         # Join lobby group
@@ -359,7 +414,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             'type': 'connection_established',
             'message': f'Connected to lobby {self.lobby_id} WebSocket',
             'lobby_id': self.lobby_id,
-            'lobby': lobby
+            'lobby': lobby,
+            'timestamp': timezone.now().isoformat()
         }))
 
     async def disconnect(self, close_code):
@@ -377,18 +433,24 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             data = json.loads(text_data)
             logger.info(f"Received message in lobby {self.lobby_id}: {data}")
             
-            if data.get('action') == 'get_teams':
+            if data.get('action') == 'get_teams' or data.get('type') == 'request_update' or data.get('type') == 'ping':
                 # Client requesting fresh team data
                 lobby = await self.get_lobby_data()
                 await self.send(text_data=json.dumps({
                     'type': 'lobby_data',
-                    'lobby': lobby
+                    'lobby': lobby,
+                    'timestamp': timezone.now().isoformat()
                 }))
                 
         except json.JSONDecodeError:
             logger.error(f"Invalid JSON received in lobby {self.lobby_id}")
         except Exception as e:
             logger.error(f"Error processing message in lobby {self.lobby_id}: {str(e)}")
+            # Send error response
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': f'An error occurred: {str(e)}'
+            }))
 
     @database_sync_to_async
     def get_lobby_data(self):
@@ -399,12 +461,15 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             # Format for JSON
             teams_data = []
             for team in lobby.teams.all():
+                # Get full member data with IDs
+                members = list(team.members.values('id', 'role'))
+                
                 teams_data.append({
                     'id': team.id,
                     'name': team.name,
                     'code': team.code,
-                    'members_count': team.members.count(),
-                    'members': list(team.members.values('id', 'role'))
+                    'members_count': len(members),
+                    'members': members
                 })
             
             return {
