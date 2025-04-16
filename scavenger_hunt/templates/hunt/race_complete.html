@@ -37,8 +37,44 @@
                 </div>
                 <div class="stat-info">
                     <span class="stat-label">Total Score</span>
-                    <span class="stat-value">{{ total_score }}</span>
+                    <span class="stat-value" id="total-score">{{ total_score }}</span>
                 </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-award"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Your Position</span>
+                    <span class="stat-value" id="team-position">Calculating...</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Real-time leaderboard section -->
+        <div class="leaderboard-section">
+            <h3>Live Leaderboard</h3>
+            <div class="connection-status">
+                <span id="connection-indicator" class="connected">
+                    <i class="fas fa-signal"></i> Live Updates
+                </span>
+            </div>
+            <div class="leaderboard-container">
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Position</th>
+                            <th>Team</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-body">
+                        <tr>
+                            <td colspan="3" class="loading-message">Loading leaderboard data...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
         
@@ -208,5 +244,327 @@
 .action-btn i {
     margin-right: 0.5rem;
 }
+
+/* Leaderboard Styles */
+.leaderboard-section {
+    margin: 2rem 0;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(144, 200, 60, 0.2);
+}
+
+.leaderboard-section h3 {
+    color: #90C83C;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.connection-status {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+#connection-indicator {
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+#connection-indicator.connected {
+    background-color: rgba(40, 167, 69, 0.2);
+    color: #28a745;
+}
+
+#connection-indicator.connecting {
+    background-color: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+}
+
+#connection-indicator.disconnected {
+    background-color: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+}
+
+#connection-indicator i {
+    margin-right: 0.4rem;
+}
+
+.leaderboard-container {
+    background-color: rgba(33, 37, 41, 0.8);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 8px;
+    padding: 0.5rem;
+    overflow: hidden;
+}
+
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+}
+
+.leaderboard-table th {
+    color: #90C83C;
+    font-weight: bold;
+}
+
+.leaderboard-table td {
+    color: #ffffff;
+}
+
+.leaderboard-table tr:last-child td {
+    border-bottom: none;
+}
+
+.leaderboard-table tr:hover td {
+    background-color: rgba(144, 200, 60, 0.1);
+}
+
+.loading-message {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.team-row.current-team td {
+    background-color: rgba(144, 200, 60, 0.2);
+    font-weight: bold;
+}
+
+.team-row.updated td {
+    animation: highlight-row 2s ease-out;
+}
+
+@keyframes highlight-row {
+    0% { background-color: rgba(144, 200, 60, 0.4); }
+    100% { background-color: transparent; }
+}
+
+.pulsing-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: #28a745;
+    border-radius: 50%;
+    margin-right: 5px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { opacity: 0.4; }
+}
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const teamId = '{{ team.id }}';
+    const teamName = '{{ team.name }}';
+    const lobbyId = '{{ team.lobby.id }}';
+    let socket = null;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    let currentTeamPosition = null;
+    
+    // Initialize WebSocket connection
+    function initWebSocket() {
+        try {
+            const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const socketUrl = `${wsScheme}//${window.location.host}/ws/leaderboard/`;
+            
+            updateConnectionStatus('connecting');
+            
+            socket = new WebSocket(socketUrl);
+            
+            socket.onopen = function() {
+                console.log('WebSocket connected successfully');
+                updateConnectionStatus('connected');
+                reconnectAttempts = 0;
+                
+                // Request initial leaderboard data
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        action: 'get_data',
+                        lobby_id: lobbyId
+                    }));
+                }
+            };
+            
+            socket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'leaderboard_update' && data.teams) {
+                        updateLeaderboard(data.teams);
+                    }
+                } catch (error) {
+                    console.error('Error processing WebSocket message:', error);
+                }
+            };
+            
+            socket.onclose = function(event) {
+                console.log(`WebSocket closed with code: ${event.code}`);
+                updateConnectionStatus('disconnected');
+                
+                // Attempt to reconnect
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++;
+                    console.log(`Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`);
+                    
+                    setTimeout(initWebSocket, 3000);
+                } else {
+                    console.log('Max reconnection attempts reached, falling back to API polling');
+                    fallbackToPolling();
+                }
+            };
+            
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateConnectionStatus('disconnected');
+            };
+        } catch (error) {
+            console.error('Error initializing WebSocket:', error);
+            updateConnectionStatus('disconnected');
+            fallbackToPolling();
+        }
+    }
+    
+    // Update connection status indicator
+    function updateConnectionStatus(status) {
+        const indicator = document.getElementById('connection-indicator');
+        if (!indicator) return;
+        
+        // Remove all status classes
+        indicator.classList.remove('connected', 'connecting', 'disconnected');
+        
+        // Add appropriate class and text
+        switch (status) {
+            case 'connected':
+                indicator.classList.add('connected');
+                indicator.innerHTML = '<span class="pulsing-dot"></span> Live Updates';
+                break;
+            case 'connecting':
+                indicator.classList.add('connecting');
+                indicator.innerHTML = '<i class="fas fa-sync fa-spin"></i> Connecting...';
+                break;
+            case 'disconnected':
+                indicator.classList.add('disconnected');
+                indicator.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Disconnected';
+                break;
+        }
+    }
+    
+    // Update the leaderboard with team data
+    function updateLeaderboard(teams) {
+        if (!teams || !teams.length) return;
+        
+        // Sort teams by score (highest first)
+        teams.sort((a, b) => b.score - a.score);
+        
+        const leaderboardBody = document.getElementById('leaderboard-body');
+        if (!leaderboardBody) return;
+        
+        // Clear the loading message
+        leaderboardBody.innerHTML = '';
+        
+        // Add teams to the table
+        teams.forEach((team, index) => {
+            const position = index + 1;
+            const isCurrentTeam = team.id == teamId || team.name === teamName;
+            
+            // Update current team position if this is our team
+            if (isCurrentTeam && currentTeamPosition !== position) {
+                currentTeamPosition = position;
+                updateTeamPosition(position);
+            }
+            
+            const row = document.createElement('tr');
+            row.className = `team-row ${isCurrentTeam ? 'current-team' : ''}`;
+            row.dataset.teamId = team.id;
+            
+            // Position cell
+            const positionCell = document.createElement('td');
+            positionCell.textContent = position;
+            
+            // Team name cell
+            const nameCell = document.createElement('td');
+            nameCell.textContent = team.name;
+            
+            // Score cell
+            const scoreCell = document.createElement('td');
+            scoreCell.textContent = team.score;
+            
+            row.appendChild(positionCell);
+            row.appendChild(nameCell);
+            row.appendChild(scoreCell);
+            
+            leaderboardBody.appendChild(row);
+        });
+        
+        // If our team isn't in the list for some reason, update position as unknown
+        if (currentTeamPosition === null) {
+            updateTeamPosition('--');
+        }
+    }
+    
+    // Update the team position display
+    function updateTeamPosition(position) {
+        const positionElement = document.getElementById('team-position');
+        if (!positionElement) return;
+        
+        // Set the position text
+        positionElement.textContent = position;
+        
+        // Add special styling for top positions
+        if (position === 1) {
+            positionElement.style.color = 'gold';
+            positionElement.innerHTML = `${position} <i class="fas fa-crown"></i>`;
+        } else if (position === 2) {
+            positionElement.style.color = 'silver';
+            positionElement.innerHTML = `${position} <i class="fas fa-medal"></i>`;
+        } else if (position === 3) {
+            positionElement.style.color = '#cd7f32'; // bronze
+            positionElement.innerHTML = `${position} <i class="fas fa-medal"></i>`;
+        }
+    }
+    
+    // Fall back to polling for updates
+    function fallbackToPolling() {
+        console.log('Starting fallback API polling');
+        
+        // Start with an immediate data fetch
+        fetchLeaderboardData();
+        
+        // Then poll every 5 seconds
+        setInterval(fetchLeaderboardData, 5000);
+    }
+    
+    // Fetch leaderboard data via API
+    function fetchLeaderboardData() {
+        fetch(`/api/leaderboard-data/?lobby_id=${lobbyId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.teams) {
+                    updateLeaderboard(data.teams);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching leaderboard data:', error);
+            });
+    }
+    
+    // Initialize
+    initWebSocket();
+    
+    // Also do an initial API fetch to ensure we have data
+    fetchLeaderboardData();
+});
+</script>
 {% endblock %} 
