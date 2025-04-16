@@ -48,6 +48,43 @@ def team_created(sender, instance, created, **kwargs):
                 }
             )
 
+# Add this function to broadcast team member updates to race channels
+def broadcast_team_members_to_race_channels(team):
+    """
+    Broadcasts team member updates to all race update channels for a specific team.
+    This ensures that all clients connected to race pages get real-time updates about team members.
+    """
+    try:
+        from .models import Race, TeamRaceProgress
+        
+        # Get channel layer for broadcasting
+        channel_layer = get_channel_layer()
+        
+        # Format the team members data
+        members = list(team.members.values('id', 'role'))
+        
+        # Find all races this team is participating in
+        team_race_progress = TeamRaceProgress.objects.filter(team=team)
+        races = [progress.race for progress in team_race_progress]
+        
+        print(f"DEBUG: Broadcasting team members update for team {team.name} (ID: {team.id}) to {len(races)} race channels")
+        
+        # Broadcast to each race update channel
+        for race in races:
+            race_team_group_name = f'race_updates_{race.id}_{team.code}'
+            print(f"DEBUG: Broadcasting to race channel: {race_team_group_name}")
+            
+            async_to_sync(channel_layer.group_send)(
+                race_team_group_name,
+                {
+                    'type': 'team_members_update',
+                    'members': members
+                }
+            )
+            print(f"DEBUG: Sent team_members_update to race channel {race_team_group_name}")
+    except Exception as e:
+        print(f"DEBUG ERROR: Failed to broadcast team members to race channels: {str(e)}")
+
 @receiver(post_save, sender=TeamMember)
 def team_member_created(sender, instance, created, **kwargs):
     """
@@ -122,6 +159,9 @@ def team_member_created(sender, instance, created, **kwargs):
                     }
                 }
             )
+        
+        # Also broadcast to race update channels for this team
+        broadcast_team_members_to_race_channels(instance.team)
         
         print(f"DEBUG SIGNAL: Completed all notifications for new member {instance.role} in team {instance.team.name}")
 
@@ -604,4 +644,18 @@ def cleanup_after_lobby_deletion(sender, instance, **kwargs):
                     logger.error(f"Error deleting orphaned team {team_id}: {str(e)}")
                 
     except Exception as e:
-        logger.error(f"Error in cleanup_after_lobby_deletion: {str(e)}") 
+        logger.error(f"Error in cleanup_after_lobby_deletion: {str(e)}")
+
+# Also modify the TeamMember deletion or post_delete signal to broadcast the update
+@receiver(post_delete, sender=TeamMember)
+def team_member_deleted(sender, instance, **kwargs):
+    """
+    Signal handler to notify connected clients when a team member is deleted
+    """
+    if instance.team:
+        print(f"DEBUG SIGNAL: Member {instance.role} removed from team {instance.team.name} (ID: {instance.team.id})")
+        
+        # Broadcast to race update channels for this team
+        broadcast_team_members_to_race_channels(instance.team)
+        
+        print(f"DEBUG SIGNAL: Sent team member removal update for {instance.role}") 

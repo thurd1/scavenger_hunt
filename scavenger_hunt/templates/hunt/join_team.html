@@ -501,26 +501,42 @@ function showConnectionStatus(status, message) {
 }
 
 function updateTeamsDisplay(teams) {
+    console.log("Updating teams display with:", teams);
     const teamsContainer = document.getElementById('teamsContainer');
+    
+    // Save current scroll position
+    const scrollPosition = window.scrollY;
+    
     teamsContainer.innerHTML = '';
     
     if (teams && teams.length > 0) {
         teams.forEach(team => {
+            console.log(`Processing team ${team.name} with ${team.members ? team.members.length : 0} members:`, team.members);
+            
             const teamCard = document.createElement('div');
             teamCard.className = 'team-card';
             
+            // Ensure the members array exists
+            const members = team.members || [];
+            const memberCount = members.length;
+            
+            // Debug: Check if members data is correctly structured
+            console.log(`Team ${team.name} member count: ${memberCount}`);
+            console.log(`Members data:`, members);
+            
+            // Create team card HTML
             teamCard.innerHTML = `
                 <div class="team-header">
                     <h4>${team.name}</h4>
-                    <span class="member-count">${team.members.length} member(s)</span>
+                    <span class="member-count">${memberCount} member(s)</span>
                 </div>
                 <div class="team-members">
                     <ul class="members-list">
-                        ${team.members.map(member => `
-                            <li><i class="fas fa-user"></i> ${member.role}</li>
+                        ${members.map(member => `
+                            <li><i class="fas fa-user"></i> ${member.role || member}</li>
                         `).join('')}
                     </ul>
-                    ${team.members.length >= 1 ? 
+                    ${memberCount >= 1 ? 
                         `<button class="join-btn team-full" disabled>Team Full</button>` : 
                         `<button onclick="joinTeam('${team.code}')" class="join-btn">Join Team</button>`
                     }
@@ -538,6 +554,15 @@ function updateTeamsDisplay(teams) {
             </div>
         `;
     }
+    
+    // Restore scroll position
+    window.scrollTo(0, scrollPosition);
+    
+    // Force a visual update
+    teamsContainer.style.opacity = '0.8';
+    setTimeout(() => {
+        teamsContainer.style.opacity = '1';
+    }, 100);
 }
 
 function joinTeam(teamCode) {
