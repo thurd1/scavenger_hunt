@@ -781,4 +781,220 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
             return teams_data
         except Exception as e:
             logging.error(f"Error getting leaderboard data: {str(e)}")
-            return [] 
+            return []
+
+class RaceUpdatesConsumer(AsyncWebsocketConsumer):
+    """
+    WebSocket consumer for race updates specific to a team.
+    Handles real-time updates for a team in a race.
+    """
+    async def connect(self):
+        # Extract parameters from URL
+        self.race_id = self.scope['url_route']['kwargs']['race_id']
+        self.team_code = self.scope['url_route']['kwargs']['team_code']
+        self.race_team_group_name = f'race_updates_{self.race_id}_{self.team_code}'
+        
+        # Join both the race-specific and team-specific groups
+        await self.channel_layer.group_add(
+            self.race_team_group_name,
+            self.channel_name
+        )
+        
+        # Also join the general race group
+        self.race_group_name = f'race_{self.race_id}'
+        await self.channel_layer.group_add(
+            self.race_group_name,
+            self.channel_name
+        )
+        
+        # Accept the connection
+        await self.accept()
+        
+        # Log for debugging
+        logger.info(f"WebSocket CONNECTED: Race Updates for race {self.race_id}, team {self.team_code}, channel: {self.channel_name}")
+        
+        # Send initial state
+        await self.send_initial_state()
+
+    async def disconnect(self, close_code):
+        # Leave the race-team specific group
+        await self.channel_layer.group_discard(
+            self.race_team_group_name,
+            self.channel_name
+        )
+        
+        # Leave the general race group
+        await self.channel_layer.group_discard(
+            self.race_group_name,
+            self.channel_name
+        )
+        
+        logger.info(f"WebSocket DISCONNECTED: Race Updates for race {self.race_id}, team {self.team_code}")
+
+    async def receive(self, text_data):
+        """Handle messages from clients"""
+        try:
+            data = json.loads(text_data)
+            
+            # Handle heartbeat messages
+            if data.get('type') == 'ping':
+                await self.send(text_data=json.dumps({
+                    'type': 'pong',
+                    'timestamp': datetime.now().isoformat()
+                }))
+                return
+                
+            # Handle request for initial state
+            if data.get('type') == 'request_race_update':
+                await self.send_initial_state()
+                return
+                
+            # Handle other messages as needed
+            logger.info(f"Received message in race updates consumer: {data}")
+            
+        except json.JSONDecodeError:
+            logger.error(f"Invalid JSON received in RaceUpdatesConsumer")
+        except Exception as e:
+            logger.error(f"Error in RaceUpdatesConsumer receive: {str(e)}")
+    
+    @database_sync_to_async
+    def get_race_data(self):
+        """Get race data including team progress"""
+        try:
+            from hunt.models import Race, Team, TeamRaceProgress, Question, Answer
+            
+            # Get the race
+            race = Race.objects.get(id=self.race_id)
+            
+            # Get the team
+            team = Team.objects.get(code=self.team_code)
+            
+            # Get team's progress in this race
+            try:
+                progress = TeamRaceProgress.objects.get(team=team, race=race)
+                total_points = progress.total_points
+                current_question_index = progress.current_question_index
+            except TeamRaceProgress.DoesNotExist:
+                total_points = 0
+                current_question_index = 0
+            
+            # Get team members
+            members = list(team.members.values('id', 'role'))
+            
+            # Get questions and answers for this team
+            questions_data = {}
+            for question in Question.objects.filter(race=race):
+                try:
+                    answer = Answer.objects.get(team=team, question=question)
+                    questions_data[str(question.id)] = {
+                        'attempts': answer.attempts,
+                        'points_awarded': answer.points_awarded,
+                        'answered_correctly': answer.answered_correctly,
+                        'photo_uploaded': answer.photo_uploaded
+                    }
+                except Answer.DoesNotExist:
+                    questions_data[str(question.id)] = {
+                        'attempts': 0,
+                        'points_awarded': 0,
+                        'answered_correctly': False,
+                        'photo_uploaded': False
+                    }
+            
+            # Get race timer data
+            remaining_seconds = None
+            if race.time_limit_minutes and race.started_at:
+                elapsed_seconds = (timezone.now() - race.started_at).total_seconds()
+                time_limit_seconds = race.time_limit_minutes * 60
+                remaining_seconds = max(0, time_limit_seconds - elapsed_seconds)
+            
+            return {
+                'race_id': race.id,
+                'race_name': race.name,
+                'team_id': team.id,
+                'team_name': team.name,
+                'team_code': team.code,
+                'total_points': total_points,
+                'current_question_index': current_question_index,
+                'members': members,
+                'question_data': questions_data,
+                'remaining_seconds': remaining_seconds,
+                'race_status': 'active' if race.is_active else 'inactive'
+            }
+        except Exception as e:
+            logger.error(f"Error getting race data: {str(e)}")
+            return None
+    
+    async def send_initial_state(self):
+        """Send initial state to the client"""
+        try:
+            race_data = await self.get_race_data()
+            if race_data:
+                await self.send(text_data=json.dumps({
+                    'type': 'race_update',
+                    'data': race_data
+                }))
+        except Exception as e:
+            logger.error(f"Error sending initial state: {str(e)}")
+    
+    # Event handlers from the channel layer
+    async def score_update(self, event):
+        """Handle score update event"""
+        await self.send(text_data=json.dumps({
+            'type': 'score_update',
+            'score': event.get('score', 0),
+            'team_id': event.get('team_id')
+        }))
+    
+    async def question_update(self, event):
+        """Handle question update event"""
+        await self.send(text_data=json.dumps({
+            'type': 'question_update',
+            'question_data': event.get('question_data', {}),
+            'question_id': event.get('question_id')
+        }))
+    
+    async def race_time_update(self, event):
+        """Handle race timer update event"""
+        await self.send(text_data=json.dumps({
+            'type': 'race_time_update',
+            'remaining_seconds': event.get('remaining_seconds')
+        }))
+    
+    async def navigate_to_question(self, event):
+        """Handle navigation event"""
+        await self.send(text_data=json.dumps({
+            'type': 'navigate_to_question',
+            'question_index': event.get('question_index')
+        }))
+    
+    async def race_status_update(self, event):
+        """Handle race status update event"""
+        await self.send(text_data=json.dumps({
+            'type': 'race_status_update',
+            'status': event.get('status'),
+            'message': event.get('message', '')
+        }))
+    
+    async def team_members_update(self, event):
+        """Handle team members update event"""
+        await self.send(text_data=json.dumps({
+            'type': 'team_members_update',
+            'members': event.get('members', [])
+        }))
+    
+    async def race_complete(self, event):
+        """Handle race completion event"""
+        await self.send(text_data=json.dumps({
+            'type': 'race_complete',
+            'redirect_url': event.get('redirect_url', '/race-complete/')
+        }))
+    
+    # This handler is to ensure we also receive events from the general race group
+    async def race_started(self, event):
+        """Handle race started event from the general race group"""
+        await self.send(text_data=json.dumps({
+            'type': 'race_started',
+            'race_id': event.get('race_id', self.race_id),
+            'redirect_url': event.get('redirect_url', f'/race/{self.race_id}/questions/'),
+            'message': event.get('message', 'Race has started! Redirecting to questions page.')
+        })) 
