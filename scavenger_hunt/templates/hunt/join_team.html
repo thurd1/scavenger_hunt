@@ -29,7 +29,11 @@
                                         <li><i class="fas fa-user"></i> {{ member.role }}</li>
                                     {% endfor %}
                                 </ul>
-                                <button onclick="joinTeam('{{ team.code }}')" class="join-btn">Join Team</button>
+                                {% if team.member_count >= 1 %}
+                                    <button class="join-btn team-full" disabled>Team Full</button>
+                                {% else %}
+                                    <button onclick="joinTeam('{{ team.code }}')" class="join-btn">Join Team</button>
+                                {% endif %}
                             </div>
                         </div>
                     {% endfor %}
@@ -211,6 +215,18 @@
     transform: translateY(-2px);
 }
 
+.join-btn.team-full {
+    background: rgba(220, 53, 69, 0.1);
+    color: rgba(220, 53, 69, 0.7);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    cursor: not-allowed;
+}
+
+.join-btn.team-full:hover {
+    background: rgba(220, 53, 69, 0.1);
+    transform: none;
+}
+
 .divider {
     text-align: center;
     margin: 2rem 0;
@@ -302,6 +318,10 @@
 
 <script>
 let socket = null;
+let reconnectInterval = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY = 3000; // 3 seconds
 
 document.addEventListener("DOMContentLoaded", function() {
     setupWebSocket();
@@ -313,6 +333,12 @@ function setupWebSocket() {
         socket.close();
     }
     
+    // Clear any existing reconnect interval
+    if (reconnectInterval) {
+        clearInterval(reconnectInterval);
+        reconnectInterval = null;
+    }
+    
     // Get lobby code if available
     const lobbyCode = '{{ lobby_code }}';
     console.log('Current lobby code:', lobbyCode);
@@ -321,33 +347,157 @@ function setupWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/available-teams/`;
     
-    socket = new WebSocket(wsUrl);
-    
-    socket.onopen = function(e) {
-        console.log("WebSocket connection established");
-        // Request initial state with lobby code
-        socket.send(JSON.stringify({
-            'type': 'request_update',
-            'lobby_code': lobbyCode
-        }));
-    };
-    
-    socket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        console.log("WebSocket message received:", data);
+    try {
+        socket = new WebSocket(wsUrl);
         
-        if (data.type === 'teams_update') {
-            updateTeamsDisplay(data.teams);
+        socket.onopen = function(e) {
+            console.log("WebSocket connection established");
+            // Reset reconnect attempts on successful connection
+            reconnectAttempts = 0;
+            
+            // Request initial state with lobby code
+            sendMessage({
+                'type': 'request_update',
+                'lobby_code': lobbyCode
+            });
+            
+            // Set up a heartbeat to keep the connection alive
+            startHeartbeat();
+        };
+        
+        socket.onmessage = function(e) {
+            try {
+                const data = JSON.parse(e.data);
+                console.log("WebSocket message received:", data);
+                
+                if (data.type === 'teams_update') {
+                    updateTeamsDisplay(data.teams);
+                } else if (data.type === 'pong') {
+                    console.log("Heartbeat response received");
+                } else if (data.type === 'error') {
+                    console.error("WebSocket error from server:", data.message);
+                    showConnectionStatus('error', data.message);
+                }
+            } catch (error) {
+                console.error("Error processing WebSocket message:", error);
+            }
+        };
+        
+        socket.onerror = function(error) {
+            console.error("WebSocket error:", error);
+            showConnectionStatus('error', 'Connection error');
+        };
+        
+        socket.onclose = function(e) {
+            console.log("WebSocket connection closed:", e);
+            
+            // Stop heartbeat
+            stopHeartbeat();
+            
+            // Show connection status
+            if (e.code !== 1000) {
+                showConnectionStatus('closed', 'Connection lost');
+                
+                // Only attempt to reconnect if we haven't exceeded the maximum attempts
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++;
+                    showConnectionStatus('reconnecting', `Reconnecting (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                    
+                    // Try to reconnect after delay
+                    setTimeout(() => {
+                        setupWebSocket();
+                    }, RECONNECT_DELAY);
+                } else {
+                    showConnectionStatus('failed', 'Failed to reconnect. Please refresh the page.');
+                }
+            }
+        };
+    } catch (error) {
+        console.error("Failed to create WebSocket connection:", error);
+        showConnectionStatus('error', 'Failed to establish connection');
+    }
+}
+
+// Heartbeat to keep connection alive
+let heartbeatInterval = null;
+
+function startHeartbeat() {
+    // Clear any existing heartbeat
+    stopHeartbeat();
+    
+    // Send heartbeat every 30 seconds
+    heartbeatInterval = setInterval(() => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            sendMessage({ 'type': 'ping' });
         }
-    };
+    }, 30000);
+}
+
+function stopHeartbeat() {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+    }
+}
+
+// Safe wrapper for sending messages
+function sendMessage(message) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        try {
+            socket.send(JSON.stringify(message));
+        } catch (error) {
+            console.error("Error sending WebSocket message:", error);
+        }
+    } else {
+        console.warn("Cannot send message, WebSocket is not open");
+    }
+}
+
+// Show connection status to the user
+function showConnectionStatus(status, message) {
+    console.log(`Connection status: ${status} - ${message}`);
     
-    socket.onerror = function(error) {
-        console.error("WebSocket error:", error);
-    };
+    // Create or update status indicator
+    let statusElement = document.getElementById('ws-status-indicator');
     
-    socket.onclose = function(e) {
-        console.log("WebSocket connection closed:", e);
-    };
+    if (!statusElement) {
+        statusElement = document.createElement('div');
+        statusElement.id = 'ws-status-indicator';
+        statusElement.style.position = 'fixed';
+        statusElement.style.bottom = '10px';
+        statusElement.style.right = '10px';
+        statusElement.style.padding = '5px 10px';
+        statusElement.style.borderRadius = '5px';
+        statusElement.style.fontSize = '12px';
+        statusElement.style.zIndex = '1000';
+        document.body.appendChild(statusElement);
+    }
+    
+    // Set message and style based on status
+    statusElement.textContent = message;
+    
+    switch (status) {
+        case 'connected':
+            statusElement.style.backgroundColor = 'rgba(40, 167, 69, 0.8)';
+            statusElement.style.color = 'white';
+            // Hide after 3 seconds if connected
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 3000);
+            break;
+        case 'reconnecting':
+            statusElement.style.backgroundColor = 'rgba(255, 193, 7, 0.8)';
+            statusElement.style.color = 'black';
+            statusElement.style.display = 'block';
+            break;
+        case 'error':
+        case 'closed':
+        case 'failed':
+            statusElement.style.backgroundColor = 'rgba(220, 53, 69, 0.8)';
+            statusElement.style.color = 'white';
+            statusElement.style.display = 'block';
+            break;
+    }
 }
 
 function updateTeamsDisplay(teams) {
@@ -370,7 +520,10 @@ function updateTeamsDisplay(teams) {
                             <li><i class="fas fa-user"></i> ${member.role}</li>
                         `).join('')}
                     </ul>
-                    <button onclick="joinTeam('${team.code}')" class="join-btn">Join Team</button>
+                    ${team.members.length >= 1 ? 
+                        `<button class="join-btn team-full" disabled>Team Full</button>` : 
+                        `<button onclick="joinTeam('${team.code}')" class="join-btn">Join Team</button>`
+                    }
                 </div>
             `;
             
@@ -393,6 +546,15 @@ function joinTeam(teamCode) {
     
     if (!playerName) {
         alert('Player name not found in session. Please go back to the home page.');
+        return;
+    }
+    
+    // Verify team is not full
+    const teamCard = document.querySelector(`.team-card button[onclick*="${teamCode}"]`).closest('.team-card');
+    const memberCount = teamCard.querySelector('.member-count').textContent.split(' ')[0];
+    
+    if (parseInt(memberCount) >= 1) {
+        alert('This team is already full. Please choose another team or create a new one.');
         return;
     }
     

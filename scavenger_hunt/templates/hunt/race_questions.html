@@ -468,6 +468,260 @@ const answersFromServer = {
 {% endfor %}
 };
 
+// Add a WebSocket connection for real-time race questions updates
+let raceSocket = null;
+let raceReconnectAttempts = 0;
+const MAX_RACE_RECONNECT_ATTEMPTS = 5;
+const RACE_RECONNECT_DELAY = 3000; // 3 seconds
+
+function setupRaceWebSocket() {
+    // Close any existing connection
+    if (raceSocket) {
+        raceSocket.close();
+    }
+    
+    // Only proceed if we have team code and race id
+    const teamCode = '{{ team.code }}';
+    const raceId = '{{ race.id }}';
+    
+    if (!teamCode || !raceId) {
+        console.warn("Missing team code or race ID, can't establish WebSocket connection");
+        return;
+    }
+    
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/race-updates/${raceId}/${teamCode}/`;
+    
+    try {
+        raceSocket = new WebSocket(wsUrl);
+        
+        raceSocket.onopen = function(e) {
+            console.log("Race WebSocket connection established");
+            raceReconnectAttempts = 0;
+            
+            // Request initial state
+            sendRaceMessage({
+                'type': 'request_race_update',
+                'team_code': teamCode,
+                'race_id': raceId
+            });
+            
+            // Show connected status briefly
+            showRaceConnectionStatus('connected', 'Connected to race updates');
+        };
+        
+        raceSocket.onmessage = function(e) {
+            try {
+                const data = JSON.parse(e.data);
+                console.log("Race WebSocket message received:", data);
+                
+                if (data.type === 'score_update') {
+                    // Update score without page refresh
+                    const totalScoreEl = document.getElementById('total-score');
+                    if (totalScoreEl && data.score !== undefined) {
+                        totalScoreEl.textContent = data.score;
+                        
+                        // Add animation for score change
+                        totalScoreEl.style.transition = 'color 0.5s';
+                        totalScoreEl.style.color = '#90C83C';
+                        setTimeout(() => {
+                            totalScoreEl.style.color = '';
+                        }, 1000);
+                    }
+                } else if (data.type === 'question_update') {
+                    // Process question status updates
+                    if (data.question_data) {
+                        updateQuestionState(data.question_data);
+                    }
+                } else if (data.type === 'time_update') {
+                    // Update timer if needed
+                    if (data.remaining_seconds !== undefined) {
+                        updateTimerDisplay(data.remaining_seconds);
+                    }
+                } else if (data.type === 'race_complete') {
+                    // Handle race completion
+                    showRaceCompleteNotification(data.redirect_url);
+                }
+            } catch (error) {
+                console.error("Error processing race WebSocket message:", error);
+            }
+        };
+        
+        raceSocket.onerror = function(error) {
+            console.error("Race WebSocket error:", error);
+            showRaceConnectionStatus('error', 'Connection error');
+        };
+        
+        raceSocket.onclose = function(e) {
+            console.log("Race WebSocket connection closed:", e);
+            
+            // Attempt to reconnect for unexpected closures
+            if (e.code !== 1000) {
+                showRaceConnectionStatus('closed', 'Race updates connection lost');
+                
+                if (raceReconnectAttempts < MAX_RACE_RECONNECT_ATTEMPTS) {
+                    raceReconnectAttempts++;
+                    showRaceConnectionStatus('reconnecting', `Reconnecting (${raceReconnectAttempts}/${MAX_RACE_RECONNECT_ATTEMPTS})...`);
+                    
+                    setTimeout(() => {
+                        setupRaceWebSocket();
+                    }, RACE_RECONNECT_DELAY);
+                } else {
+                    showRaceConnectionStatus('failed', 'Failed to reconnect. Please refresh the page.');
+                }
+            }
+        };
+    } catch (error) {
+        console.error("Failed to create race WebSocket connection:", error);
+    }
+}
+
+// Helper function to send race WebSocket messages
+function sendRaceMessage(message) {
+    if (raceSocket && raceSocket.readyState === WebSocket.OPEN) {
+        try {
+            raceSocket.send(JSON.stringify(message));
+        } catch (error) {
+            console.error("Error sending race WebSocket message:", error);
+        }
+    } else {
+        console.warn("Cannot send race message, WebSocket is not open");
+    }
+}
+
+// Update question state based on WebSocket data
+function updateQuestionState(questionData) {
+    // Loop through question data and update UI
+    for (const questionId in questionData) {
+        const data = questionData[questionId];
+        
+        // Find the question in the DOM
+        const questionEl = document.querySelector(`.question-card[data-question-id="${questionId}"]`);
+        if (!questionEl) continue;
+        
+        // Extract the question index from the DOM element
+        const questionIndex = questionEl.id.split('-')[1];
+        
+        // Update attempts
+        const attemptsEl = document.getElementById(`attempts-${questionIndex}`);
+        if (attemptsEl && data.attempts !== undefined) {
+            attemptsEl.textContent = data.attempts;
+        }
+        
+        // Update feedback if question is answered
+        if (data.answered_correctly) {
+            const feedbackEl = document.getElementById(`feedback-${questionIndex}`);
+            if (feedbackEl) {
+                feedbackEl.className = 'feedback correct';
+                feedbackEl.style.display = 'block';
+                feedbackEl.textContent = `Correct! You earned ${data.points_awarded} points.`;
+            }
+            
+            // Disable the answer submission
+            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionIndex}"]`);
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            
+            // Show navigation buttons
+            document.getElementById('navigation-buttons').style.display = 'block';
+        }
+        
+        // Handle photo upload state
+        if (data.photo_uploaded) {
+            const photoUploadEl = document.getElementById(`photo-upload-${questionIndex}`);
+            if (photoUploadEl) {
+                const uploadButton = photoUploadEl.querySelector('.upload-photo');
+                if (uploadButton) {
+                    uploadButton.disabled = true;
+                    uploadButton.textContent = "Photo Uploaded ✓";
+                }
+                
+                // Show success feedback
+                const feedbackEl = document.getElementById(`feedback-${questionIndex}`);
+                if (feedbackEl) {
+                    feedbackEl.className = 'feedback correct';
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.textContent = 'Photo uploaded successfully!';
+                }
+                
+                // Show navigation buttons
+                document.getElementById('navigation-buttons').style.display = 'block';
+            }
+        }
+        
+        // Handle max attempts case
+        if (data.attempts >= 3 && !data.answered_correctly && !data.photo_uploaded) {
+            showPhotoUpload(questionIndex);
+        }
+    }
+}
+
+// Show connection status specifically for race updates
+function showRaceConnectionStatus(status, message) {
+    console.log(`Race connection status: ${status} - ${message}`);
+    
+    let statusElement = document.getElementById('race-ws-status');
+    
+    if (!statusElement) {
+        statusElement = document.createElement('div');
+        statusElement.id = 'race-ws-status';
+        statusElement.style.position = 'fixed';
+        statusElement.style.bottom = '10px';
+        statusElement.style.left = '10px';
+        statusElement.style.padding = '5px 10px';
+        statusElement.style.borderRadius = '5px';
+        statusElement.style.fontSize = '12px';
+        statusElement.style.zIndex = '1000';
+        document.body.appendChild(statusElement);
+    }
+    
+    statusElement.textContent = message;
+    
+    switch (status) {
+        case 'connected':
+            statusElement.style.backgroundColor = 'rgba(40, 167, 69, 0.8)';
+            statusElement.style.color = 'white';
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 3000);
+            break;
+        case 'reconnecting':
+            statusElement.style.backgroundColor = 'rgba(255, 193, 7, 0.8)';
+            statusElement.style.color = 'black';
+            statusElement.style.display = 'block';
+            break;
+        case 'error':
+        case 'closed':
+        case 'failed':
+            statusElement.style.backgroundColor = 'rgba(220, 53, 69, 0.8)';
+            statusElement.style.color = 'white';
+            statusElement.style.display = 'block';
+            break;
+    }
+}
+
+// Show race completion notification
+function showRaceCompleteNotification(redirectUrl) {
+    const completeMessage = document.createElement('div');
+    completeMessage.style.position = 'fixed';
+    completeMessage.style.top = '50%';
+    completeMessage.style.left = '50%';
+    completeMessage.style.transform = 'translate(-50%, -50%)';
+    completeMessage.style.background = 'rgba(40, 167, 69, 0.9)';
+    completeMessage.style.color = 'white';
+    completeMessage.style.padding = '20px';
+    completeMessage.style.borderRadius = '10px';
+    completeMessage.style.zIndex = '20000';
+    completeMessage.innerHTML = '<h3>Congratulations!</h3><p>You\'ve completed all questions!</p><p>Redirecting to results page...</p>';
+    document.body.appendChild(completeMessage);
+    
+    // Redirect after a short delay
+    setTimeout(() => {
+        window.location.href = redirectUrl || '/race-complete/';
+    }, 2000);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Simple way to handle the conditional logic without template tags in JS
     const questionContainer = document.getElementById('question-container');
@@ -1427,6 +1681,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
+
+    // Only initialize if we're on the question view (not the join form)
+    if (document.getElementById('race-questions')) {
+        setupRaceWebSocket();
+    }
 });
 
 // Helper function to get cookies for CSRF token
@@ -1443,6 +1702,45 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// Update timer display based on remaining seconds
+function updateTimerDisplay(remainingSeconds) {
+    const timerDisplay = document.getElementById('race-timer');
+    if (!timerDisplay) return;
+    
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = remainingSeconds % 60;
+    
+    // Update timer display
+    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Set timer color to red when time is running low
+    if (remainingSeconds <= 300) { // 5 minutes or less
+        timerDisplay.style.color = "red";
+        timerDisplay.style.fontWeight = "bold";
+    }
+    
+    // Show 5-minute warning popup if needed
+    if (remainingSeconds <= 300 && remainingSeconds > 299) {
+        showCustomPopup(
+            "⏳ Time Warning", 
+            "Only 5 minutes left!<br><br>Finish strong and complete all your questions!",
+            "warning"
+        );
+    }
+    
+    // Redirect when time runs out
+    if (remainingSeconds <= 0) {
+        showCustomPopup(
+            "⏰ Time's Up!", 
+            "Your race time has ended.<br><br>Redirecting to the race completion page...",
+            "danger",
+            function() {
+                window.location.href = "{% url 'race_complete' %}";
+            }
+        );
+    }
 }
 </script>
 {% endblock %} 
