@@ -489,8 +489,12 @@ function setupRaceWebSocket() {
         return;
     }
     
+    console.log(`Setting up race WebSocket for race ${raceId}, team ${teamCode}`);
+    
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/race-updates/${raceId}/${teamCode}/`;
+    
+    console.log(`Connecting to WebSocket URL: ${wsUrl}`);
     
     try {
         raceSocket = new WebSocket(wsUrl);
@@ -951,8 +955,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Only initialize if we're on the question view (not the join form)
     if (document.getElementById('race-questions')) {
+        console.log("Initializing race WebSocket connection...");
         setupRaceWebSocket();
+    } else {
+        console.log("Race questions not found, not initializing WebSocket");
     }
+});
+
+// Also add this to capture and log any general errors
+window.addEventListener('error', function(event) {
+    console.error('Global error caught:', event.error);
 });
 </script>
 {% endblock %} 

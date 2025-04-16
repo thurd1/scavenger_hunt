@@ -48,32 +48,47 @@ def team_created(sender, instance, created, **kwargs):
                 }
             )
 
-# Add this function to broadcast team member updates to race channels
+# Update this function to handle both race progress and lobby-associated races
 def broadcast_team_members_to_race_channels(team):
     """
     Broadcasts team member updates to all race update channels for a specific team.
     This ensures that all clients connected to race pages get real-time updates about team members.
     """
     try:
-        from .models import Race, TeamRaceProgress
+        from .models import Race, TeamRaceProgress, Lobby
         
         # Get channel layer for broadcasting
         channel_layer = get_channel_layer()
         
-        # Format the team members data
+        # Format the team members data 
         members = list(team.members.values('id', 'role'))
         
-        # Find all races this team is participating in
+        # Method 1: Find races from TeamRaceProgress
         team_race_progress = TeamRaceProgress.objects.filter(team=team)
-        races = [progress.race for progress in team_race_progress]
+        races_from_progress = [progress.race for progress in team_race_progress]
+        
+        # Method 2: Find races from team's lobbies
+        lobbies = team.participating_lobbies.all()
+        races_from_lobbies = [lobby.race for lobby in lobbies if lobby.race is not None]
+        
+        # Combine both sets of races (using IDs to avoid duplicates)
+        all_race_ids = set()
+        races = []
+        
+        for race in races_from_progress + races_from_lobbies:
+            if race and race.id not in all_race_ids:
+                all_race_ids.add(race.id)
+                races.append(race)
         
         print(f"DEBUG: Broadcasting team members update for team {team.name} (ID: {team.id}) to {len(races)} race channels")
+        print(f"DEBUG: Team members: {[m['role'] for m in members]}")
         
         # Broadcast to each race update channel
         for race in races:
             race_team_group_name = f'race_updates_{race.id}_{team.code}'
             print(f"DEBUG: Broadcasting to race channel: {race_team_group_name}")
             
+            # Send team members update to race updates channel
             async_to_sync(channel_layer.group_send)(
                 race_team_group_name,
                 {
@@ -82,8 +97,29 @@ def broadcast_team_members_to_race_channels(team):
                 }
             )
             print(f"DEBUG: Sent team_members_update to race channel {race_team_group_name}")
+            
+            # Also try broadcasting to the general race channel as a fallback
+            race_group_name = f'race_{race.id}'
+            print(f"DEBUG: Also broadcasting to general race channel: {race_group_name}")
+            
+            async_to_sync(channel_layer.group_send)(
+                race_group_name,
+                {
+                    'type': 'team_members_update',
+                    'team_id': team.id,
+                    'team_code': team.code,
+                    'members': members
+                }
+            )
+            print(f"DEBUG: Sent team_members_update to general race channel {race_group_name}")
+        
+        if not races:
+            print(f"DEBUG: No races found for team {team.name} - team member updates won't be broadcast")
+            
     except Exception as e:
         print(f"DEBUG ERROR: Failed to broadcast team members to race channels: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 @receiver(post_save, sender=TeamMember)
 def team_member_created(sender, instance, created, **kwargs):

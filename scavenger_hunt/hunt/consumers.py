@@ -770,6 +770,26 @@ class RaceConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error in RaceConsumer.race_started: {str(e)}")
 
+    async def team_members_update(self, event):
+        """
+        Handle team members update events in the general race channel
+        This forwards team member updates to all clients watching the race
+        """
+        try:
+            # Forward the team members update message to the client
+            logger.info(f"RaceConsumer: Forwarding team members update for team {event.get('team_id')} in race {self.race_id}")
+            
+            await self.send(text_data=json.dumps({
+                'type': 'team_members_update',
+                'team_id': event.get('team_id'),
+                'team_code': event.get('team_code'),
+                'members': event.get('members', [])
+            }))
+            
+            logger.info(f"Successfully forwarded team members update in race {self.race_id}")
+        except Exception as e:
+            logger.error(f"Error in RaceConsumer.team_members_update: {str(e)}")
+
 class LeaderboardConsumer(AsyncWebsocketConsumer):
     """
     Consumer for the leaderboard page.

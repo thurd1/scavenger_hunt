@@ -1972,7 +1972,9 @@ def race_complete(request):
     })
 
 def race_questions(request, race_id):
-    """View for participants to see and answer questions during a race"""
+    """
+    Display questions for a race or show join form
+    """
     # Get race and check if it's active
     race = get_object_or_404(Race, id=race_id)
     
@@ -2086,6 +2088,27 @@ def race_questions(request, race_id):
         'current_question_index': current_question_index,
         'total_points': total_points
     }
+    
+    # Check if the team member has TeamRaceProgress for this race
+    team_race_progress, created = TeamRaceProgress.objects.get_or_create(
+        team=team,
+        race=race,
+        defaults={
+            'total_points': 0,
+            'current_question_index': 0
+        }
+    )
+    
+    if created:
+        logger.info(f"Created new TeamRaceProgress for team {team.id} in race {race_id}")
+        
+        # Force broadcast team members to race channels since we now have TeamRaceProgress
+        try:
+            from .signals import broadcast_team_members_to_race_channels
+            broadcast_team_members_to_race_channels(team)
+            logger.info(f"Manually broadcast team members for team {team.id} after creating TeamRaceProgress")
+        except Exception as e:
+            logger.error(f"Error broadcasting team members: {str(e)}")
     
     return render(request, 'hunt/race_questions.html', context)
 
