@@ -10,6 +10,7 @@ from django.utils import timezone
 import asyncio
 from datetime import datetime
 from django.db.models import Sum, Count
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -115,15 +116,26 @@ class TeamConsumer(AsyncWebsocketConsumer):
             if data.get('action') == 'join':
                 self.player_name = data.get('player_name')
                 if self.player_name:
-                    await self.create_team_member()
-                    await self.channel_layer.group_send(
-                        self.team_group_name,
-                        {
-                            'type': 'team_update',
+                    # Try to create team member, which returns success/failure
+                    creation_success = await self.create_team_member()
+                    
+                    if creation_success:
+                        # Only broadcast if successfully created
+                        await self.channel_layer.group_send(
+                            self.team_group_name,
+                            {
+                                'type': 'team_update',
+                                'action': 'join',
+                                'player_name': self.player_name
+                            }
+                        )
+                    else:
+                        # Send error response back to this client only
+                        await self.send(text_data=json.dumps({
+                            'type': 'error',
                             'action': 'join',
-                            'player_name': self.player_name
-                        }
-                    )
+                            'message': f'Player {self.player_name} is already in this team'
+                        }))
             elif data.get('action') == 'leave':
                 if self.player_name:
                     await self.remove_team_member()
@@ -142,12 +154,28 @@ class TeamConsumer(AsyncWebsocketConsumer):
             logger.error("Invalid JSON received")
         except Exception as e:
             logger.error(f"Error in receive: {e}")
+            # Send error response
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': f'An error occurred: {str(e)}'
+            }))
 
     @database_sync_to_async
     def create_team_member(self):
         try:
-            team = Team.objects.get(id=self.team_id)
-            if not TeamMember.objects.filter(team=team, role=self.player_name).exists():
+            # Use a transaction to ensure atomic operation
+            with transaction.atomic():
+                team = Team.objects.get(id=self.team_id)
+                
+                # Check if this player name already exists in the team - use select_for_update to lock the row
+                existing_member = TeamMember.objects.select_for_update().filter(team=team, role=self.player_name).first()
+                
+                if existing_member:
+                    # Already exists - don't create a duplicate
+                    logger.info(f"Player {self.player_name} already exists in team {self.team_id}, not creating duplicate")
+                    return False
+                
+                # Create new team member
                 TeamMember.objects.create(team=team, role=self.player_name)
                 logger.info(f"Created team member {self.player_name} for team {self.team_id}")
                 
@@ -156,6 +184,21 @@ class TeamConsumer(AsyncWebsocketConsumer):
                 lobby = team.participating_lobbies.first()
                 if lobby:
                     lobby_code = lobby.code
+                    
+                    # Send team_member_joined event to the lobby
+                    lobby_group_name = f'lobby_{lobby.id}'
+                    channel_layer = get_channel_layer()
+                    
+                    # Send an event to the lobby group
+                    async_to_sync(channel_layer.group_send)(
+                        lobby_group_name,
+                        {
+                            'type': 'team_member_joined',
+                            'member': {'role': self.player_name},
+                            'team_id': str(team.id),
+                            'team_name': team.name
+                        }
+                    )
                 
                 # Also broadcast to available teams
                 channel_layer = get_channel_layer()
@@ -166,8 +209,11 @@ class TeamConsumer(AsyncWebsocketConsumer):
                         'lobby_code': lobby_code
                     }
                 )
+                
+                return True
         except Exception as e:
             logger.error(f"Error creating team member: {e}")
+            return False
 
 
 class AvailableTeamsConsumer(AsyncWebsocketConsumer):
