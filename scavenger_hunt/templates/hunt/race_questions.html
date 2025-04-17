@@ -4,6 +4,13 @@
 
 {% block title %}Race Questions - {{ race.name|default:"Join Race" }}{% endblock %}
 
+{% block head_extras %}
+<!-- Add script includes for required JavaScript files -->
+<script src="{% static 'hunt/js/jquery-3.6.0.min.js' %}"></script>
+<script src="{% static 'hunt/js/bootstrap.min.js' %}"></script>
+<script src="{% static 'hunt/js/common.js' %}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4">
     <div class="dashboard-box p-4">
@@ -482,31 +489,7 @@ let raceReconnectAttempts = 0;
 const MAX_RACE_RECONNECT_ATTEMPTS = 5;
 const RACE_RECONNECT_DELAY = 3000; // 3 seconds
 let lastRefreshTime = Date.now();
-let lastWebSocketActivity = Date.now();
 let refreshInterval = null;
-
-function setupAutoRefresh() {
-    console.log("Setting up auto-refresh mechanism");
-    
-    // Check periodically if we need to refresh
-    setInterval(function() {
-        const now = Date.now();
-        const timeSinceLastActivity = now - lastWebSocketActivity;
-        
-        console.log(`Time since last WebSocket activity: ${Math.round(timeSinceLastActivity/1000)}s`);
-        
-        // If no WebSocket activity for 30 seconds, refresh the page
-        if (timeSinceLastActivity > 30000) {
-            console.log("No WebSocket updates detected for too long, refreshing page");
-            showRaceConnectionStatus('updating', 'No updates received. Refreshing page...');
-            
-            // Wait a moment for the notification to be visible
-            setTimeout(function() {
-                location.reload();
-            }, 1000);
-        }
-    }, 10000); // Check every 10 seconds
-}
 
 function setupRaceWebSocket() {
     // Close any existing connection
@@ -551,7 +534,10 @@ function setupRaceWebSocket() {
             startRaceHeartbeat();
             
             // Initialize auto-refresh as fallback
-            setupAutoRefresh();
+            setupAutoRefresh(10000, 30000, setupRaceWebSocket);
+            
+            // Update last activity timestamp
+            window.lastWebSocketActivity = Date.now();
         };
         
         raceSocket.onmessage = function(e) {
@@ -561,7 +547,22 @@ function setupRaceWebSocket() {
                 
                 // Update last refresh time and WebSocket activity time
                 lastRefreshTime = Date.now();
-                lastWebSocketActivity = Date.now();
+                window.lastWebSocketActivity = Date.now();
+                
+                // Handle error messages
+                if (data.type === 'error') {
+                    console.error("Error from server:", data.message);
+                    showRaceConnectionStatus('error', data.message || 'An unknown error occurred');
+                    
+                    // Handle specific error types
+                    if (data.error_type === 'race_not_found' || data.error_type === 'team_not_found') {
+                        // Redirect to main page after a delay
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 5000);
+                    }
+                    return;
+                }
                 
                 if (data.type === 'score_update') {
                     // Update score without page refresh
@@ -591,6 +592,8 @@ function setupRaceWebSocket() {
                     showRaceCompleteNotification(data.redirect_url);
                 } else if (data.type === 'pong') {
                     console.log("Race heartbeat response received");
+                    // Update last activity timestamp
+                    window.lastWebSocketActivity = Date.now();
                 } else if (data.type === 'navigate_to_question') {
                     // Navigate to specific question
                     if (data.question_index !== undefined) {
@@ -608,12 +611,13 @@ function setupRaceWebSocket() {
                 }
             } catch (error) {
                 console.error("Error processing race WebSocket message:", error);
+                handleWebSocketError(raceSocket, 'message', error);
             }
         };
         
         raceSocket.onerror = function(error) {
             console.error("Race WebSocket error:", error);
-            showRaceConnectionStatus('error', 'Connection error');
+            handleWebSocketError(raceSocket, 'connect', error);
         };
         
         raceSocket.onclose = function(e) {
@@ -636,7 +640,7 @@ function setupRaceWebSocket() {
                 } else {
                     showRaceConnectionStatus('failed', 'Failed to reconnect. Please refresh the page.');
                     // Enable auto refresh if WebSocket fails
-                    setupAutoRefresh();
+                    setupAutoRefresh(10000);
                 }
             }
         };
@@ -644,7 +648,7 @@ function setupRaceWebSocket() {
         console.error("Failed to create race WebSocket connection:", error);
         showRaceConnectionStatus('error', 'Failed to establish connection');
         // Enable auto refresh if WebSocket fails
-        setupAutoRefresh();
+        setupAutoRefresh(10000);
     }
 }
 
@@ -949,51 +953,8 @@ function updateTeamMembersDisplay(members) {
 
 // Show race connection status
 function showRaceConnectionStatus(status, message) {
-    console.log(`Connection status: ${status} - ${message}`);
-    
-    // Only show status for errors or important messages to avoid UI clutter
-    if (['error', 'closed', 'failed', 'updating'].includes(status)) {
-        const statusEl = document.createElement('div');
-        statusEl.id = 'connection-status';
-        statusEl.style.position = 'fixed';
-        statusEl.style.bottom = '20px';
-        statusEl.style.right = '20px';
-        statusEl.style.padding = '10px 15px';
-        statusEl.style.borderRadius = '5px';
-        statusEl.style.zIndex = '1000';
-        statusEl.style.maxWidth = '300px';
-        
-        // Style based on status
-        if (status === 'error' || status === 'closed' || status === 'failed') {
-            statusEl.style.backgroundColor = 'rgba(220, 53, 69, 0.9)';
-        } else if (status === 'reconnecting') {
-            statusEl.style.backgroundColor = 'rgba(255, 193, 7, 0.9)';
-        } else if (status === 'connected') {
-            statusEl.style.backgroundColor = 'rgba(40, 167, 69, 0.9)';
-        } else if (status === 'updating') {
-            statusEl.style.backgroundColor = 'rgba(0, 123, 255, 0.9)';
-        }
-        
-        statusEl.style.color = 'white';
-        statusEl.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
-        statusEl.innerHTML = message;
-        
-        // Remove any existing status
-        const existingStatus = document.getElementById('connection-status');
-        if (existingStatus) {
-            existingStatus.remove();
-        }
-        
-        // Add to DOM
-        document.body.appendChild(statusEl);
-        
-        // Auto-remove after delay for non-error messages
-        if (status !== 'error' && status !== 'failed') {
-            setTimeout(() => {
-                statusEl.remove();
-            }, 3000);
-        }
-    }
+    // Use the common function from common.js
+    showConnectionStatus(status, message);
 }
 
 // Show race completion notification

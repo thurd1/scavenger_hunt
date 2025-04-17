@@ -11,6 +11,7 @@ import asyncio
 from datetime import datetime
 from django.db.models import Sum, Count
 from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist
 
 logger = logging.getLogger(__name__)
 
@@ -987,31 +988,50 @@ class RaceUpdatesConsumer(AsyncWebsocketConsumer):
     """
     async def connect(self):
         # Extract parameters from URL
-        self.race_id = self.scope['url_route']['kwargs']['race_id']
-        self.team_code = self.scope['url_route']['kwargs']['team_code']
-        self.race_team_group_name = f'race_updates_{self.race_id}_{self.team_code}'
-        
-        # Join both the race-specific and team-specific groups
-        await self.channel_layer.group_add(
-            self.race_team_group_name,
-            self.channel_name
-        )
-        
-        # Also join the general race group
-        self.race_group_name = f'race_{self.race_id}'
-        await self.channel_layer.group_add(
-            self.race_group_name,
-            self.channel_name
-        )
-        
-        # Accept the connection
-        await self.accept()
-        
-        # Log for debugging
-        logger.info(f"WebSocket CONNECTED: Race Updates for race {self.race_id}, team {self.team_code}, channel: {self.channel_name}")
-        
-        # Send initial state
-        await self.send_initial_state()
+        try:
+            self.race_id = self.scope['url_route']['kwargs']['race_id']
+            self.team_code = self.scope['url_route']['kwargs']['team_code']
+            self.race_team_group_name = f'race_updates_{self.race_id}_{self.team_code}'
+            
+            # Log the connection attempt
+            logger.info(f"WebSocket connection attempt: Race Updates for race {self.race_id}, team {self.team_code}")
+            
+            # Join both the race-specific and team-specific groups
+            await self.channel_layer.group_add(
+                self.race_team_group_name,
+                self.channel_name
+            )
+            
+            # Also join the general race group
+            self.race_group_name = f'race_{self.race_id}'
+            await self.channel_layer.group_add(
+                self.race_group_name,
+                self.channel_name
+            )
+            
+            # Accept the connection
+            await self.accept()
+            
+            # Log for debugging
+            logger.info(f"WebSocket CONNECTED: Race Updates for race {self.race_id}, team {self.team_code}, channel: {self.channel_name}")
+            
+            # Initialize last activity timestamp
+            self.lastWebSocketActivity = timezone.now()
+            
+            # Send initial state
+            await self.send_initial_state()
+            
+        except Exception as e:
+            logger.error(f"Error in RaceUpdatesConsumer connect: {str(e)}")
+            # Accept connection so we can send error message
+            await self.accept()
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'error_type': 'connection_error',
+                'message': f"Error connecting: {str(e)}"
+            }))
+            # Close the connection after sending error
+            await self.close(code=1011)
 
     async def disconnect(self, close_code):
         # Leave the race-team specific group
@@ -1039,6 +1059,8 @@ class RaceUpdatesConsumer(AsyncWebsocketConsumer):
                     'type': 'pong',
                     'timestamp': datetime.now().isoformat()
                 }))
+                # Update the last activity timestamp
+                self.lastWebSocketActivity = timezone.now()
                 return
                 
             # Handle request for initial state
@@ -1051,8 +1073,18 @@ class RaceUpdatesConsumer(AsyncWebsocketConsumer):
             
         except json.JSONDecodeError:
             logger.error(f"Invalid JSON received in RaceUpdatesConsumer")
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'error_type': 'invalid_json',
+                'message': 'Invalid JSON data received'
+            }))
         except Exception as e:
             logger.error(f"Error in RaceUpdatesConsumer receive: {str(e)}")
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'error_type': 'receive_error',
+                'message': str(e)
+            }))
     
     @database_sync_to_async
     def get_race_data(self):
@@ -1060,11 +1092,27 @@ class RaceUpdatesConsumer(AsyncWebsocketConsumer):
         try:
             from hunt.models import Race, Team, TeamRaceProgress, Question, Answer
             
-            # Get the race
-            race = Race.objects.get(id=self.race_id)
+            # Get the race - add specific exception handling
+            try:
+                race = Race.objects.get(id=self.race_id)
+            except Race.DoesNotExist:
+                logger.error(f"Race with ID {self.race_id} does not exist")
+                return {
+                    'error': True,
+                    'message': f"Race with ID {self.race_id} does not exist",
+                    'error_type': 'race_not_found'
+                }
             
-            # Get the team
-            team = Team.objects.get(code=self.team_code)
+            # Get the team - add specific exception handling
+            try:
+                team = Team.objects.get(code=self.team_code)
+            except Team.DoesNotExist:
+                logger.error(f"Team with code {self.team_code} does not exist")
+                return {
+                    'error': True,
+                    'message': f"Team with code {self.team_code} does not exist",
+                    'error_type': 'team_not_found'
+                }
             
             # Get team's progress in this race
             try:
@@ -1119,19 +1167,36 @@ class RaceUpdatesConsumer(AsyncWebsocketConsumer):
             }
         except Exception as e:
             logger.error(f"Error getting race data: {str(e)}")
-            return None
+            return {
+                'error': True,
+                'message': str(e),
+                'error_type': 'general_error'
+            }
     
     async def send_initial_state(self):
         """Send initial state to the client"""
         try:
             race_data = await self.get_race_data()
             if race_data:
-                await self.send(text_data=json.dumps({
-                    'type': 'race_update',
-                    'data': race_data
-                }))
+                # Check if there was an error
+                if race_data.get('error'):
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'error_type': race_data.get('error_type', 'unknown'),
+                        'message': race_data.get('message', 'An unknown error occurred')
+                    }))
+                else:
+                    await self.send(text_data=json.dumps({
+                        'type': 'race_update',
+                        'data': race_data
+                    }))
         except Exception as e:
             logger.error(f"Error sending initial state: {str(e)}")
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'error_type': 'initial_state_error',
+                'message': str(e)
+            }))
     
     # Event handlers from the channel layer
     async def score_update(self, event):
