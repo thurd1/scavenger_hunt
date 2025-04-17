@@ -7,6 +7,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from asgiref.sync import sync_to_async
 from django.utils import timezone
+from django.db import models
 import asyncio
 from datetime import datetime
 from django.db.models import Sum, Count
@@ -782,3 +783,202 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logging.error(f"Error getting leaderboard data: {str(e)}")
             return [] 
+
+class RaceUpdatesConsumer(AsyncWebsocketConsumer):
+    """
+    WebSocket consumer for team-specific race updates.
+    Provides real-time updates about score, question status, and timer for a specific team in a race.
+    """
+    async def connect(self):
+        self.race_id = self.scope['url_route']['kwargs']['race_id']
+        self.team_code = self.scope['url_route']['kwargs']['team_code']
+        self.race_team_group_name = f'race_updates_{self.race_id}_{self.team_code}'
+        
+        # Also join the general race group
+        self.race_group_name = f'race_{self.race_id}'
+        
+        logger.info(f"WebSocket connecting for race updates: Race {self.race_id}, Team {self.team_code}")
+        
+        # Join the team-specific race group
+        await self.channel_layer.group_add(
+            self.race_team_group_name,
+            self.channel_name
+        )
+        
+        # Also join the general race group
+        await self.channel_layer.group_add(
+            self.race_group_name,
+            self.channel_name
+        )
+        
+        # Accept the connection
+        await self.accept()
+        
+        # Get and send initial state
+        try:
+            await self.send_initial_state()
+        except Exception as e:
+            logger.error(f"Error in race consumer connect: {str(e)}")
+    
+    async def disconnect(self, close_code):
+        # Leave the race groups
+        await self.channel_layer.group_discard(
+            self.race_team_group_name,
+            self.channel_name
+        )
+        
+        await self.channel_layer.group_discard(
+            self.race_group_name,
+            self.channel_name
+        )
+        
+        logger.info(f"WebSocket disconnected: Race {self.race_id}, Team {self.team_code}")
+    
+    async def receive(self, text_data):
+        """Handle messages from the client"""
+        try:
+            data = json.loads(text_data)
+            message_type = data.get('type')
+            
+            if message_type == 'request_race_update':
+                # Client is requesting updated data
+                await self.send_initial_state()
+            
+        except Exception as e:
+            logger.error(f"Error in race consumer receive: {str(e)}")
+    
+    @database_sync_to_async
+    def get_initial_state(self):
+        """Get the current state of the team's progress in the race"""
+        try:
+            # Get the team and race
+            from hunt.models import Team, Race, TeamAnswer, TeamRaceProgress
+            
+            team = Team.objects.get(code=self.team_code)
+            race = Race.objects.get(id=self.race_id)
+            
+            # Get the team's progress in this race
+            progress = TeamRaceProgress.objects.filter(team=team, race=race).first()
+            
+            # Get all the team's answers for this race
+            answers = TeamAnswer.objects.filter(
+                team=team,
+                question__zone__race=race
+            ).select_related('question')
+            
+            # Format the answers data
+            question_data = {}
+            for answer in answers:
+                question_data[answer.question.id] = {
+                    'attempts': answer.attempts,
+                    'points_awarded': answer.points_awarded,
+                    'answered_correctly': answer.answered_correctly,
+                    'photo_uploaded': answer.photo_uploaded
+                }
+            
+            # Calculate total score
+            total_score = answers.filter(answered_correctly=True).aggregate(
+                total=models.Sum('points_awarded'))['total'] or 0
+            
+            # Get race start time and time limit
+            start_time = None
+            time_limit_minutes = 0
+            remaining_seconds = 0
+            
+            if race:
+                # Get start time from the first lobby with this race that has started
+                from hunt.models import Lobby
+                lobby = Lobby.objects.filter(race=race, hunt_started=True).first()
+                if lobby and lobby.hunt_start_time:
+                    start_time = lobby.hunt_start_time
+                    time_limit_minutes = race.time_limit_minutes or 20
+                    
+                    # Calculate remaining time
+                    if start_time:
+                        from django.utils import timezone
+                        elapsed = timezone.now() - start_time
+                        elapsed_seconds = elapsed.total_seconds()
+                        total_seconds = time_limit_minutes * 60
+                        remaining_seconds = max(0, total_seconds - elapsed_seconds)
+            
+            # Return formatted state
+            return {
+                'score': total_score,
+                'current_question_index': progress.current_question_index if progress else 0,
+                'question_data': question_data,
+                'remaining_seconds': int(remaining_seconds),
+                'race_id': race.id,
+                'team_code': team.code,
+                'team_name': team.name
+            }
+            
+        except Team.DoesNotExist:
+            logger.error(f"Team with code {self.team_code} not found")
+            return {'error': 'Team not found'}
+            
+        except Race.DoesNotExist:
+            logger.error(f"Race with ID {self.race_id} not found")
+            return {'error': 'Race not found'}
+            
+        except Exception as e:
+            logger.error(f"Error getting race updates state: {str(e)}")
+            return {'error': str(e)}
+    
+    async def send_initial_state(self):
+        """Send the initial state to the client"""
+        state = await self.get_initial_state()
+        
+        if 'error' in state:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': state['error']
+            }))
+            return
+        
+        # Send score update
+        await self.send(text_data=json.dumps({
+            'type': 'score_update',
+            'score': state['score']
+        }))
+        
+        # Send question data update
+        await self.send(text_data=json.dumps({
+            'type': 'question_update',
+            'question_data': state['question_data'],
+            'current_question_index': state['current_question_index']
+        }))
+        
+        # Send timer update
+        await self.send(text_data=json.dumps({
+            'type': 'time_update',
+            'remaining_seconds': state['remaining_seconds']
+        }))
+    
+    async def score_update(self, event):
+        """Handle score update events"""
+        await self.send(text_data=json.dumps({
+            'type': 'score_update',
+            'score': event['score']
+        }))
+    
+    async def question_update(self, event):
+        """Handle question update events"""
+        await self.send(text_data=json.dumps({
+            'type': 'question_update',
+            'question_data': event.get('question_data', {}),
+            'current_question_index': event.get('current_question_index', 0)
+        }))
+    
+    async def time_update(self, event):
+        """Handle time update events"""
+        await self.send(text_data=json.dumps({
+            'type': 'time_update',
+            'remaining_seconds': event.get('remaining_seconds', 0)
+        }))
+    
+    async def race_complete(self, event):
+        """Handle race completion events"""
+        await self.send(text_data=json.dumps({
+            'type': 'race_complete',
+            'redirect_url': event.get('redirect_url', '/race-complete/')
+        })) 

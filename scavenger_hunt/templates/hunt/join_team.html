@@ -549,11 +549,23 @@ function joinTeam(teamCode) {
         return;
     }
     
-    // Verify team is not full
-    const teamCard = document.querySelector(`.team-card button[onclick*="${teamCode}"]`).closest('.team-card');
-    const memberCount = teamCard.querySelector('.member-count').textContent.split(' ')[0];
+    // Find the team card to check member count
+    const teamCards = document.querySelectorAll('.team-card');
+    let teamMemberCount = 0;
     
-    if (parseInt(memberCount) >= 1) {
+    for (const card of teamCards) {
+        const button = card.querySelector(`button[onclick*="${teamCode}"]`);
+        if (button) {
+            const countSpan = card.querySelector('.member-count');
+            if (countSpan) {
+                const countText = countSpan.textContent;
+                teamMemberCount = parseInt(countText);
+                break;
+            }
+        }
+    }
+    
+    if (teamMemberCount >= 1) {
         alert('This team is already full. Please choose another team or create a new one.');
         return;
     }

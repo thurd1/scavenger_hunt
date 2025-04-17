@@ -489,10 +489,14 @@ function setupRaceWebSocket() {
         return;
     }
     
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/race-updates/${raceId}/${teamCode}/`;
-    
+    // Try multiple WebSocket URL formats to find one that works
+    // First try the new format with race-updates
     try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let wsUrl = `${protocol}//${window.location.host}/ws/race-updates/${raceId}/${teamCode}/`;
+        
+        console.log("Attempting to connect to WebSocket at:", wsUrl);
+        
         raceSocket = new WebSocket(wsUrl);
         
         raceSocket.onopen = function(e) {
@@ -510,50 +514,25 @@ function setupRaceWebSocket() {
             showRaceConnectionStatus('connected', 'Connected to race updates');
         };
         
-        raceSocket.onmessage = function(e) {
-            try {
-                const data = JSON.parse(e.data);
-                console.log("Race WebSocket message received:", data);
-                
-                if (data.type === 'score_update') {
-                    // Update score without page refresh
-                    const totalScoreEl = document.getElementById('total-score');
-                    if (totalScoreEl && data.score !== undefined) {
-                        totalScoreEl.textContent = data.score;
-                        
-                        // Add animation for score change
-                        totalScoreEl.style.transition = 'color 0.5s';
-                        totalScoreEl.style.color = '#90C83C';
-                        setTimeout(() => {
-                            totalScoreEl.style.color = '';
-                        }, 1000);
-                    }
-                } else if (data.type === 'question_update') {
-                    // Process question status updates
-                    if (data.question_data) {
-                        updateQuestionState(data.question_data);
-                    }
-                } else if (data.type === 'time_update') {
-                    // Update timer if needed
-                    if (data.remaining_seconds !== undefined) {
-                        updateTimerDisplay(data.remaining_seconds);
-                    }
-                } else if (data.type === 'race_complete') {
-                    // Handle race completion
-                    showRaceCompleteNotification(data.redirect_url);
-                }
-            } catch (error) {
-                console.error("Error processing race WebSocket message:", error);
+        // Add a timeout to detect if connection fails quickly
+        let connectionTimeout = setTimeout(() => {
+            if (raceSocket.readyState !== WebSocket.OPEN) {
+                console.log("WebSocket connection timed out, trying fallback URL");
+                // If this doesn't connect quickly, try the old format
+                tryFallbackConnection();
             }
-        };
-        
-        raceSocket.onerror = function(error) {
-            console.error("Race WebSocket error:", error);
-            showRaceConnectionStatus('error', 'Connection error');
-        };
+        }, 3000);
         
         raceSocket.onclose = function(e) {
+            clearTimeout(connectionTimeout);
             console.log("Race WebSocket connection closed:", e);
+            
+            // If closed immediately, try fallback
+            if (raceReconnectAttempts === 0 && e.code === 1006) {
+                console.log("Immediate close detected, trying fallback URL");
+                tryFallbackConnection();
+                return;
+            }
             
             // Attempt to reconnect for unexpected closures
             if (e.code !== 1000) {
@@ -567,12 +546,120 @@ function setupRaceWebSocket() {
                         setupRaceWebSocket();
                     }, RACE_RECONNECT_DELAY);
                 } else {
-                    showRaceConnectionStatus('failed', 'Failed to reconnect. Please refresh the page.');
+                    showRaceConnectionStatus('failed', 'Failed to reconnect. Using local data.');
+                    // Switch to local data updates
+                    startLocalUpdates();
                 }
             }
         };
+        
+        // Rest of the WebSocket handlers
+        raceSocket.onmessage = handleRaceSocketMessage;
+        raceSocket.onerror = handleRaceSocketError;
+        
     } catch (error) {
-        console.error("Failed to create race WebSocket connection:", error);
+        console.error("Error setting up race WebSocket:", error);
+        tryFallbackConnection();
+    }
+    
+    // Fallback to older WebSocket URL format if the new one fails
+    function tryFallbackConnection() {
+        try {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            let wsUrl = `${protocol}//${window.location.host}/ws/race/${raceId}/`;
+            
+            console.log("Trying fallback WebSocket connection at:", wsUrl);
+            
+            raceSocket = new WebSocket(wsUrl);
+            
+            raceSocket.onopen = function(e) {
+                console.log("Fallback WebSocket connection established");
+                raceReconnectAttempts = 0;
+                showRaceConnectionStatus('connected', 'Connected to race updates (fallback)');
+                
+                // Use a different message format for the older consumer
+                raceSocket.send(JSON.stringify({
+                    'action': 'check_status',
+                    'team_code': teamCode,
+                    'race_id': raceId
+                }));
+            };
+            
+            raceSocket.onclose = function(e) {
+                console.log("Fallback WebSocket connection closed:", e);
+                if (e.code !== 1000 && raceReconnectAttempts < MAX_RACE_RECONNECT_ATTEMPTS) {
+                    raceReconnectAttempts++;
+                    setTimeout(() => tryFallbackConnection(), RACE_RECONNECT_DELAY);
+                } else {
+                    showRaceConnectionStatus('failed', 'All connection attempts failed. Using local data.');
+                    startLocalUpdates();
+                }
+            };
+            
+            raceSocket.onmessage = handleRaceSocketMessage;
+            raceSocket.onerror = handleRaceSocketError;
+            
+        } catch (error) {
+            console.error("Error with fallback connection:", error);
+            showRaceConnectionStatus('failed', 'WebSocket connection failed. Using local data.');
+            startLocalUpdates();
+        }
+    }
+    
+    function handleRaceSocketMessage(e) {
+        try {
+            const data = JSON.parse(e.data);
+            console.log("Race WebSocket message received:", data);
+            
+            if (data.type === 'score_update') {
+                // Update score without page refresh
+                const totalScoreEl = document.getElementById('total-score');
+                if (totalScoreEl && data.score !== undefined) {
+                    totalScoreEl.textContent = data.score;
+                    
+                    // Add animation for score change
+                    totalScoreEl.style.transition = 'color 0.5s';
+                    totalScoreEl.style.color = '#90C83C';
+                    setTimeout(() => {
+                        totalScoreEl.style.color = '';
+                    }, 1000);
+                }
+            } else if (data.type === 'question_update') {
+                // Process question status updates
+                if (data.question_data) {
+                    updateQuestionState(data.question_data);
+                }
+            } else if (data.type === 'time_update') {
+                // Update timer if needed
+                if (data.remaining_seconds !== undefined) {
+                    updateTimerDisplay(data.remaining_seconds);
+                }
+            } else if (data.type === 'race_complete') {
+                // Handle race completion
+                showRaceCompleteNotification(data.redirect_url);
+            } else if (data.type === 'race_started') {
+                // Legacy message format
+                console.log("Race started message received:", data);
+                if (data.redirect_url) {
+                    showRaceCompleteNotification(data.redirect_url);
+                }
+            }
+        } catch (error) {
+            console.error("Error processing race WebSocket message:", error);
+        }
+    }
+    
+    function handleRaceSocketError(error) {
+        console.error("Race WebSocket error:", error);
+        showRaceConnectionStatus('error', 'Connection error');
+    }
+    
+    // Start local updates if all WebSocket connections fail
+    function startLocalUpdates() {
+        console.log("Switching to local updates mode");
+        setInterval(() => {
+            updateTimerWithLocalData();
+        }, 1000);
     }
 }
 
@@ -1497,71 +1584,55 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
     
-    // Add a comprehensive periodic update system
+    // Update to avoid API calls that are failing
     function initializePeriodicUpdates() {
-        // 1. Set up periodic score updates
-        periodicScoreUpdate();
-        
-        // 2. Set up auto-refresh of question data every 10 seconds
-        setInterval(() => {
-            const teamCode = '{{ team.code }}';
-            const raceId = '{{ race.id }}';
+        // Only initialize WebSocket if we're not on the join form
+        if (!document.querySelector('.join-race-form')) {
+            try {
+                setupRaceWebSocket();
+            } catch (error) {
+                console.error("Error setting up WebSocket:", error);
+                // Fall back to periodic score updates without API
+                setInterval(() => {
+                    // Update timer display without server connection
+                    updateTimerWithLocalData();
+                }, 1000);
+            }
+        }
+    }
+
+    // Function to update timer with local data if server connection fails
+    function updateTimerWithLocalData() {
+        try {
+            const startTimeStr = "{{ start_time|safe }}";
+            let startTime;
             
-            // Only fetch if we have the required data
-            if (!teamCode || !raceId) return;
+            try {
+                startTime = startTimeStr && startTimeStr !== "None" ? new Date(startTimeStr) : new Date();
+                if (isNaN(startTime.getTime())) {
+                    startTime = new Date();
+                }
+            } catch (e) {
+                console.log("Using current time as fallback:", e);
+                startTime = new Date();
+            }
             
-            // Fetch updated question answers from server
-            fetch(`/api/question-answers/?team_code=${teamCode}&race_id=${raceId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.answers) {
-                        // Update local data with server data
-                        for (const questionId in data.answers) {
-                            const answer = data.answers[questionId];
-                            
-                            // If we have this question in our local data, update it
-                            if (questionData[questionId]) {
-                                questionData[questionId].attempts = answer.attempts || 0;
-                                questionData[questionId].points = answer.points_awarded || 0;
-                                questionData[questionId].answered = answer.answered_correctly || false;
-                                questionData[questionId].photoUploaded = answer.photo_uploaded || false;
-                                
-                                // Update UI to match server data if needed
-                                const attemptsEl = document.getElementById(`attempts-${questionId}`);
-                                if (attemptsEl) {
-                                    attemptsEl.textContent = answer.attempts || 0;
-                                }
-                                
-                                // Update feedback if needed
-                                const feedbackEl = document.getElementById(`feedback-${questionId}`);
-                                if (feedbackEl) {
-                                    if (answer.answered_correctly && !feedbackEl.classList.contains('correct')) {
-                                        feedbackEl.className = 'feedback correct';
-                                        feedbackEl.style.display = 'block';
-                                        feedbackEl.textContent = `Correct! You earned ${answer.points_awarded} points.`;
-                                    }
-                                }
-                                
-                                // Show navigation buttons if this is the current question and it's been answered
-                                const questions = document.querySelectorAll('.question-card');
-                                const currentQuestion = Array.from(questions).findIndex(q => q.style.display === 'block');
-                                
-                                if (currentQuestion !== -1 && 
-                                    questions[currentQuestion].dataset.questionId === questionId &&
-                                    (answer.answered_correctly || answer.photo_uploaded)) {
-                                    document.getElementById('navigation-buttons').style.display = 'block';
-                                }
-                            }
-                        }
-                        
-                        // Update total score
-                        updateTotalScore();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching question answers:', error);
-                });
-        }, 10000);
+            // Get time limit from race object or fall back to default
+            const timeLimitMinutes = {% if race.time_limit_minutes %}{{ race.time_limit_minutes }}{% else %}{{ time_limit_minutes|default:20 }}{% endif %};
+            
+            // Calculate end time
+            const endTime = new Date(startTime.getTime() + (timeLimitMinutes * 60 * 1000));
+            
+            // Calculate remaining time
+            const now = new Date();
+            const remainingMs = endTime - now;
+            const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+            
+            // Update the timer display
+            updateTimerDisplay(remainingSeconds);
+        } catch (error) {
+            console.error("Error updating timer with local data:", error);
+        }
     }
     
     // Initialize all periodic updates
@@ -1680,11 +1751,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 );
             }
         }
-    }
-
-    // Only initialize if we're on the question view (not the join form)
-    if (document.getElementById('race-questions')) {
-        setupRaceWebSocket();
     }
 });
 

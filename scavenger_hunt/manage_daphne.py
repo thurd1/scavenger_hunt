@@ -12,13 +12,24 @@ django.setup()
 
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
+from channels.security.websocket import AllowedHostsOriginValidator
+from hunt.consumers import TeamConsumer, AvailableTeamsConsumer, LobbyConsumer, RaceConsumer, LeaderboardConsumer, RaceUpdatesConsumer
+
+# Import the websocket patterns directly from the routing module
 from hunt.routing import websocket_urlpatterns
+
+# Print out the available WebSocket routes for debugging
+print("WebSocket routes:")
+for pattern in websocket_urlpatterns:
+    print(f" - {pattern.pattern}")
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
-    "websocket": AuthMiddlewareStack(
-        URLRouter(
-            websocket_urlpatterns
+    "websocket": AllowedHostsOriginValidator(
+        AuthMiddlewareStack(
+            URLRouter(
+                websocket_urlpatterns
+            )
         )
     ),
 })

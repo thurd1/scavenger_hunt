@@ -2791,3 +2791,66 @@ def trigger_leaderboard_update_internal(race_id=None):
     except Exception as e:
         logger.error(f"Error in trigger_leaderboard_update_internal: {str(e)}")
         return False
+
+@csrf_exempt
+def question_answers_api(request):
+    """API endpoint to get a team's answers for a race"""
+    # Check if method is GET
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=405)
+    
+    # Get parameters from request
+    team_code = request.GET.get('team_code')
+    race_id = request.GET.get('race_id')
+    
+    if not team_code or not race_id:
+        return JsonResponse({
+            'success': False, 
+            'error': 'Missing required parameters. Both team_code and race_id are required.'
+        }, status=400)
+    
+    try:
+        # Get the team and race
+        team = Team.objects.get(code=team_code)
+        race = Race.objects.get(id=race_id)
+        
+        # Get all answers for this team in this race
+        answers = TeamAnswer.objects.filter(
+            team=team,
+            question__zone__race=race
+        ).select_related('question')
+        
+        # Format the answers data
+        answers_data = {}
+        for answer in answers:
+            answers_data[answer.question.id] = {
+                'attempts': answer.attempts,
+                'points_awarded': answer.points_awarded,
+                'answered_correctly': answer.answered_correctly,
+                'photo_uploaded': answer.photo_uploaded,
+                'question_text': answer.question.text[:50] + '...'  # Include a snippet for debugging
+            }
+        
+        # Calculate total score
+        total_score = answers.filter(answered_correctly=True).aggregate(
+            total=Sum('points_awarded'))['total'] or 0
+        
+        # Get team race progress
+        progress = TeamRaceProgress.objects.filter(team=team, race=race).first()
+        current_question_index = progress.current_question_index if progress else 0
+        
+        return JsonResponse({
+            'success': True,
+            'answers': answers_data,
+            'total_score': total_score,
+            'current_question_index': current_question_index
+        })
+        
+    except Team.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Team not found'}, status=404)
+    except Race.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Race not found'}, status=404)
+    except Exception as e:
+        # Log the error
+        logger.error(f"Error in question_answers_api: {str(e)}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
