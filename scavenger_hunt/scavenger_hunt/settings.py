@@ -113,7 +113,7 @@ CHANNEL_LAYERS = {
 CSRF_FAILURE_VIEW = 'hunt.views.csrf_failure'
 
 # Add or update WhiteNoise settings
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # Add explicit MIME type mappings for WhiteNoise
 WHITENOISE_MIMETYPES = {
