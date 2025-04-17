@@ -939,7 +939,17 @@ function updateTeamMembersDisplay(members) {
         members.forEach((member, index) => {
             console.log(`Adding member ${index}:`, member);
             const memberItem = document.createElement('li');
-            const role = member.role || "Unknown";
+            // Handle different possible data formats
+            let role = '';
+            if (typeof member === 'string') {
+                // If member is just a string
+                role = member;
+            } else if (member && typeof member === 'object') {
+                // If member is an object, check for role property
+                role = member.role || "Unknown";
+            } else {
+                role = "Unknown";
+            }
             memberItem.innerHTML = `<span style="background: rgba(144, 200, 60, 0.2); padding: 5px 10px; border-radius: 20px; display: inline-block;"><i class="fas fa-user"></i> ${role}</span>`;
             membersList.appendChild(memberItem);
         });
