@@ -2793,15 +2793,36 @@ def trigger_leaderboard_update_internal(race_id=None):
         return False
 
 @csrf_exempt
-def question_answers_api(request):
+def question_answers_api(request, race_id=None, team_code=None):
     """API endpoint to get a team's answers for a race"""
+    # Debug logging
+    print(f"question_answers_api called with method={request.method}")
+    print(f"URL params: race_id={race_id}, team_code={team_code}")
+    print(f"GET params: {request.GET}")
+    
     # Check if method is GET
     if request.method != 'GET':
         return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=405)
     
-    # Get parameters from request
-    team_code = request.GET.get('team_code')
-    race_id = request.GET.get('race_id')
+    # Get parameters from request if not provided in URL
+    if team_code is None:
+        team_code = request.GET.get('team_code')
+    if race_id is None:
+        race_id = request.GET.get('race_id')
+    
+    # Ensure race_id is an integer
+    try:
+        if race_id and isinstance(race_id, str) and not race_id.isdigit():
+            print(f"Warning: Invalid race_id format: {race_id}")
+            return JsonResponse({'success': False, 'error': 'Invalid race_id format'}, status=400)
+        
+        if race_id:
+            race_id = int(race_id)
+    except (ValueError, TypeError):
+        print(f"Error: Could not convert race_id to integer: {race_id}")
+        return JsonResponse({'success': False, 'error': 'Invalid race_id format'}, status=400)
+    
+    print(f"Final params: race_id={race_id}, team_code={team_code}")
     
     if not team_code or not race_id:
         return JsonResponse({
@@ -2823,12 +2844,12 @@ def question_answers_api(request):
         # Format the answers data
         answers_data = {}
         for answer in answers:
-            answers_data[answer.question.id] = {
+            answers_data[str(answer.question.id)] = {
                 'attempts': answer.attempts,
                 'points_awarded': answer.points_awarded,
                 'answered_correctly': answer.answered_correctly,
                 'photo_uploaded': answer.photo_uploaded,
-                'question_text': answer.question.text[:50] + '...'  # Include a snippet for debugging
+                'question_text': answer.question.text[:50] + '...' if answer.question.text else ''  # Include a snippet for debugging
             }
         
         # Calculate total score
@@ -2843,14 +2864,19 @@ def question_answers_api(request):
             'success': True,
             'answers': answers_data,
             'total_score': total_score,
-            'current_question_index': current_question_index
+            'current_question_index': current_question_index,
+            'team_code': team_code,
+            'race_id': race_id
         })
         
     except Team.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Team not found'}, status=404)
+        print(f"Team not found: {team_code}")
+        return JsonResponse({'success': False, 'error': f'Team with code {team_code} not found'}, status=404)
     except Race.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Race not found'}, status=404)
+        print(f"Race not found: {race_id}")
+        return JsonResponse({'success': False, 'error': f'Race with ID {race_id} not found'}, status=404)
     except Exception as e:
         # Log the error
+        print(f"Error in question_answers_api: {str(e)}")
         logger.error(f"Error in question_answers_api: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
