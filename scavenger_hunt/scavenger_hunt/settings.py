@@ -86,7 +86,7 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'hunt', 'static'),
 ]
@@ -111,3 +111,12 @@ CHANNEL_LAYERS = {
 
 # Custom error views
 CSRF_FAILURE_VIEW = 'hunt.views.csrf_failure'
+
+# Add or update WhiteNoise settings
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Add explicit MIME type mappings for WhiteNoise
+WHITENOISE_MIMETYPES = {
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+}
