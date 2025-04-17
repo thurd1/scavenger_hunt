@@ -4,13 +4,6 @@
 
 {% block title %}Race Questions - {{ race.name|default:"Join Race" }}{% endblock %}
 
-{% block head_extras %}
-<!-- Add script includes for required JavaScript files -->
-<script src="{% static 'hunt/js/jquery-3.6.0.min.js' %}"></script>
-<script src="{% static 'hunt/js/bootstrap.min.js' %}"></script>
-<script src="{% static 'hunt/js/common.js' %}"></script>
-{% endblock %}
-
 {% block content %}
 <div class="container py-4">
     <div class="dashboard-box p-4">
@@ -50,15 +43,6 @@
                             <h3>Team: {{ team.name }}</h3>
                             <h3>Player: {{ team_member.role }}</h3>
                             <h3>Score: <span id="total-score">0</span> points</h3>
-                            <!-- Manual refresh button will be added after team members list -->
-                        </div>
-                        
-                        <!-- Add manual refresh button -->
-                        <div class="text-center mb-4">
-                            <button id="manual-refresh" class="btn btn-success">
-                                <i class="fas fa-sync-alt"></i> Refresh Team Data
-                            </button>
-                            <div id="last-refreshed" class="small text-muted mt-1">Last refreshed: Never</div>
                         </div>
                         
                         <!-- Add the timer container here -->
@@ -348,14 +332,15 @@ input.max-attempts-reached {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.7);
-    z-index: 9999;
-    transition: all 0.3s;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
     display: flex;
     justify-content: center;
     align-items: center;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .custom-popup.show {
@@ -483,13 +468,11 @@ const answersFromServer = {
 {% endfor %}
 };
 
-// Add WebSocket connection for real-time race updates
+// Add a WebSocket connection for real-time race questions updates
 let raceSocket = null;
 let raceReconnectAttempts = 0;
 const MAX_RACE_RECONNECT_ATTEMPTS = 5;
 const RACE_RECONNECT_DELAY = 3000; // 3 seconds
-let lastRefreshTime = Date.now();
-let refreshInterval = null;
 
 function setupRaceWebSocket() {
     // Close any existing connection
@@ -506,12 +489,8 @@ function setupRaceWebSocket() {
         return;
     }
     
-    console.log(`Setting up race WebSocket for race ${raceId}, team ${teamCode}`);
-    
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/race-updates/${raceId}/${teamCode}/`;
-    
-    console.log(`Connecting to WebSocket URL: ${wsUrl}`);
     
     try {
         raceSocket = new WebSocket(wsUrl);
@@ -522,47 +501,19 @@ function setupRaceWebSocket() {
             
             // Request initial state
             sendRaceMessage({
-                type: 'request_race_update',
-                team_code: teamCode,
-                race_id: raceId
+                'type': 'request_race_update',
+                'team_code': teamCode,
+                'race_id': raceId
             });
             
             // Show connected status briefly
             showRaceConnectionStatus('connected', 'Connected to race updates');
-            
-            // Setup heartbeat for race socket
-            startRaceHeartbeat();
-            
-            // Initialize auto-refresh as fallback
-            setupAutoRefresh(10000, 30000, setupRaceWebSocket);
-            
-            // Update last activity timestamp
-            window.lastWebSocketActivity = Date.now();
         };
         
         raceSocket.onmessage = function(e) {
             try {
                 const data = JSON.parse(e.data);
                 console.log("Race WebSocket message received:", data);
-                
-                // Update last refresh time and WebSocket activity time
-                lastRefreshTime = Date.now();
-                window.lastWebSocketActivity = Date.now();
-                
-                // Handle error messages
-                if (data.type === 'error') {
-                    console.error("Error from server:", data.message);
-                    showRaceConnectionStatus('error', data.message || 'An unknown error occurred');
-                    
-                    // Handle specific error types
-                    if (data.error_type === 'race_not_found' || data.error_type === 'team_not_found') {
-                        // Redirect to main page after a delay
-                        setTimeout(() => {
-                            window.location.href = '/';
-                        }, 5000);
-                    }
-                    return;
-                }
                 
                 if (data.type === 'score_update') {
                     // Update score without page refresh
@@ -582,7 +533,7 @@ function setupRaceWebSocket() {
                     if (data.question_data) {
                         updateQuestionState(data.question_data);
                     }
-                } else if (data.type === 'race_time_update') {
+                } else if (data.type === 'time_update') {
                     // Update timer if needed
                     if (data.remaining_seconds !== undefined) {
                         updateTimerDisplay(data.remaining_seconds);
@@ -590,41 +541,19 @@ function setupRaceWebSocket() {
                 } else if (data.type === 'race_complete') {
                     // Handle race completion
                     showRaceCompleteNotification(data.redirect_url);
-                } else if (data.type === 'pong') {
-                    console.log("Race heartbeat response received");
-                    // Update last activity timestamp
-                    window.lastWebSocketActivity = Date.now();
-                } else if (data.type === 'navigate_to_question') {
-                    // Navigate to specific question
-                    if (data.question_index !== undefined) {
-                        navigateToQuestion(data.question_index);
-                    }
-                } else if (data.type === 'race_status_update') {
-                    // Update race status (paused, resumed, etc.)
-                    handleRaceStatusUpdate(data.status, data.message);
-                } else if (data.type === 'team_members_update') {
-                    // Update team members display if needed
-                    if (data.members) {
-                        console.log("Team members update received:", data.members);
-                        updateTeamMembersDisplay(data.members);
-                    }
                 }
             } catch (error) {
                 console.error("Error processing race WebSocket message:", error);
-                handleWebSocketError(raceSocket, 'message', error);
             }
         };
         
         raceSocket.onerror = function(error) {
             console.error("Race WebSocket error:", error);
-            handleWebSocketError(raceSocket, 'connect', error);
+            showRaceConnectionStatus('error', 'Connection error');
         };
         
         raceSocket.onclose = function(e) {
             console.log("Race WebSocket connection closed:", e);
-            
-            // Stop heartbeat
-            stopRaceHeartbeat();
             
             // Attempt to reconnect for unexpected closures
             if (e.code !== 1000) {
@@ -639,38 +568,11 @@ function setupRaceWebSocket() {
                     }, RACE_RECONNECT_DELAY);
                 } else {
                     showRaceConnectionStatus('failed', 'Failed to reconnect. Please refresh the page.');
-                    // Enable auto refresh if WebSocket fails
-                    setupAutoRefresh(10000);
                 }
             }
         };
     } catch (error) {
         console.error("Failed to create race WebSocket connection:", error);
-        showRaceConnectionStatus('error', 'Failed to establish connection');
-        // Enable auto refresh if WebSocket fails
-        setupAutoRefresh(10000);
-    }
-}
-
-// Heartbeat for race socket
-let raceHeartbeatInterval = null;
-
-function startRaceHeartbeat() {
-    // Clear any existing heartbeat
-    stopRaceHeartbeat();
-    
-    // Send heartbeat every 30 seconds
-    raceHeartbeatInterval = setInterval(() => {
-        if (raceSocket && raceSocket.readyState === WebSocket.OPEN) {
-            sendRaceMessage({ 'type': 'ping' });
-        }
-    }, 30000);
-}
-
-function stopRaceHeartbeat() {
-    if (raceHeartbeatInterval) {
-        clearInterval(raceHeartbeatInterval);
-        raceHeartbeatInterval = null;
     }
 }
 
@@ -721,24 +623,14 @@ function updateQuestionState(questionData) {
                 submitButton.disabled = true;
             }
             
-            // Show navigation buttons if this is the current question
-            if (questionEl.style.display === 'block') {
-                document.getElementById('navigation-buttons').style.display = 'block';
-            }
-            
-            // Update questionData
-            if (questionData[questionIndex]) {
-                questionData[questionIndex].answered = true;
-                questionData[questionIndex].points = data.points_awarded || 0;
-            }
+            // Show navigation buttons
+            document.getElementById('navigation-buttons').style.display = 'block';
         }
         
         // Handle photo upload state
         if (data.photo_uploaded) {
             const photoUploadEl = document.getElementById(`photo-upload-${questionIndex}`);
             if (photoUploadEl) {
-                photoUploadEl.style.display = 'block';
-                
                 const uploadButton = photoUploadEl.querySelector('.upload-photo');
                 if (uploadButton) {
                     uploadButton.disabled = true;
@@ -753,218 +645,60 @@ function updateQuestionState(questionData) {
                     feedbackEl.textContent = 'Photo uploaded successfully!';
                 }
                 
-                // Show navigation buttons if this is the current question
-                if (questionEl.style.display === 'block') {
-                    document.getElementById('navigation-buttons').style.display = 'block';
-                }
-                
-                // Update questionData
-                if (questionData[questionIndex]) {
-                    questionData[questionIndex].photoUploaded = true;
-                }
+                // Show navigation buttons
+                document.getElementById('navigation-buttons').style.display = 'block';
             }
         }
         
         // Handle max attempts case
         if (data.attempts >= 3 && !data.answered_correctly && !data.photo_uploaded) {
-            if (questionEl.style.display === 'block') {
-                showPhotoUpload(questionIndex);
-            }
+            showPhotoUpload(questionIndex);
         }
     }
-    
-    // Update total score
-    updateTotalScore();
 }
 
-// Update timer display based on remaining seconds
-function updateTimerDisplay(remainingSeconds) {
-    const timerDisplay = document.getElementById('race-timer');
-    if (!timerDisplay) return;
-    
-    const minutes = Math.floor(remainingSeconds / 60);
-    const seconds = remainingSeconds % 60;
-    
-    // Update timer display
-    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    
-    // Set timer color to red when time is running low
-    if (remainingSeconds <= 300) { // 5 minutes or less
-        timerDisplay.style.color = "red";
-        timerDisplay.style.fontWeight = "bold";
-    }
-    
-    // Show 5-minute warning popup if needed
-    if (remainingSeconds <= 300 && remainingSeconds > 298) {
-        showCustomPopup(
-            "⏳ Time Warning", 
-            "Only 5 minutes left!<br><br>Finish strong and complete all your questions!",
-            "warning"
-        );
-    }
-    
-    // Redirect when time runs out
-    if (remainingSeconds <= 0) {
-        showCustomPopup(
-            "⏰ Time's Up!", 
-            "Your race time has ended.<br><br>Redirecting to the race completion page...",
-            "danger",
-            function() {
-                window.location.href = "{% url 'race_complete' %}";
-            }
-        );
-    }
-}
-
-// Navigate to specific question
-function navigateToQuestion(index) {
-    const questions = document.querySelectorAll('.question-card');
-    if (index >= 0 && index < questions.length) {
-        // Hide all questions
-        for (let i = 0; i < questions.length; i++) {
-            questions[i].style.display = 'none';
-        }
-        
-        // Show the target question
-        questions[index].style.display = 'block';
-        
-        // Update current question index
-        currentQuestionIndex = index;
-        
-        // Check if question is already answered or has photo
-        const questionId = questions[index].id.split('-')[1];
-        if (questionData[questionId] && (questionData[questionId].answered || questionData[questionId].photoUploaded)) {
-            document.getElementById('navigation-buttons').style.display = 'block';
-        } else {
-            document.getElementById('navigation-buttons').style.display = 'none';
-        }
-        
-        // Save current question index to server
-        saveCurrentQuestionIndex(index);
-        
-        console.log(`Navigated to question ${index}`);
-    }
-}
-
-// Handle race status updates (paused, resumed, etc.)
-function handleRaceStatusUpdate(status, message) {
-    console.log(`Race status update: ${status} - ${message}`);
-    
-    // Create or update status banner
-    let statusBanner = document.getElementById('race-status-banner');
-    
-    if (!statusBanner) {
-        statusBanner = document.createElement('div');
-        statusBanner.id = 'race-status-banner';
-        statusBanner.style.position = 'fixed';
-        statusBanner.style.top = '0';
-        statusBanner.style.left = '0';
-        statusBanner.style.width = '100%';
-        statusBanner.style.textAlign = 'center';
-        statusBanner.style.padding = '10px';
-        statusBanner.style.fontWeight = 'bold';
-        statusBanner.style.zIndex = '2000';
-        document.body.insertBefore(statusBanner, document.body.firstChild);
-    }
-    
-    statusBanner.textContent = message;
-    
-    // Style based on status
-    switch (status) {
-        case 'paused':
-            statusBanner.style.backgroundColor = 'rgba(255, 193, 7, 0.9)';
-            statusBanner.style.color = 'black';
-            statusBanner.style.display = 'block';
-            break;
-        case 'resumed':
-            statusBanner.style.backgroundColor = 'rgba(40, 167, 69, 0.9)';
-            statusBanner.style.color = 'white';
-            statusBanner.style.display = 'block';
-            // Hide after 5 seconds
-            setTimeout(() => {
-                statusBanner.style.display = 'none';
-            }, 5000);
-            break;
-        case 'ending_soon':
-            statusBanner.style.backgroundColor = 'rgba(220, 53, 69, 0.9)';
-            statusBanner.style.color = 'white';
-            statusBanner.style.display = 'block';
-            break;
-        default:
-            statusBanner.style.display = 'none';
-    }
-}
-
-// Update team members display
-function updateTeamMembersDisplay(members) {
-    console.log("Updating team members display:", members);
-    
-    // Create or update team members list in stats section
-    const statsSection = document.querySelector('.stats');
-    if (!statsSection) {
-        console.error("Stats section not found in the DOM");
-        return;
-    }
-    
-    // Check if we already have a members list
-    let membersList = document.getElementById('team-members-list');
-    
-    if (!membersList) {
-        console.log("Creating new team members list");
-        // Create new members list
-        const membersHeading = document.createElement('h3');
-        membersHeading.textContent = 'Team Members:';
-        
-        membersList = document.createElement('ul');
-        membersList.id = 'team-members-list';
-        membersList.style.listStyle = 'none';
-        membersList.style.padding = '0';
-        membersList.style.margin = '10px 0';
-        membersList.style.display = 'flex';
-        membersList.style.justifyContent = 'center';
-        membersList.style.gap = '10px';
-        membersList.style.flexWrap = 'wrap';
-        
-        statsSection.appendChild(membersHeading);
-        statsSection.appendChild(membersList);
-    } else {
-        console.log("Updating existing team members list");
-        // Clear existing list
-        membersList.innerHTML = '';
-    }
-    
-    // Add members to the list
-    if (Array.isArray(members)) {
-        console.log(`Adding ${members.length} members to the list`);
-        members.forEach((member, index) => {
-            console.log(`Adding member ${index}:`, member);
-            const memberItem = document.createElement('li');
-            // Handle different possible data formats
-            let role = '';
-            if (typeof member === 'string') {
-                // If member is just a string
-                role = member;
-            } else if (member && typeof member === 'object') {
-                // If member is an object, check for role property
-                role = member.role || "Unknown";
-            } else {
-                role = "Unknown";
-            }
-            memberItem.innerHTML = `<span style="background: rgba(144, 200, 60, 0.2); padding: 5px 10px; border-radius: 20px; display: inline-block;"><i class="fas fa-user"></i> ${role}</span>`;
-            membersList.appendChild(memberItem);
-        });
-    } else {
-        console.error("Members is not an array:", members);
-    }
-    
-    // Update last refreshed time
-    updateLastRefreshedText();
-}
-
-// Show race connection status
+// Show connection status specifically for race updates
 function showRaceConnectionStatus(status, message) {
-    // Use the common function from common.js
-    showConnectionStatus(status, message);
+    console.log(`Race connection status: ${status} - ${message}`);
+    
+    let statusElement = document.getElementById('race-ws-status');
+    
+    if (!statusElement) {
+        statusElement = document.createElement('div');
+        statusElement.id = 'race-ws-status';
+        statusElement.style.position = 'fixed';
+        statusElement.style.bottom = '10px';
+        statusElement.style.left = '10px';
+        statusElement.style.padding = '5px 10px';
+        statusElement.style.borderRadius = '5px';
+        statusElement.style.fontSize = '12px';
+        statusElement.style.zIndex = '1000';
+        document.body.appendChild(statusElement);
+    }
+    
+    statusElement.textContent = message;
+    
+    switch (status) {
+        case 'connected':
+            statusElement.style.backgroundColor = 'rgba(40, 167, 69, 0.8)';
+            statusElement.style.color = 'white';
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 3000);
+            break;
+        case 'reconnecting':
+            statusElement.style.backgroundColor = 'rgba(255, 193, 7, 0.8)';
+            statusElement.style.color = 'black';
+            statusElement.style.display = 'block';
+            break;
+        case 'error':
+        case 'closed':
+        case 'failed':
+            statusElement.style.backgroundColor = 'rgba(220, 53, 69, 0.8)';
+            statusElement.style.color = 'white';
+            statusElement.style.display = 'block';
+            break;
+    }
 }
 
 // Show race completion notification
@@ -988,58 +722,1025 @@ function showRaceCompleteNotification(redirectUrl) {
     }, 2000);
 }
 
-// Initialize race WebSocket when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Other existing initialization code
+    // Simple way to handle the conditional logic without template tags in JS
+    const questionContainer = document.getElementById('question-container');
+    const joinForm = document.querySelector('.join-race-form');
     
-    // Setup manual refresh button
-    const manualRefreshButton = document.getElementById('manual-refresh');
-    if (manualRefreshButton) {
-        manualRefreshButton.addEventListener('click', function() {
-            console.log("Manual refresh button clicked");
+    if (questionContainer) {
+        // We're in questions display mode
+        // Keep track of current question index
+        let currentQuestionIndex = currentQuestionIndexFromServer;
+        
+        // Collect all questions
+        const questions = document.querySelectorAll('.question-card');
+        const totalQuestions = questions.length;
+        
+        // Initialize total score
+        const totalScoreElement = document.getElementById('total-score');
+        if (totalScoreElement) {
+            totalScoreElement.textContent = totalPointsFromServer;
+        }
+        
+        // Track attempts and points for each question
+        const questionData = {};
+        
+        // Initialize question data
+        document.querySelectorAll('.question-card').forEach(question => {
+            const questionId = question.id.split('-')[1];
+            questionData[questionId] = {
+                attempts: 0,
+                points: 0,
+                maxAttempts: 3,
+                photoUploaded: false,
+                answered: false
+            };
             
-            // Update last refresh time
-            lastRefreshTime = Date.now();
-            updateLastRefreshedText();
-            
-            // First try to request update via WebSocket if it's connected
-            if (raceSocket && raceSocket.readyState === WebSocket.OPEN) {
-                console.log("Requesting race update via WebSocket");
-                sendRaceMessage({
-                    type: 'request_race_update', 
-                    team_code: '{{ team.code }}',
-                    race_id: '{{ race.id }}'
-                });
+            // Apply data from server if available
+            if (answersFromServer[questionId]) {
+                const serverData = answersFromServer[questionId];
+                questionData[questionId].attempts = serverData.attempts || 0;
+                questionData[questionId].points = serverData.points || 0;
+                questionData[questionId].answered = serverData.answered || false;
+                questionData[questionId].photoUploaded = serverData.photo_uploaded || false;
                 
-                // Show a temporary message
-                showRaceConnectionStatus('updating', 'Requesting latest data...');
-            } else {
-                console.log("WebSocket not available, reloading page");
-                // If WebSocket isn't connected, fall back to page reload
-                location.reload();
+                // Update UI to match the state
+                const attemptsElement = document.getElementById(`attempts-${questionId}`);
+                if (attemptsElement) {
+                    attemptsElement.textContent = serverData.attempts || 0;
+                }
+                
+                // If question was already answered correctly, show feedback and disable submission
+                if (serverData.answered) {
+                    const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                    if (feedbackElement) {
+                        feedbackElement.className = 'feedback correct';
+                        feedbackElement.style.display = 'block';
+                        feedbackElement.textContent = `Correct! You earned ${serverData.points} points.`;
+                    }
+                    
+                    // Disable answer submission
+                    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
+                }
+                
+                // If photo was uploaded, mark it and show feedback
+                if (serverData.photo_uploaded) {
+                    questionData[questionId].photoUploaded = true;
+                    
+                    const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
+                    if (uploadButton) {
+                        uploadButton.disabled = true;
+                        uploadButton.textContent = "Photo Uploaded ✓";
+                    }
+                    
+                    const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                    if (feedbackElement) {
+                        feedbackElement.className = 'feedback correct';
+                        feedbackElement.style.display = 'block';
+                        feedbackElement.textContent = 'Photo uploaded successfully!';
+                    }
+                }
+                
+                // Always check if max attempts reached to properly handle page refresh
+                if (serverData.attempts >= 3 && !serverData.answered && !serverData.photo_uploaded) {
+                    showPhotoUpload(questionId);
+                }
             }
+        });
+        
+        // Hide all questions initially except the current one
+        for (let i = 0; i < questions.length; i++) {
+            if (i === currentQuestionIndex) {
+                questions[i].style.display = 'block';
+            } else {
+            questions[i].style.display = 'none';
+            }
+        }
+        
+        // Update the question counter
+        const updateQuestionCounter = function() {
+            const nextButton = document.getElementById('next-question');
+            const navigationButtons = document.getElementById('navigation-buttons');
+            
+            // Disable/enable next button
+            if (currentQuestionIndex >= totalQuestions - 1) {
+                nextButton.disabled = true;
+            } else {
+                nextButton.disabled = false;
+            }
+        };
+        
+        // Initialize question counter
+        updateQuestionCounter();
+        
+        // Initially hide navigation buttons - they'll only show after correct answer or photo upload
+        document.getElementById('navigation-buttons').style.display = 'none';
+        
+        // Next button event listener
+        document.getElementById('next-question').addEventListener('click', function() {
+            // Check if this button has a redirect URL (set by photo upload response)
+            const redirectUrl = this.getAttribute('data-next-url');
+            if (redirectUrl) {
+                console.log("Redirecting to:", redirectUrl);
+                window.location.href = redirectUrl;
+                return;
+            }
+            
+            if (currentQuestionIndex < totalQuestions - 1) {
+                questions[currentQuestionIndex].style.display = 'none';
+                currentQuestionIndex++;
+                questions[currentQuestionIndex].style.display = 'block';
+                updateQuestionCounter();
+                
+                // Save current question index to server
+                saveCurrentQuestionIndex(currentQuestionIndex);
+                
+                // IMPORTANT: Hide navigation buttons for new question until it's answered correctly or photo uploaded
+                const questionId = questions[currentQuestionIndex].id.split('-')[1];
+                if (questionData[questionId] && !questionData[questionId].answered && !questionData[questionId].photoUploaded) {
+                    document.getElementById('navigation-buttons').style.display = 'none';
+                    console.log('Moving to next question, hiding navigation buttons');
+                } else {
+                    console.log('Moving to next question that is already answered or has photo, showing navigation buttons');
+                }
+            } else {
+                // This is the last question and we're trying to go beyond it
+                // Redirect to race completion page
+                console.log("Last question completed, redirecting to race completion page");
+                window.location.href = "/race-complete/";
+            }
+        });
+        
+        // Show navigation buttons only if we have any answered questions
+        const hasAnsweredQuestions = document.querySelectorAll('.feedback.correct').length > 0;
+        if (hasAnsweredQuestions) {
+            // Only show if current question is already answered or has photo uploaded
+            const currentQuestionId = questions[currentQuestionIndex].id.split('-')[1];
+            if (questionData[currentQuestionId] && (questionData[currentQuestionId].answered || questionData[currentQuestionId].photoUploaded)) {
+                document.getElementById('navigation-buttons').style.display = 'block';
+            }
+        }
+
+        // Add event listeners for form submissions
+        document.querySelectorAll('.answer-form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const questionId = this.id.split('-')[2];
+                const answerInput = document.getElementById(`answer-${questionId}`);
+                if (answerInput && answerInput.value.trim()) {
+                    submitAnswer(questionId, answerInput.value);
+                }
+            });
+        });
+
+        // Add event listeners to submit buttons
+        document.querySelectorAll('.submit-answer').forEach(button => {
+            button.addEventListener('click', function() {
+                const questionId = this.getAttribute('data-question-id');
+                const answerInput = document.getElementById(`answer-${questionId}`);
+                if (answerInput && answerInput.value) {
+                    submitAnswer(questionId, answerInput.value);
+                }
+            });
+        });
+        
+        // Add event listeners to input fields to handle Enter key
+        document.querySelectorAll('input[id^="answer-"]').forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const questionId = this.id.split('-')[1];
+                    if (this.value) {
+                        submitAnswer(questionId, this.value);
+                    }
+                }
+            });
+        });
+        
+        // Function to handle answer submission
+        function submitAnswer(questionId, answer) {
+            // Get the team code from the page
+            const teamCode = '{{ team.code }}';
+            
+            // Get the actual database question ID
+            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+            if (!submitButton) {
+                console.error("Submit button not found");
+                return;
+            }
+            
+            const dbQuestionId = submitButton.getAttribute('data-db-question-id');
+            if (!dbQuestionId) {
+                console.error("Database question ID not found");
+                return;
+            }
+            
+            console.log(`Submitting answer for question ${dbQuestionId} (index: ${questionId}): "${answer}"`);
+            console.log(`Team code: ${teamCode}`);
+            
+            // Disable the submit button during processing to prevent double submission
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = "Checking...";
+            }
+            
+            // Check if this question was already answered correctly
+            if (questionData[questionId] && questionData[questionId].answered) {
+                const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                feedbackElement.className = 'feedback correct';
+                feedbackElement.style.display = 'block';
+                feedbackElement.textContent = `You've already correctly answered this question!`;
+                
+                // Re-enable the submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
+                
+                // Show navigation buttons
+                document.getElementById('navigation-buttons').style.display = 'block';
+                return;
+            }
+            
+            // Check if max attempts reached
+            if (questionData[questionId] && questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
+                showPhotoUpload(questionId);
+                
+                // Re-enable the submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
+                
+                // Hide navigation buttons until photo is uploaded
+                document.getElementById('navigation-buttons').style.display = 'none';
+                return;
+            }
+            
+            // Increment attempts
+            questionData[questionId].attempts++;
+            const attemptsElement = document.getElementById(`attempts-${questionId}`);
+            if (attemptsElement) {
+                attemptsElement.textContent = questionData[questionId].attempts;
+            }
+            
+            // Make API call to check answer
+            fetch('/check-answer/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    question_id: dbQuestionId, // Use the database ID
+                    answer: answer.trim(),
+                    team_code: teamCode,
+                    attempt_number: questionData[questionId].attempts
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Enable the submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
+                
+                // Show feedback
+                const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                if (!feedbackElement) return;
+                
+                // Display feedback with proper visibility
+                feedbackElement.style.display = 'block';
+                
+                // Handle already answered case
+                if (data.already_answered) {
+                    feedbackElement.className = 'feedback correct';
+                    feedbackElement.textContent = 'You have already answered this question correctly.';
+                    
+                    // Disable further submissions
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
+                    
+                    // Enable navigation to next question
+                    document.getElementById('navigation-buttons').style.display = 'block';
+                    return;
+                }
+                
+                // Handle correct answer case
+                if (data.correct) {
+                    feedbackElement.className = 'feedback correct';
+                    feedbackElement.textContent = `Correct! You earned ${data.points} points.`;
+                    
+                    // Update points
+                    questionData[questionId].points = data.points;
+                    questionData[questionId].answered = true;
+                    
+                    // Update total score
+                    updateTotalScore();
+                    
+                    // Disable further submissions for this question
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
+                    
+                    // RACE COMPLETION CHECK:
+                    // If server indicates this is the last question, redirect to race completion page
+                    if (data.is_last_question || data.is_race_complete) {
+                        console.log("SERVER INDICATED RACE COMPLETION - REDIRECTING NOW");
+                        
+                        // Show message to user before redirecting
+                        const redirectMessage = document.createElement('div');
+                        redirectMessage.style.position = 'fixed';
+                        redirectMessage.style.top = '50%';
+                        redirectMessage.style.left = '50%';
+                        redirectMessage.style.transform = 'translate(-50%, -50%)';
+                        redirectMessage.style.background = 'rgba(40, 167, 69, 0.9)';
+                        redirectMessage.style.color = 'white';
+                        redirectMessage.style.padding = '20px';
+                        redirectMessage.style.borderRadius = '10px';
+                        redirectMessage.style.zIndex = '10000';
+                        redirectMessage.innerHTML = '<h3>Congratulations!</h3><p>You\'ve completed all questions!</p><p>Redirecting to results page...</p>';
+                        document.body.appendChild(redirectMessage);
+                        
+                        // Redirect after a short delay (1.5 seconds)
+                        setTimeout(() => {
+                            window.location.href = data.next_url || '/race-complete/';
+                        }, 1500);
+                        
+                        return; // Exit early
+                    }
+                    
+                    // Show navigation buttons - now it's safe to proceed
+                    document.getElementById('navigation-buttons').style.display = 'block';
+                    console.log('Correct answer, showing navigation buttons');
+                } else {
+                    feedbackElement.className = 'feedback incorrect';
+                    feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
+                    
+                    // Re-enable the submit button for next attempt
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
+                    
+                    // IMPORTANT: Ensure navigation buttons are hidden for incorrect answers
+                    document.getElementById('navigation-buttons').style.display = 'none';
+                    console.log('Incorrect answer, hiding navigation buttons');
+                    
+                    // If max attempts reached, show photo upload
+                    if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
+                        showPhotoUpload(questionId);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking answer:', error);
+                alert('Error checking answer. Please try again.');
+                
+                // Re-enable the submit button on error
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
+            });
+        }
+        
+        // Save current question index to server
+        const saveCurrentQuestionIndex = function(index) {
+            const teamCode = '{{ team.code }}';
+            const raceId = '{{ race.id }}';
+            
+            fetch('/api/save-question-index/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    team_code: teamCode,
+                    race_id: raceId,
+                    question_index: index
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Saved current question index:', data);
+            })
+            .catch(error => {
+                console.error('Error saving question index:', error);
+            });
+        };
+        
+        // Update total score
+        const updateTotalScore = function() {
+            let totalScore = 0;
+            for (const questionId in questionData) {
+                totalScore += questionData[questionId].points;
+            }
+            document.getElementById('total-score').textContent = totalScore;
+        };
+        
+        // Show photo upload form
+        const showPhotoUpload = function(questionId) {
+            const photoUploadElement = document.getElementById(`photo-upload-${questionId}`);
+            if (!photoUploadElement) {
+                console.error(`Photo upload element not found for question ${questionId}`);
+                return;
+            }
+            
+            photoUploadElement.style.display = 'block';
+            
+            // Disable answer submission
+            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            
+            // Set the question's input field as read-only to prevent further attempts
+                const answerInput = document.getElementById(`answer-${questionId}`);
+            if (answerInput) {
+                answerInput.readOnly = true;
+                answerInput.classList.add('max-attempts-reached');
+                answerInput.placeholder = 'Maximum attempts reached';
+            }
+            
+            // Add a clear notice about max attempts being reached
+            const feedbackElement = document.getElementById(`feedback-${questionId}`);
+            if (feedbackElement && !questionData[questionId].photoUploaded) {
+                feedbackElement.className = 'feedback max-attempts';
+                feedbackElement.style.display = 'block';
+                feedbackElement.textContent = 'Maximum attempts reached. Please upload a photo to continue.';
+            }
+            
+            // IMPORTANT: Explicitly hide navigation buttons until photo is uploaded
+            document.getElementById('navigation-buttons').style.display = 'none';
+            console.log('Max attempts reached, showing photo upload and hiding navigation buttons');
+        };
+        
+        // Add event listeners to upload photo buttons
+        document.querySelectorAll('.upload-photo').forEach(button => {
+            button.addEventListener('click', function() {
+                const questionId = this.getAttribute('data-question-id');
+                uploadPhoto(questionId);
+            });
         });
     }
     
-    // Setup the race websocket connection
-    setupRaceWebSocket();
+    // Photo upload function
+    function uploadPhoto(questionId) {
+        const photoInput = document.getElementById(`photo-${questionId}`);
+        if (!photoInput.files || !photoInput.files[0]) {
+            alert('Please select a photo to upload.');
+            return;
+        }
+        
+        // Get the actual database question ID
+        const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
+        if (!uploadButton) {
+            alert('Error: Cannot find upload button');
+            return;
+        }
+        
+        const dbQuestionId = uploadButton.getAttribute('data-db-question-id');
+        if (!dbQuestionId) {
+            alert('Error: Missing question ID');
+            return;
+        }
+        
+        // Show loading indicator
+        if (uploadButton) {
+            uploadButton.disabled = true;
+            uploadButton.textContent = "Uploading...";
+        }
+        
+        const formData = new FormData();
+        formData.append('photo', photoInput.files[0]);
+        formData.append('question_id', dbQuestionId); // Use the database ID
+        formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+        
+        // Get the team code
+        const teamCode = '{{ team.code }}';
+        formData.append('team_code', teamCode);
+        
+        fetch('/api/upload-photo/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                feedbackElement.className = 'feedback correct';
+                feedbackElement.style.display = 'block';
+                feedbackElement.textContent = 'Photo uploaded successfully!';
+                
+                // Mark photo as uploaded
+                questionData[questionId].photoUploaded = true;
+                
+                // Always show the next button after a successful photo upload
+                // regardless of what the server returns
+                const navButtons = document.getElementById('navigation-buttons');
+                
+                // CRITICAL FIX: Force visibility of navigation buttons with multiple methods
+                navButtons.style.display = 'block';
+                navButtons.style.visibility = 'visible';
+                navButtons.style.opacity = '1';
+                navButtons.style.zIndex = '10000'; // Above the overlay
+                
+                // Create an attention-grabbing overlay to highlight the next button
+                const overlayDiv = document.createElement('div');
+                overlayDiv.style.position = 'fixed';
+                overlayDiv.style.top = '0';
+                overlayDiv.style.left = '0';
+                overlayDiv.style.width = '100%';
+                overlayDiv.style.height = '100%';
+                overlayDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                overlayDiv.style.zIndex = '9999';
+                overlayDiv.style.display = 'flex';
+                overlayDiv.style.flexDirection = 'column';
+                overlayDiv.style.justifyContent = 'center';
+                overlayDiv.style.alignItems = 'center';
+                overlayDiv.style.transition = 'opacity 0.5s';
+                
+                // Create success message
+                const messageDiv = document.createElement('div');
+                messageDiv.innerHTML = `
+                    <div style="background-color: rgba(40, 167, 69, 0.9); border-radius: 10px; padding: 20px; max-width: 90%; text-align: center; margin-bottom: 30px;">
+                        <h3 style="color: white; margin-bottom: 15px;"><i class="fas fa-check-circle"></i> Photo Successfully Uploaded!</h3>
+                        <p style="color: white; font-size: 1.2rem;">Click the 'Next Question' button below to continue</p>
+                        <div style="margin-top: 20px;">
+                            <button id="overlay-next-btn" class="btn btn-light btn-lg">Next Question <i class="fas fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+                `;
+                
+                // Add to body
+                overlayDiv.appendChild(messageDiv);
+                document.body.appendChild(overlayDiv);
+                
+                // Clone the navigation buttons and append to the message for easy access
+                const navButtonsClone = navButtons.cloneNode(true);
+                navButtonsClone.style.display = 'block';
+                navButtonsClone.style.marginTop = '20px';
+                messageDiv.appendChild(navButtonsClone);
+                
+                // Set up click events
+                document.getElementById('overlay-next-btn').addEventListener('click', function() {
+                    // Trigger click on the actual next button
+                    document.getElementById('next-question').click();
+                    // Remove overlay
+                    document.body.removeChild(overlayDiv);
+                });
+                
+                // Allow clicking anywhere to dismiss the overlay after a delay
+                setTimeout(() => {
+                    overlayDiv.addEventListener('click', function(e) {
+                        if (e.target === overlayDiv) {
+                            document.body.removeChild(overlayDiv);
+                        }
+                    });
+                }, 1000);
+                
+                // Auto-dismiss after 7 seconds
+                setTimeout(() => {
+                    if (document.body.contains(overlayDiv)) {
+                        document.body.removeChild(overlayDiv);
+                    }
+                }, 7000);
+                
+                // ENHANCED AUTO-NAVIGATION: Improve the auto-redirect mechanism for photo uploads
+                // Determine the URL to navigate to, prioritizing different sources
+                const redirectUrl = data.next_url || data.legacy_next_url;
+                
+                // RACE COMPLETION CHECK:
+                // If server indicates this is the last question, redirect to race completion page
+                if (data.is_last_question || data.is_race_complete) {
+                    console.log("SERVER INDICATED RACE COMPLETION AFTER PHOTO UPLOAD - REDIRECTING NOW");
+                    
+                    // Show message to user before redirecting
+                    const completeMessage = document.createElement('div');
+                    completeMessage.style.position = 'fixed';
+                    completeMessage.style.top = '50%';
+                    completeMessage.style.left = '50%';
+                    completeMessage.style.transform = 'translate(-50%, -50%)';
+                    completeMessage.style.background = 'rgba(40, 167, 69, 0.9)';
+                    completeMessage.style.color = 'white';
+                    completeMessage.style.padding = '20px';
+                    completeMessage.style.borderRadius = '10px';
+                    completeMessage.style.zIndex = '20000'; // Higher than other overlays
+                    completeMessage.innerHTML = '<h3>Congratulations!</h3><p>You\'ve completed all questions!</p><p>Redirecting to results page...</p>';
+                    document.body.appendChild(completeMessage);
+                    
+                    // Redirect after a short delay (2 seconds)
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 2000);
+                    
+                    // Don't do any more processing
+                    return;
+                }
+                
+                // Automatic navigation after 5 seconds if user doesn't click the Next button
+                if (redirectUrl) {
+                    // Show auto-navigation countdown message
+                    const autoNavMessage = document.createElement('div');
+                    autoNavMessage.id = 'auto-nav-message';
+                    autoNavMessage.style.position = 'fixed';
+                    autoNavMessage.style.bottom = '20px';
+                    autoNavMessage.style.left = '50%';
+                    autoNavMessage.style.transform = 'translateX(-50%)';
+                    autoNavMessage.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                    autoNavMessage.style.color = 'white';
+                    autoNavMessage.style.padding = '10px 20px';
+                    autoNavMessage.style.borderRadius = '5px';
+                    autoNavMessage.style.zIndex = '10001';
+                    autoNavMessage.style.fontWeight = 'bold';
+                    autoNavMessage.innerHTML = 'Auto-navigating to next question in <span id="auto-nav-countdown">5</span> seconds...';
+                    document.body.appendChild(autoNavMessage);
+                    
+                    // Countdown timer for auto-navigation
+                    let autoNavCountdown = 5; // 5 seconds
+                    const autoNavCountdownEl = document.getElementById('auto-nav-countdown');
+                    const autoNavInterval = setInterval(() => {
+                        autoNavCountdown--;
+                        if (autoNavCountdownEl) {
+                            autoNavCountdownEl.textContent = autoNavCountdown;
+                        }
+                        
+                        if (autoNavCountdown <= 0) {
+                            clearInterval(autoNavInterval);
+                            if (document.body.contains(autoNavMessage)) {
+                                document.body.removeChild(autoNavMessage);
+                            }
+                            
+                            // Navigate to the next question
+                            console.log("Auto-navigating to next question:", redirectUrl);
+                            window.location.href = redirectUrl;
+                        }
+                    }, 1000);
+                    
+                    // If user clicks the Next button, cancel auto-navigation
+                    const nextButton = document.getElementById('next-question');
+                    if (nextButton) {
+                        nextButton.addEventListener('click', function() {
+                            // Cancel auto-navigation
+                            clearInterval(autoNavInterval);
+                            if (document.body.contains(autoNavMessage)) {
+                                document.body.removeChild(autoNavMessage);
+                            }
+                        });
+                    }
+                    
+                    // Store the redirect URL on the Next button so clicking it works even if event listener fails
+                    if (nextButton && !nextButton.hasAttribute('data-next-url')) {
+                        nextButton.setAttribute('data-next-url', redirectUrl);
+                        nextButton.addEventListener('click', function() {
+                            window.location.href = this.getAttribute('data-next-url');
+                        });
+                    }
+                } else {
+                    console.warn("No redirect URL provided by server after photo upload");
+                    
+                    // Create a fallback mechanism: if no URL provided, try to use the "next" button's normal mechanism
+                    setTimeout(() => {
+                        const nextButton = document.getElementById('next-question');
+                        if (nextButton) {
+                            console.log("Auto-clicking next button as fallback");
+                            nextButton.click();
+                        }
+                    }, 5000);
+                }
+                
+                // Also update the existing display
+                const nextButton = document.getElementById('next-question');
+                if (nextButton) {
+                    // Make it stand out
+                    nextButton.classList.add('ready');
+                    nextButton.style.backgroundColor = '#90C83C';
+                    nextButton.style.color = 'white';
+                    nextButton.style.fontSize = '1.3rem';
+                    nextButton.style.boxShadow = '0 0 20px rgba(144, 200, 60, 0.8)';
+                    
+                    // Ensure it's enabled
+                    nextButton.disabled = false;
+                }
+            } else {
+                alert('Error uploading photo: ' + (data.error || 'Unknown error'));
+                
+                // Re-enable upload button on error
+                if (uploadButton) {
+                    uploadButton.disabled = false;
+                    uploadButton.textContent = "Upload Photo";
+                }
+                
+                // Make sure navigation buttons remain hidden on error
+                document.getElementById('navigation-buttons').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error uploading photo:', error);
+            alert('Error uploading photo. Please try again.');
+            
+            // Re-enable upload button on error
+            if (uploadButton) {
+                uploadButton.disabled = false;
+                uploadButton.textContent = "Upload Photo";
+            }
+            
+            // Make sure navigation buttons remain hidden on error
+            document.getElementById('navigation-buttons').style.display = 'none';
+        });
+    }
+
+    // Add a new function to periodically update the score from the server
+    function periodicScoreUpdate() {
+        // Only run every 3 seconds to avoid overloading the server
+        setInterval(() => {
+            // Get the team code
+            const teamCode = '{{ team.code }}';
+            const raceId = '{{ race.id }}';
+            
+            if (!teamCode || !raceId) return;
+            
+            // Make API call to get current team score
+            fetch(`/api/leaderboard-data/?team_code=${teamCode}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.teams) {
+                        // Find our team in the response
+                        const ourTeam = data.teams.find(team => team.code === teamCode);
+                        if (ourTeam && ourTeam.score !== undefined) {
+                            // Update the score display
+                            const totalScoreEl = document.getElementById('total-score');
+                            if (totalScoreEl && parseInt(totalScoreEl.textContent) !== ourTeam.score) {
+                                // If score is different, update with animation
+                                totalScoreEl.textContent = ourTeam.score;
+                                totalScoreEl.style.transition = 'color 0.5s';
+                                totalScoreEl.style.color = '#90C83C';
+                                setTimeout(() => {
+                                    totalScoreEl.style.color = '';
+                                }, 1000);
+                            }
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching score update:', error);
+                });
+        }, 3000);
+    }
     
-    // Initialize the last refreshed text
-    updateLastRefreshedText();
+    // Add a comprehensive periodic update system
+    function initializePeriodicUpdates() {
+        // 1. Set up periodic score updates
+        periodicScoreUpdate();
+        
+        // 2. Set up auto-refresh of question data every 10 seconds
+        setInterval(() => {
+            const teamCode = '{{ team.code }}';
+            const raceId = '{{ race.id }}';
+            
+            // Only fetch if we have the required data
+            if (!teamCode || !raceId) return;
+            
+            // Fetch updated question answers from server
+            fetch(`/api/question-answers/?team_code=${teamCode}&race_id=${raceId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.answers) {
+                        // Update local data with server data
+                        for (const questionId in data.answers) {
+                            const answer = data.answers[questionId];
+                            
+                            // If we have this question in our local data, update it
+                            if (questionData[questionId]) {
+                                questionData[questionId].attempts = answer.attempts || 0;
+                                questionData[questionId].points = answer.points_awarded || 0;
+                                questionData[questionId].answered = answer.answered_correctly || false;
+                                questionData[questionId].photoUploaded = answer.photo_uploaded || false;
+                                
+                                // Update UI to match server data if needed
+                                const attemptsEl = document.getElementById(`attempts-${questionId}`);
+                                if (attemptsEl) {
+                                    attemptsEl.textContent = answer.attempts || 0;
+                                }
+                                
+                                // Update feedback if needed
+                                const feedbackEl = document.getElementById(`feedback-${questionId}`);
+                                if (feedbackEl) {
+                                    if (answer.answered_correctly && !feedbackEl.classList.contains('correct')) {
+                                        feedbackEl.className = 'feedback correct';
+                                        feedbackEl.style.display = 'block';
+                                        feedbackEl.textContent = `Correct! You earned ${answer.points_awarded} points.`;
+                                    }
+                                }
+                                
+                                // Show navigation buttons if this is the current question and it's been answered
+                                const questions = document.querySelectorAll('.question-card');
+                                const currentQuestion = Array.from(questions).findIndex(q => q.style.display === 'block');
+                                
+                                if (currentQuestion !== -1 && 
+                                    questions[currentQuestion].dataset.questionId === questionId &&
+                                    (answer.answered_correctly || answer.photo_uploaded)) {
+                                    document.getElementById('navigation-buttons').style.display = 'block';
+                                }
+                            }
+                        }
+                        
+                        // Update total score
+                        updateTotalScore();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching question answers:', error);
+                });
+        }, 10000);
+    }
+    
+    // Initialize all periodic updates
+    initializePeriodicUpdates();
+    
+    // ADD THE NEW TIMER CODE RIGHT HERE, BEFORE THE CLOSING BRACKET
+    // Get start time from server or use current time as fallback
+    let startTime;
+    try {
+        const startTimeStr = "{{ start_time|safe }}";
+        startTime = startTimeStr && startTimeStr !== "None" ? new Date(startTimeStr) : new Date();
+        // Check if date is valid, otherwise use current time
+        if (isNaN(startTime.getTime())) {
+            console.log("Invalid start time, using current time as fallback");
+            startTime = new Date();
+        }
+    } catch (e) {
+        console.log("Error parsing start time, using current time as fallback:", e);
+        startTime = new Date();
+    }
+    
+    // Get time limit from race object or fall back to default
+    const timeLimitMinutes = {% if race.time_limit_minutes %}{{ race.time_limit_minutes }}{% else %}{{ time_limit_minutes|default:20 }}{% endif %};
+    console.log("Race start time:", startTime);
+    console.log("Time limit (minutes):", timeLimitMinutes);
+    
+    // Initialize timer functionality
+    const timerDisplay = document.getElementById('race-timer');
+    if (timerDisplay) {
+        // Calculate end time
+        const endTime = new Date(startTime.getTime() + (timeLimitMinutes * 60 * 1000));
+        console.log("Race end time:", endTime);
+        
+        // Flag to ensure 5-minute warning only shows once
+        let fiveMinuteWarningShown = false;
+        
+        // Function to show custom popup
+        function showCustomPopup(title, message, type, callback) {
+            const popup = document.getElementById('custom-popup');
+            const popupTitle = document.getElementById('popup-title');
+            const popupMessage = document.getElementById('popup-message');
+            const popupButton = document.getElementById('popup-button');
+            
+            // Set content
+            popupTitle.textContent = title;
+            popupMessage.innerHTML = message;
+            
+            // Clear previous classes
+            popup.classList.remove('warning', 'danger');
+            
+            // Add type class if specified
+            if (type) {
+                popup.classList.add(type);
+            }
+            
+            // Handle button click
+            popupButton.onclick = function() {
+                popup.classList.remove('show');
+                setTimeout(() => {
+                    popup.style.display = 'none';
+                    if (callback && typeof callback === 'function') {
+                        callback();
+                    }
+                }, 300);
+            };
+            
+            // Show popup with animation
+            popup.style.display = 'flex';
+            setTimeout(() => {
+                popup.classList.add('show');
+            }, 10);
+        }
+        
+        // Update timer immediately once
+        updateTimer();
+        
+        // Update timer every second
+        const timerInterval = setInterval(updateTimer, 1000);
+        
+        function updateTimer() {
+            const now = new Date();
+            const remainingMs = endTime - now;
+            const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+
+            // 🕒 Update timer on page
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Set timer color to red when time is running low
+            if (remainingSeconds <= 300) { // 5 minutes or less
+                timerDisplay.style.color = "red";
+                timerDisplay.style.fontWeight = "bold";
+            }
+
+            // ⚠️ Popup warning at 5 minutes
+            if (!fiveMinuteWarningShown && remainingSeconds <= 300 && remainingSeconds > 0) {
+                showCustomPopup(
+                    "⏳ Time Warning", 
+                    "Only 5 minutes left!<br><br>Finish strong and complete all your questions!",
+                    "warning"
+                );
+                fiveMinuteWarningShown = true;
+            }
+
+            // ⏰ Redirect when time runs out
+            if (remainingSeconds <= 0) {
+                clearInterval(timerInterval);
+                showCustomPopup(
+                    "⏰ Time's Up!", 
+                    "Your race time has ended.<br><br>Redirecting to the race completion page...",
+                    "danger",
+                    function() {
+                        window.location.href = "{% url 'race_complete' %}";
+                    }
+                );
+            }
+        }
+    }
+
+    // Only initialize if we're on the question view (not the join form)
+    if (document.getElementById('race-questions')) {
+        setupRaceWebSocket();
+    }
 });
 
-// Function to update last refreshed text
-function updateLastRefreshedText() {
-    const lastRefreshedEl = document.getElementById('last-refreshed');
-    if (lastRefreshedEl) {
-        const now = new Date();
-        lastRefreshedEl.textContent = `Last refreshed: ${now.toLocaleTimeString()}`;
+// Helper function to get cookies for CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
     }
+    return cookieValue;
 }
 
-// Also add this to capture and log any general errors
-window.addEventListener('error', function(event) {
-    console.error('Global error caught:', event.error);
-});
+// Update timer display based on remaining seconds
+function updateTimerDisplay(remainingSeconds) {
+    const timerDisplay = document.getElementById('race-timer');
+    if (!timerDisplay) return;
+    
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = remainingSeconds % 60;
+    
+    // Update timer display
+    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Set timer color to red when time is running low
+    if (remainingSeconds <= 300) { // 5 minutes or less
+        timerDisplay.style.color = "red";
+        timerDisplay.style.fontWeight = "bold";
+    }
+    
+    // Show 5-minute warning popup if needed
+    if (remainingSeconds <= 300 && remainingSeconds > 299) {
+        showCustomPopup(
+            "⏳ Time Warning", 
+            "Only 5 minutes left!<br><br>Finish strong and complete all your questions!",
+            "warning"
+        );
+    }
+    
+    // Redirect when time runs out
+    if (remainingSeconds <= 0) {
+        showCustomPopup(
+            "⏰ Time's Up!", 
+            "Your race time has ended.<br><br>Redirecting to the race completion page...",
+            "danger",
+            function() {
+                window.location.href = "{% url 'race_complete' %}";
+            }
+        );
+    }
+}
 </script>
 {% endblock %} 

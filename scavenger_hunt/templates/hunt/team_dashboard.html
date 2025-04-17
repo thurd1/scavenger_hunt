@@ -125,173 +125,24 @@
 <script>
     const teamId = {{ team.id }};
     let socket;
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT_ATTEMPTS = 5;
-    const RECONNECT_DELAY_MS = 3000;
-    let heartbeatInterval = null;
-    let lastMessageTime = Date.now();
-    let forcedRefreshInterval = null;
-    
-    // Connection status indicator
-    function createStatusIndicator() {
-        const indicator = document.createElement('div');
-        indicator.id = 'connection-status';
-        indicator.style.position = 'fixed';
-        indicator.style.bottom = '10px';
-        indicator.style.right = '10px';
-        indicator.style.backgroundColor = 'rgba(33, 37, 41, 0.8)';
-        indicator.style.color = '#ffcc00';
-        indicator.style.padding = '5px 10px';
-        indicator.style.borderRadius = '4px';
-        indicator.style.fontSize = '12px';
-        indicator.style.zIndex = '9999';
-        indicator.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#ffcc00;border-radius:50%;margin-right:5px;"></span> Connecting...';
-        document.body.appendChild(indicator);
-        return indicator;
-    }
-    
-    // Update status indicator
-    function updateStatus(status, color) {
-        let indicator = document.getElementById('connection-status');
-        if (!indicator) {
-            indicator = createStatusIndicator();
-        }
-        
-        indicator.innerHTML = `<span style="display:inline-block;width:8px;height:8px;background:${color};border-radius:50%;margin-right:5px;"></span> ${status}`;
-    }
 
-    // Connect WebSocket with reconnection logic
     function connectWebSocket() {
-        updateStatus('Connecting...', '#ffcc00');
-        
-        try {
-            const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-            socket = new WebSocket(
-                `${wsScheme}://${window.location.host}/ws/team/${teamId}/`
-            );
+        const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        socket = new WebSocket(
+            `${wsScheme}://${window.location.host}/ws/team/${teamId}/`
+        );
 
-            socket.onopen = function() {
-                console.log('WebSocket connected');
-                updateStatus('Connected', '#90C83C');
-                reconnectAttempts = 0;
-                lastMessageTime = Date.now();
-                
-                // Start heartbeat
-                startHeartbeat();
-                
-                // Request initial data
-                sendMessage({ type: 'request_data' });
-            };
-
-            socket.onmessage = function(e) {
-                try {
-                    const data = JSON.parse(e.data);
-                    lastMessageTime = Date.now();
-                    
-                    if (data.type === 'team_update') {
-                        updateMembersList(data.members);
-                    } else if (data.type === 'game_started') {
-                        // Redirect to race questions page
-                        window.location.href = data.redirect_url || `/race/${data.race_id}/questions/`;
-                    } else if (data.type === 'pong') {
-                        console.log('Heartbeat response received');
-                    }
-                } catch (error) {
-                    console.error('Error parsing WebSocket message:', error);
-                }
-            };
-
-            socket.onclose = function(e) {
-                console.log(`WebSocket closed with code: ${e.code}`);
-                stopHeartbeat();
-                updateStatus('Disconnected', '#ff6b6b');
-                
-                // Attempt to reconnect with exponential backoff
-                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                    reconnectAttempts++;
-                    const delay = RECONNECT_DELAY_MS * Math.pow(1.5, reconnectAttempts - 1);
-                    console.log(`Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${delay}ms...`);
-                    updateStatus(`Reconnecting (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, '#ffcc00');
-                    
-                    setTimeout(connectWebSocket, delay);
-                } else {
-                    console.log('Max reconnection attempts reached. Using polling fallback.');
-                    updateStatus('Using polling fallback', '#ff6b6b');
-                    startPollingFallback();
-                }
-            };
-
-            socket.onerror = function(error) {
-                console.error('WebSocket error:', error);
-                updateStatus('Connection error', '#ff6b6b');
-            };
-        } catch (error) {
-            console.error('Error creating WebSocket:', error);
-            updateStatus('Failed to connect', '#ff6b6b');
-            startPollingFallback();
-        }
-    }
-    
-    // Heartbeat to keep connection alive
-    function startHeartbeat() {
-        stopHeartbeat();
-        
-        heartbeatInterval = setInterval(() => {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                sendMessage({ type: 'ping' });
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if (data.type === 'team_update') {
+                updateMembersList(data.members);
             }
-        }, 30000); // Send heartbeat every 30 seconds
-    }
-    
-    function stopHeartbeat() {
-        if (heartbeatInterval) {
-            clearInterval(heartbeatInterval);
-            heartbeatInterval = null;
-        }
-    }
-    
-    // Send message safely
-    function sendMessage(message) {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            try {
-                socket.send(JSON.stringify(message));
-            } catch (error) {
-                console.error('Error sending message:', error);
-            }
-        }
-    }
-    
-    // Fallback to API polling if WebSocket fails
-    function startPollingFallback() {
-        if (forcedRefreshInterval) return;
-        
-        console.log('Starting fallback API polling');
-        
-        // Initial data load
-        fetchTeamData();
-        
-        // Poll every 3 seconds
-        forcedRefreshInterval = setInterval(fetchTeamData, 3000);
-    }
-    
-    // Fetch team data via API
-    function fetchTeamData() {
-        fetch(`/api/team/${teamId}/data/`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.members) {
-                    updateMembersList(data.members);
-                    lastMessageTime = Date.now();
-                }
-                
-                // Check if game has started
-                if (data.game_started) {
-                    window.location.href = data.redirect_url || `/race/${data.race_id}/questions/`;
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching team data:', error);
-            });
+        };
+
+        socket.onclose = function(e) {
+            console.log('Socket closed, attempting to reconnect...');
+            setTimeout(connectWebSocket, 1000);
+        };
     }
 
     function updateMembersList(members) {
@@ -307,29 +158,12 @@
             membersList.innerHTML = '<p class="no-members">No members in this team yet</p>';
         }
     }
-    
-    // Monitor connection health and force refresh if necessary
-    function monitorConnectionHealth() {
-        setInterval(() => {
-            const timeSinceLastMessage = Date.now() - lastMessageTime;
-            
-            // If no messages for 1 minute, force page refresh
-            if (timeSinceLastMessage > 60000) {
-                console.log('No updates for 60 seconds, reloading page');
-                window.location.reload();
-            }
-        }, 10000);
-    }
 
     // Initial members load
     const initialMembers = {{ members_json|safe }};
     updateMembersList(initialMembers);
 
-    // Initialize everything on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        createStatusIndicator();
-        connectWebSocket();
-        monitorConnectionHealth();
-    });
+    // Connect WebSocket
+    document.addEventListener('DOMContentLoaded', connectWebSocket);
 </script>
 {% endblock %} 
