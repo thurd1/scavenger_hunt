@@ -357,17 +357,20 @@ def home(request):
         
         if not code:
             print("No code received in POST request")
-            return render(request, 'hunt/join_game_session.html', {'error': 'Please enter a game code.'})
+            messages.error(request, 'Please enter a game code.')
+            return render(request, 'hunt/join_game_session.html')
             
         try:
             lobby = Lobby.objects.filter(code=code).first()
             if lobby is None:
                 print(f"No lobby found with code: {code}")
-                return render(request, 'hunt/join_game_session.html', {'error': 'Invalid lobby code. Please try again.'})
+                messages.error(request, 'Invalid lobby code. Please try again.')
+                return render(request, 'hunt/join_game_session.html')
             
             if not lobby.is_active:
                 print(f"Lobby found but inactive: {lobby.name}")
-                return render(request, 'hunt/join_game_session.html', {'error': 'This lobby is no longer active.'})
+                messages.error(request, 'This lobby is no longer active.')
+                return render(request, 'hunt/join_game_session.html')
             
             print(f"Found active lobby: {lobby.name}")
             request.session['lobby_code'] = code
@@ -375,7 +378,8 @@ def home(request):
             
         except Exception as e:
             print(f"Error looking up lobby: {str(e)}")
-            return render(request, 'hunt/join_game_session.html', {'error': 'An error occurred. Please try again.'})
+            messages.error(request, 'An error occurred. Please try again.')
+            return render(request, 'hunt/join_game_session.html')
     return render(request, 'hunt/join_game_session.html')
 
 def user_login(request):
@@ -388,8 +392,8 @@ def user_login(request):
             login(request, user)
             return redirect('leader_dashboard')
         else:
+            messages.error(request, 'Invalid credentials. Please try again.')
             return render(request, 'hunt/login.html', {
-                'error': 'Invalid credentials',
                 'form': {'username': username}
             })
     return render(request, 'hunt/login.html')
