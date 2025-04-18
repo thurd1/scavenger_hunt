@@ -1037,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 questions[i].style.display = 'block';
                 console.log(`Showing question ${i}`);
             } else {
-                questions[i].style.display = 'none';
+            questions[i].style.display = 'none';
             }
         }
         
@@ -1067,8 +1067,8 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('navigation-buttons').style.display = 'block';
             console.log('Showing navigation buttons based on question state');
         } else {
-            // Initially hide navigation buttons - they'll only show after correct answer or photo upload
-            document.getElementById('navigation-buttons').style.display = 'none';
+        // Initially hide navigation buttons - they'll only show after correct answer or photo upload
+        document.getElementById('navigation-buttons').style.display = 'none';
             console.log('Hiding navigation buttons');
         }
         
@@ -1331,16 +1331,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Show max attempts message and next button
                         showPhotoUpload(questionId);
                     } else {
-                        feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
-                        
-                        // Re-enable the submit button for next attempt
-                        if (submitButton) {
-                            submitButton.disabled = false;
-                        }
-                        
-                        // IMPORTANT: Ensure navigation buttons are hidden for incorrect answers
-                        document.getElementById('navigation-buttons').style.display = 'none';
-                        console.log('Incorrect answer, hiding navigation buttons');
+                    feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
+                    
+                    // Re-enable the submit button for next attempt
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
+                    
+                    // IMPORTANT: Ensure navigation buttons are hidden for incorrect answers
+                    document.getElementById('navigation-buttons').style.display = 'none';
+                    console.log('Incorrect answer, hiding navigation buttons');
                     }
                 }
             })
@@ -1400,7 +1400,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Set the question's input field as read-only to prevent further attempts
-            const answerInput = document.getElementById(`answer-${questionId}`);
+                const answerInput = document.getElementById(`answer-${questionId}`);
             if (answerInput) {
                 answerInput.readOnly = true;
                 answerInput.classList.add('max-attempts-reached');
@@ -1435,9 +1435,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const timerDisplay = document.getElementById('race-timer');
             if (!timerDisplay) {
                 console.error('Timer display element not found!');
-                return;
-            }
-            
+            return;
+        }
+        
             // Try to get stored start time first
             let startTime;
             try {
@@ -1464,8 +1464,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (isNaN(startTime.getTime())) {
                             console.warn('Server start time is invalid, using current time');
                             startTime = new Date();
-                        }
-                    } else {
+                    }
+                } else {
                         console.log('No start time from server, using current time');
                         startTime = new Date();
                     }
@@ -1618,39 +1618,39 @@ function updateTimerDisplay(remainingSeconds) {
     const timerDisplay = document.getElementById('race-timer');
     if (!timerDisplay) return;
     
-    const minutes = Math.floor(remainingSeconds / 60);
-    const seconds = remainingSeconds % 60;
-    
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+
     // Update timer display
-    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    
-    // Set timer color to red when time is running low
-    if (remainingSeconds <= 300) { // 5 minutes or less
-        timerDisplay.style.color = "red";
-        timerDisplay.style.fontWeight = "bold";
-    }
-    
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Set timer color to red when time is running low
+            if (remainingSeconds <= 300) { // 5 minutes or less
+                timerDisplay.style.color = "red";
+                timerDisplay.style.fontWeight = "bold";
+            }
+
     // Show 5-minute warning popup if needed
     if (remainingSeconds <= 300 && remainingSeconds > 299) {
-        showCustomPopup(
-            "⏳ Time Warning", 
-            "Only 5 minutes left!<br><br>Finish strong and complete all your questions!",
-            "warning"
-        );
-    }
-    
-    // Redirect when time runs out
-    if (remainingSeconds <= 0) {
-        showCustomPopup(
-            "⏰ Time's Up!", 
-            "Your race time has ended.<br><br>Redirecting to the race completion page...",
-            "danger",
-            function() {
-                window.location.href = "{% url 'race_complete' %}";
+                showCustomPopup(
+                    "⏳ Time Warning", 
+                    "Only 5 minutes left!<br><br>Finish strong and complete all your questions!",
+                    "warning"
+                );
             }
-        );
-    }
-}
+
+    // Redirect when time runs out
+            if (remainingSeconds <= 0) {
+                showCustomPopup(
+                    "⏰ Time's Up!", 
+                    "Your race time has ended.<br><br>Redirecting to the race completion page...",
+                    "danger",
+                    function() {
+                        window.location.href = "{% url 'race_complete' %}";
+                    }
+                );
+            }
+        }
 
 // Update to avoid API calls that are failing
 function initializePeriodicUpdates() {
