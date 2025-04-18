@@ -225,7 +225,7 @@
     let lastUpdateTime = 0;
     
     // Debug logging that can be turned on/off
-    const DEBUG = false;
+    const DEBUG = true;
     function debug(message, data = null) {
         if (!DEBUG) return;
         if (data) {
@@ -238,6 +238,10 @@
     // Fetch leaderboard data via API
     function fetchLeaderboardData() {
         debug('Fetching leaderboard data from API');
+        
+        // Get currently selected lobby for debugging
+        const selectedLobbyId = document.getElementById('lobby-select')?.value || 'all';
+        debug(`Current selected lobby ID: ${selectedLobbyId}`);
         
         fetch('/api/leaderboard-data/')
             .then(response => response.json())
@@ -297,7 +301,7 @@
             team.score = parseInt(team.score) || 0;
             
             // Ensure lobby data is present
-            team.lobby_id = team.lobby_id || '';
+            team.lobby_id = team.lobby_id?.toString() || '';
             team.lobby_name = team.lobby_name || 'Unknown Race';
             
             return team;
@@ -308,11 +312,27 @@
         
         // Get currently selected lobby
         const selectedLobbyId = document.getElementById('lobby-select')?.value || 'all';
+        debug(`Selected lobby ID: ${selectedLobbyId}`);
+        
+        // Log all teams' lobby IDs for debugging
+        debug('All teams lobby IDs:', teams.map(team => ({ 
+            id: team.id, 
+            name: team.name, 
+            lobby_id: team.lobby_id, 
+            type: typeof team.lobby_id 
+        })));
         
         // Filter teams by selected lobby before rendering
+        const originalCount = teams.length;
         if (selectedLobbyId !== 'all') {
-            teams = teams.filter(team => team.lobby_id === selectedLobbyId);
+            teams = teams.filter(team => {
+                // Convert both to strings for proper comparison
+                const match = String(team.lobby_id) === String(selectedLobbyId);
+                debug(`Comparing team ${team.name} lobby ${team.lobby_id} (${typeof team.lobby_id}) with selected ${selectedLobbyId} (${typeof selectedLobbyId}): ${match}`);
+                return match;
+            });
         }
+        debug(`Filtered teams: ${teams.length} (from ${originalCount})`);
         
         // Get current teams for highlighting changes
         const currentTeams = {};
@@ -375,6 +395,17 @@
             
             leaderboardBody.appendChild(row);
         });
+        
+        // If no teams after filtering, show a message
+        if (teams.length === 0) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 3;
+            cell.className = 'text-center';
+            cell.textContent = 'No teams available for this race';
+            row.appendChild(cell);
+            leaderboardBody.appendChild(row);
+        }
         
         // Update last update time
         lastUpdateTime = Date.now();
