@@ -888,42 +888,18 @@ class RaceUpdatesConsumer(AsyncWebsocketConsumer):
             if race:
                 # Get start time from the first lobby with this race that has started
                 from hunt.models import Lobby
-                try:
-                    lobby = Lobby.objects.filter(race=race, hunt_started=True).first()
-                    
-                    # Check if lobby exists and has the hunt_start_time attribute
-                    if lobby:
-                        start_time = None
-                        # Try different attributes as fallbacks
-                        if hasattr(lobby, 'hunt_start_time') and lobby.hunt_start_time:
-                            start_time = lobby.hunt_start_time
-                        elif hasattr(lobby, 'updated_at') and lobby.updated_at:
-                            start_time = lobby.updated_at
-                            logger.info(f"Using updated_at as fallback for race {race.id} start time")
-                        elif hasattr(lobby, 'created_at') and lobby.created_at:
-                            start_time = lobby.created_at
-                            logger.info(f"Using created_at as fallback for race {race.id} start time")
-                        else:
-                            from django.utils import timezone
-                            start_time = timezone.now()
-                            logger.warning(f"Using current time as fallback for race {race.id} start time")
-                        
-                        time_limit_minutes = race.time_limit_minutes or 20
-                        
-                        # Calculate remaining time
-                        if start_time:
-                            from django.utils import timezone
-                            elapsed = timezone.now() - start_time
-                            elapsed_seconds = elapsed.total_seconds()
-                            total_seconds = time_limit_minutes * 60
-                            remaining_seconds = max(0, total_seconds - elapsed_seconds)
-                except Exception as lobby_error:
-                    logger.error(f"Error processing lobby for race {race.id}: {str(lobby_error)}")
-                    # Use current time as fallback
-                    from django.utils import timezone
-                    start_time = timezone.now()
+                lobby = Lobby.objects.filter(race=race, hunt_started=True).first()
+                if lobby and lobby.hunt_start_time:
+                    start_time = lobby.hunt_start_time
                     time_limit_minutes = race.time_limit_minutes or 20
-                    remaining_seconds = time_limit_minutes * 60
+                    
+                    # Calculate remaining time
+                    if start_time:
+                        from django.utils import timezone
+                        elapsed = timezone.now() - start_time
+                        elapsed_seconds = elapsed.total_seconds()
+                        total_seconds = time_limit_minutes * 60
+                        remaining_seconds = max(0, total_seconds - elapsed_seconds)
             
             # Return formatted state
             return {
@@ -1005,26 +981,4 @@ class RaceUpdatesConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'race_complete',
             'redirect_url': event.get('redirect_url', '/race-complete/')
-        }))
-
-    async def race_started(self, event):
-        """Handle race started event"""
-        logger.info(f"Race {self.race_id} started event received in RaceUpdatesConsumer")
-        
-        try:
-            # Extract data from the event
-            race_id = event.get('race_id', self.race_id)
-            redirect_url = event.get('redirect_url', f'/race/{race_id}/questions/')
-            message = event.get('message', 'Race has started! Redirecting to questions page.')
-            
-            # Send the event to the WebSocket
-            await self.send(text_data=json.dumps({
-                'type': 'race_started',
-                'race_id': race_id,
-                'redirect_url': redirect_url,
-                'message': message
-            }))
-            
-            logger.info(f"Race started event forwarded to client for race {race_id}")
-        except Exception as e:
-            logger.error(f"Error in race_started handler: {str(e)}") 
+        })) 
