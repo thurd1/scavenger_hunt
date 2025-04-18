@@ -11,6 +11,24 @@
         <div class="dashboard-box p-4">
             <h2 style="color: #90C83C; text-align: center; margin-bottom: 3rem;">Leaderboard</h2>
             
+            <!-- Real-time indicator and refresh button -->
+            <div class="text-center mb-3">
+                <span id="realtime-indicator" class="badge bg-success" style="background-color: rgba(144, 200, 60, 0.2) !important; color: #90C83C !important; font-size: 0.9rem; padding: 6px 12px; border-radius: 50px;">
+                    <span class="pulse-dot">●</span> Live Updates
+                </span>
+                <button id="refresh-button" class="btn btn-sm" style="margin-left: 10px; background-color: rgba(144, 200, 60, 0.8); color: white; border: none; padding: 6px 12px; border-radius: 50px; cursor: pointer;">
+                    <i class="fa fa-refresh"></i> Refresh
+                </button>
+            </div>
+            
+            <!-- Connection status display -->
+            <div class="text-center mb-3">
+                <div id="connection-status" style="display: inline-block; padding: 5px 10px; font-size: 0.85rem; color: #f8f9fa;">
+                    <span id="status-dot" style="display:inline-block; width:8px; height:8px; background:#ffcc00; border-radius:50%; margin-right:5px;"></span>
+                    Connecting...
+                </div>
+            </div>
+            
             <!-- Lobby Selector -->
             <div class="lobby-selector mb-5">
                 <label for="lobby-select" class="mb-3" style="color: #90C83C; display: block; font-size: 1.2rem;">Select Race:</label>
@@ -441,7 +459,7 @@
         debug(`Updating leaderboard with ${teams.length} teams`);
         
         // Only use test data if no teams are provided AND the table is empty
-        if ((!teams || !teams.length) && (!leaderboardBody.children.length || leaderboardBody.children.length === 1 && leaderboardBody.children[0].cells && leaderboardBody.cells.length === 1)) {
+        if ((!teams || !teams.length) && (!leaderboardBody.children.length || leaderboardBody.children.length === 1 && leaderboardBody.children[0].cells && leaderboardBody.children[0].cells.length === 1)) {
             debug('No teams provided and table is empty - using test data');
             teams = testTeams;
         } else if (!teams || !teams.length) {

@@ -1954,16 +1954,7 @@ def upload_photo(request, lobby_id, question_id):
 def race_complete(request):
     """Display race completion page"""
     player_name = request.session.get('player_name')
-    
-    # First check if score is passed as a URL parameter (from timer expiration)
-    score_param = request.GET.get('score')
-    if score_param and score_param.isdigit():
-        total_score = int(score_param)
-        # Update the session score with the URL parameter value
-        request.session['total_score'] = total_score
-    else:
-        # If no score in URL, get from session
-        total_score = request.session.get('total_score', 0)
+    total_score = request.session.get('total_score', 0)
     
     # If accessed from admin dashboard, show an example view
     if not player_name and request.user.is_authenticated:

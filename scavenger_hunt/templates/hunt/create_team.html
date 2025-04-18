@@ -12,6 +12,16 @@
                 <p><strong>Race:</strong> {{ lobby.race.name }}</p>
             </div>
         </div>
+
+        {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+            <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
         
         <div class="teams-section">
             <h2 class="section-title">Team Information</h2>
@@ -36,6 +46,30 @@
         </div>
     </div>
 </div>
+
+<script>
+// Clear Django messages after displaying them
+document.addEventListener('DOMContentLoaded', function() {
+    // Find all message alerts
+    const messageAlerts = document.querySelectorAll('.alert');
+    
+    // If there are messages, set a timeout to fade them out
+    if (messageAlerts.length > 0) {
+        setTimeout(function() {
+            messageAlerts.forEach(function(alert) {
+                // Add fade-out effect
+                alert.style.transition = 'opacity 1s';
+                alert.style.opacity = '0';
+                
+                // Remove from DOM after fade completes
+                setTimeout(function() {
+                    alert.remove();
+                }, 1000);
+            });
+        }, 5000); // Display for 5 seconds before fading
+    }
+});
+</script>
 
 <style>
 .dashboard-box {
