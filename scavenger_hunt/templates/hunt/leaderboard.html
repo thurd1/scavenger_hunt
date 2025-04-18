@@ -20,7 +20,7 @@
                 <select id="lobby-select" class="lobby-selector">
                     <option value="all">All Races</option>
                     {% for race in races %}
-                        <option value="{{ race.id }}">{{ race.title }}</option>
+                        <option value="{{ race.id }}">{{ race.name }}</option>
                     {% endfor %}
                 </select>
             </div>
