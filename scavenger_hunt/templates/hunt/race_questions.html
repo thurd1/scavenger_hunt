@@ -572,7 +572,7 @@ window.moveToQuestion = function(direction) {
 
 // Function to update timer display
 window.updateTimerDisplay = function(timeRemainingSeconds) {
-    const timerElement = document.getElementById('timer');
+    const timerElement = document.getElementById('timer-display');
     if (!timerElement) return;
     
     // Convert seconds to minutes and seconds
@@ -610,7 +610,7 @@ window.updateTimerDisplay = function(timeRemainingSeconds) {
         
         // Redirect to results page after a short delay
         setTimeout(() => {
-            window.location.href = "{% url 'race_results' race.id %}";
+            window.location.href = "{% url 'race_complete' race.id %}";
         }, 3000);
     }
 };
