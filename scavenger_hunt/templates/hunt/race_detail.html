@@ -52,81 +52,45 @@
             </div>
         </div>
 
-        <div class="zones-container">
+        <div class="questions-container">
             <div class="card-header main-header">
-                <h2>Zones & Questions</h2>
-                <button class="add-btn" onclick="showAddZoneModal()">
-                    <i class="fas fa-plus"></i> Add Zone
+                <h2>Questions</h2>
+                <button class="add-btn" onclick="showAddQuestionModal()">
+                    <i class="fas fa-plus"></i> Add Question
                 </button>
             </div>
 
-            {% if zones %}
-                <div class="accordion" id="zonesAccordion">
-                    {% for zone in zones %}
-                    <div class="accordion-item">
-                        <div class="accordion-header" id="heading{{ zone.id }}" onclick="toggleZone({{ zone.id }})">
-                            <div class="zone-title">
-                                <i class="fas fa-map-marker-alt zone-icon"></i>
-                                <span>{{ zone.name }}</span>
-                                <small class="location-tag">{{ zone.location }}</small>
+            <div class="questions-content">
+                {% if questions %}
+                    <div class="questions-list">
+                        {% for question in questions %}
+                        <div class="question-item">
+                            <div class="question-content" onclick="editQuestion({{ question.id }}, '{{ question.text|escapejs }}', '{{ question.answer|escapejs }}', {{ question.zone.id }})">
+                                <div class="question-header">
+                                    <i class="fas fa-question-circle"></i>
+                                    <span>{{ question.text }}</span>
+                                </div>
+                                <div class="question-answer">
+                                    <strong>Answer:</strong> {{ question.answer }}
+                                </div>
                             </div>
-                            <div class="zone-actions">
-                                <button class="edit-btn" onclick="editZone({{ zone.id }}, '{{ zone.name }}', '{{ zone.location }}'); event.stopPropagation();">
+                            <div class="question-actions">
+                                <button class="edit-btn" onclick="editQuestion({{ question.id }}, '{{ question.text|escapejs }}', '{{ question.answer|escapejs }}', {{ question.zone.id }})" title="Edit Question">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="delete-btn" onclick="confirmDeleteZone({{ zone.id }}); event.stopPropagation();">
+                                <button class="delete-btn" onclick="confirmDeleteQuestion({{ question.id }})" title="Delete Question">
                                     <i class="fas fa-trash"></i>
                                 </button>
-                                <i class="fas fa-chevron-down toggle-icon" id="icon{{ zone.id }}"></i>
                             </div>
                         </div>
-                        <div class="accordion-collapse collapse" id="collapse{{ zone.id }}">
-                            <div class="accordion-body">
-                                <div class="zone-questions-header">
-                                    <h3>Questions</h3>
-                                    <button class="add-question-btn" onclick="showAddQuestionModal({{ zone.id }})">
-                                        <i class="fas fa-plus"></i> Add Question
-                                    </button>
-                                </div>
-                                <div class="questions-list">
-                                    {% for question in questions %}
-                                        {% if question.zone.id == zone.id %}
-                                        <div class="question-item">
-                                            <div class="question-content" onclick="editQuestion({{ question.id }}, '{{ question.text|escapejs }}', '{{ question.answer|escapejs }}', {{ question.zone.id }})">
-                                                <div class="question-header">
-                                                    <i class="fas fa-question-circle"></i>
-                                                    <span>{{ question.text }}</span>
-                                                </div>
-                                                <div class="question-answer">
-                                                    <strong>Answer:</strong> {{ question.answer }}
-                                                </div>
-                                            </div>
-                                            <div class="question-actions">
-                                                <button class="edit-btn" onclick="editQuestion({{ question.id }}, '{{ question.text|escapejs }}', '{{ question.answer|escapejs }}', {{ question.zone.id }})" title="Edit Question">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button class="delete-btn" onclick="confirmDeleteQuestion({{ question.id }})" title="Delete Question">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    
-                                    {% if not questions|get_item:zone.id %}
-                                    <p class="no-items">No questions for this zone yet</p>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="no-zones-message">
-                    <p>No zones have been created for this race yet. Add your first zone to get started!</p>
-                </div>
-            {% endif %}
+                {% else %}
+                    <div class="no-questions-message">
+                        <p>No questions have been created for this race yet. Add your first question to get started!</p>
+                    </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 
@@ -134,32 +98,6 @@
         <a href="{% url 'manage_riddles' %}" class="btn btn-success">
             <i class="fas fa-arrow-left"></i> Back to Races
         </a>
-    </div>
-</div>
-
-<!-- Zone Modal -->
-<div id="zoneModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 id="zoneModalTitle">Add New Zone</h3>
-            <button class="close-btn" onclick="closeZoneModal()">×</button>
-        </div>
-        <form id="zoneForm" method="POST" action="{% url 'add_zone' race.id %}" onsubmit="return submitZoneForm(event)">
-            {% csrf_token %}
-            <input type="hidden" id="zoneId" name="zone_id" value="">
-            <div class="form-group">
-                <label for="zoneName">Zone Name</label>
-                <input type="text" id="zoneName" name="name" required class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="zoneLocation">Location</label>
-                <input type="text" id="zoneLocation" name="location" required class="form-control">
-            </div>
-            <div class="modal-buttons">
-                <button type="submit" class="submit-btn" id="zoneSubmitBtn">Add Zone</button>
-                <button type="button" class="cancel-btn" onclick="closeZoneModal()">Cancel</button>
-            </div>
-        </form>
     </div>
 </div>
 
@@ -181,15 +119,7 @@
                 <label for="questionAnswer">Answer</label>
                 <input type="text" id="questionAnswer" name="answer" required class="form-control">
             </div>
-            <div class="form-group">
-                <label for="zoneSelect">Zone</label>
-                <select id="zoneSelect" name="zone" required class="form-control">
-                    <option value="">Select a zone...</option>
-                    {% for zone in zones %}
-                        <option value="{{ zone.id }}">{{ zone.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+            <input type="hidden" id="zoneSelect" name="zone" value="{% if zones %}{{ zones.0.id }}{% endif %}">
             <div class="modal-buttons">
                 <button type="submit" class="submit-btn" id="questionSubmitBtn">Add Question</button>
                 <button type="button" class="cancel-btn" onclick="closeQuestionModal()">Cancel</button>
@@ -335,7 +265,7 @@
     color: #dc3545;
 }
 
-.zones-container {
+.questions-container {
     background: rgba(33, 37, 41, 0.95);
     border: 2px solid rgba(144, 200, 60, 0.3);
     border-radius: 12px;
@@ -347,165 +277,8 @@
     border-radius: 10px 10px 0 0;
 }
 
-.accordion {
-    width: 100%;
-}
-
-.accordion-item {
-    border-bottom: 1px solid rgba(144, 200, 60, 0.1);
-}
-
-.accordion-item:last-child {
-    border-bottom: none;
-}
-
-.accordion-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 20px;
-    cursor: pointer;
-    background: rgba(144, 200, 60, 0.05);
-    transition: all 0.2s;
-    position: relative;
-}
-
-.accordion-header:hover {
-    background: rgba(144, 200, 60, 0.1);
-}
-
-.accordion-header:hover .zone-actions {
-    opacity: 1;
-    transform: translateX(0);
-}
-
-.zone-title {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #ffffff;
-    font-weight: 500;
-    flex: 1;
-    padding-right: 100px;
-}
-
-.zone-icon {
-    color: #90C83C;
-}
-
-.location-tag {
-    background: rgba(144, 200, 60, 0.1);
-    color: #90C83C;
-    padding: 2px 8px;
-    border-radius: 12px;
-    margin-left: 10px;
-    font-size: 0.8rem;
-}
-
-.zone-actions {
-    position: absolute;
-    right: 15px;
-    top: 40%;
-    transform: translateY(-50%) translateX(10px);
-    display: flex;
-    gap: 6px;
-    opacity: 0;
-    transition: all 0.3s ease;
-    background: rgba(33, 37, 41, 0.8);
-    padding: 2px;
-    border-radius: 12px;
-}
-
-.zone-actions button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 3px;
-    border-radius: 50%;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    font-size: 0.8rem;
-}
-
-.zone-actions .edit-btn {
-    color: #17a2b8;
-    background: rgba(23, 162, 184, 0.1);
-}
-
-.zone-actions .delete-btn {
-    color: #dc3545;
-    background: rgba(220, 53, 69, 0.1);
-}
-
-.zone-actions .edit-btn:hover {
-    transform: scale(1.1);
-    background: rgba(23, 162, 184, 0.2);
-}
-
-.zone-actions .delete-btn:hover {
-    transform: scale(1.1);
-    background: rgba(220, 53, 69, 0.2);
-}
-
-.toggle-icon {
-    margin-left: 8px;
-    color: #90C83C;
-    transition: transform 0.3s;
-    font-size: 0.9rem;
-}
-
-.rotate-icon {
-    transform: rotate(180deg);
-}
-
-.accordion-collapse {
-    height: 0;
-    overflow: hidden;
-    transition: height 0.3s ease-out;
-}
-
-.accordion-collapse.show {
-    height: auto;
-}
-
-.accordion-body {
+.questions-content {
     padding: 20px;
-    background: rgba(33, 37, 41, 0.7);
-}
-
-.zone-questions-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid rgba(144, 200, 60, 0.1);
-}
-
-.zone-questions-header h3 {
-    color: #90C83C;
-    margin: 0;
-    font-size: 1.2rem;
-}
-
-.add-question-btn {
-    background: linear-gradient(135deg, #90C83C, #7AAF2F);
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.add-question-btn:hover {
-    background: linear-gradient(135deg, #7AAF2F, #90C83C);
-    transform: translateY(-2px);
 }
 
 .questions-list {
@@ -613,183 +386,34 @@
     background: rgba(220, 53, 69, 0.2);
 }
 
-.no-items {
-    color: rgba(255, 255, 255, 0.5);
+.no-questions-message {
+    padding: 40px;
     text-align: center;
-    padding: 20px;
+    color: rgba(255, 255, 255, 0.7);
     font-style: italic;
 }
 
-.no-zones-message {
-    padding: 30px;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.7);
-}
-
 .back-button-container {
+    margin-bottom: 30px;
     text-align: center;
-    margin: 30px 0;
 }
 
 .back-btn {
-    display: inline-block;
     background: linear-gradient(135deg, #90C83C, #7AAF2F);
     color: white;
-    padding: 10px 20px;
-    border-radius: 6px;
-    text-decoration: none;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
     transition: all 0.2s;
 }
 
 .back-btn:hover {
     background: linear-gradient(135deg, #7AAF2F, #90C83C);
     transform: translateY(-2px);
-}
-
-.btn-success {
-    background: linear-gradient(135deg, #90C83C, #7AAF2F) !important;
-    color: white !important;
-    border: none !important;
-    padding: 10px 20px !important;
-    border-radius: 6px !important;
-    text-decoration: none !important;
-    transition: all 0.2s !important;
-}
-
-.btn-success:hover {
-    background: linear-gradient(135deg, #7AAF2F, #90C83C) !important;
-    transform: translateY(-2px) !important;
-    color: white !important;
-    text-decoration: none !important;
-}
-
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 1000;
-    overflow-y: auto;
-}
-
-.modal-content {
-    background: rgba(33, 37, 41, 0.95);
-    border: 2px solid rgba(144, 200, 60, 0.3);
-    border-radius: 12px;
-    width: 90%;
-    max-width: 500px;
-    margin: 50px auto;
-    padding: 20px;
-    max-height: 80vh;
-    overflow-y: auto;
-    position: relative;
-    transform: translateX(-25%);
-}
-
-.modal-header {
-    background: rgba(144, 200, 60, 0.1);
-    padding: 15px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(144, 200, 60, 0.3);
-    margin: -20px -20px 20px -20px;
-    border-radius: 12px 12px 0 0;
-}
-
-.modal-header h3 {
-    color: #90C83C;
-    margin: 0;
-    font-size: 1.4rem;
-    font-weight: 500;
-}
-
-.close-btn {
-    background: none;
-    border: none;
-    color: #ffffff;
-    font-size: 1.5rem;
-    cursor: pointer;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    color: #90C83C;
-    margin-bottom: 8px;
-    font-size: 1.1rem;
-}
-
-.form-control {
-    width: 100%;
-    padding: 10px;
-    background: rgba(144, 200, 60, 0.1);
-    border: 1px solid rgba(144, 200, 60, 0.3);
-    border-radius: 4px;
-    color: #000000;
-    box-sizing: border-box;
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: #90C83C;
-    background: rgba(144, 200, 60, 0.15);
-}
-
-select.form-control {
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2390C83C'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    background-size: 20px;
-    padding-right: 40px;
-}
-
-textarea.form-control {
-    min-height: 100px;
-    resize: vertical;
-    font-family: inherit;
-}
-
-.modal-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    padding: 15px 20px;
-    border-top: 1px solid rgba(144, 200, 60, 0.1);
-}
-
-.submit-btn {
-    background: linear-gradient(135deg, #90C83C, #7AAF2F);
-    color: white;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.submit-btn:hover {
-    background: linear-gradient(135deg, #7AAF2F, #90C83C);
-}
-
-.cancel-btn {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.cancel-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
 }
 
 .add-btn {
@@ -872,14 +496,128 @@ textarea.form-control {
     transform: translateY(-2px) !important;
 }
 
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    overflow-y: auto;
+    display: none;
+}
+
+.modal-content {
+    background: rgba(33, 37, 41, 0.95);
+    border: 2px solid rgba(144, 200, 60, 0.3);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    margin: 50px auto;
+    padding: 20px;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.modal-header {
+    background: rgba(144, 200, 60, 0.1);
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(144, 200, 60, 0.3);
+    margin: -20px -20px 20px -20px;
+    border-radius: 12px 12px 0 0;
+}
+
+.modal-header h3 {
+    color: #90C83C;
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 500;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    color: #90C83C;
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    background: rgba(144, 200, 60, 0.1);
+    border: 1px solid rgba(144, 200, 60, 0.3);
+    border-radius: 4px;
+    color: #ffffff;
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #90C83C;
+    background: rgba(144, 200, 60, 0.15);
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px 0 0 0;
+    border-top: 1px solid rgba(144, 200, 60, 0.1);
+    margin-top: 20px;
+}
+
+.submit-btn {
+    background: linear-gradient(135deg, #90C83C, #7AAF2F);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.submit-btn:hover {
+    background: linear-gradient(135deg, #7AAF2F, #90C83C);
+}
+
+.cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
 @media (max-width: 768px) {
-    .card-header, .zone-actions {
+    .card-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
     }
     
-    .zone-actions {
+    .action-buttons {
         margin-top: 10px;
     }
 }
@@ -950,56 +688,13 @@ textarea.form-control {
 </style>
 
 <script>
-// Toggle zone collapse
-function toggleZone(zoneId) {
-    const collapseElement = document.getElementById(`collapse${zoneId}`);
-    const iconElement = document.getElementById(`icon${zoneId}`);
-    
-    // Toggles collapse state
-    if (collapseElement.classList.contains('show')) {
-        collapseElement.classList.remove('show');
-        collapseElement.style.height = '0';
-        iconElement.classList.remove('rotate-icon');
-    } else {
-        collapseElement.classList.add('show');
-        collapseElement.style.height = collapseElement.scrollHeight + 'px';
-        iconElement.classList.add('rotate-icon');
-    }
-}
-
-// Zone modal functions
-function showAddZoneModal() {
-    document.getElementById('zoneModalTitle').textContent = 'Add New Zone';
-    document.getElementById('zoneSubmitBtn').textContent = 'Add Zone';
-    document.getElementById('zoneId').value = '';
-    document.getElementById('zoneName').value = '';
-    document.getElementById('zoneLocation').value = '';
-    document.getElementById('zoneForm').action = '{% url "add_zone" race.id %}';
-    document.getElementById('zoneModal').style.display = 'block';
-}
-
-function editZone(zoneId, zoneName, zoneLocation) {
-    document.getElementById('zoneModalTitle').textContent = 'Edit Zone';
-    document.getElementById('zoneSubmitBtn').textContent = 'Save Changes';
-    document.getElementById('zoneId').value = zoneId;
-    document.getElementById('zoneName').value = zoneName;
-    document.getElementById('zoneLocation').value = zoneLocation;
-    document.getElementById('zoneForm').action = '{% url "edit_zone" race.id %}';
-    document.getElementById('zoneModal').style.display = 'block';
-}
-
-function closeZoneModal() {
-    document.getElementById('zoneModal').style.display = 'none';
-}
-
 // Question modal functions
-function showAddQuestionModal(zoneId = '') {
+function showAddQuestionModal() {
     document.getElementById('questionModalTitle').textContent = 'Add New Question';
     document.getElementById('questionSubmitBtn').textContent = 'Add Question';
     document.getElementById('questionId').value = '';
     document.getElementById('questionText').value = '';
     document.getElementById('questionAnswer').value = '';
-    document.getElementById('zoneSelect').value = zoneId || '';
     document.getElementById('questionForm').action = '{% url "add_question" race.id %}';
     document.getElementById('questionModal').style.display = 'block';
 }
@@ -1032,14 +727,6 @@ function closeEditRaceModal() {
 let deleteItemType = '';
 let deleteItemId = 0;
 
-function confirmDeleteZone(zoneId) {
-    deleteItemType = 'zone';
-    deleteItemId = zoneId;
-    document.getElementById('confirmTitle').textContent = 'Delete Zone';
-    document.getElementById('confirmMessage').textContent = 'Are you sure you want to delete this zone? All associated questions will also be deleted.';
-    document.getElementById('confirmModal').style.display = 'block';
-}
-
 function confirmDeleteQuestion(questionId) {
     deleteItemType = 'question';
     deleteItemId = questionId;
@@ -1056,9 +743,7 @@ function executeDelete() {
     let form = document.createElement('form');
     form.method = 'POST';
     
-    if (deleteItemType === 'zone') {
-        form.action = '{% url "delete_zone" race.id %}';
-    } else if (deleteItemType === 'question') {
+    if (deleteItemType === 'question') {
         form.action = '{% url "delete_question" race.id %}';
     }
     
@@ -1076,37 +761,6 @@ function executeDelete() {
     
     document.body.appendChild(form);
     form.submit();
-}
-
-// Submit zone form with AJAX
-function submitZoneForm(event) {
-    event.preventDefault();
-    
-    const form = document.getElementById('zoneForm');
-    const formData = new FormData(form);
-    
-    fetch(form.action, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Reload the page to show the new zone
-            window.location.reload();
-        } else {
-            alert(data.error || 'Error saving zone');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while saving the zone');
-    });
-    
-    return false;
 }
 
 // Close modals when clicking outside
