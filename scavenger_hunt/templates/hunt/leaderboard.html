@@ -11,24 +11,6 @@
         <div class="dashboard-box p-4">
             <h2 style="color: #90C83C; text-align: center; margin-bottom: 3rem;">Leaderboard</h2>
             
-            <!-- Real-time indicator and refresh button -->
-            <div class="text-center mb-3">
-                <span id="realtime-indicator" class="badge bg-success" style="background-color: rgba(144, 200, 60, 0.2) !important; color: #90C83C !important; font-size: 0.9rem; padding: 6px 12px; border-radius: 50px;">
-                    <span class="pulse-dot">●</span> Live Updates
-                </span>
-                <button id="refresh-button" class="btn btn-sm" style="margin-left: 10px; background-color: rgba(144, 200, 60, 0.8); color: white; border: none; padding: 6px 12px; border-radius: 50px; cursor: pointer;">
-                    <i class="fa fa-refresh"></i> Refresh
-                </button>
-            </div>
-            
-            <!-- Connection status display -->
-            <div class="text-center mb-3">
-                <div id="connection-status" style="display: inline-block; padding: 5px 10px; font-size: 0.85rem; color: #f8f9fa;">
-                    <span id="status-dot" style="display:inline-block; width:8px; height:8px; background:#ffcc00; border-radius:50%; margin-right:5px;"></span>
-                    Connecting...
-                </div>
-            </div>
-            
             <!-- Lobby Selector -->
             <div class="lobby-selector mb-5">
                 <label for="lobby-select" class="mb-3" style="color: #90C83C; display: block; font-size: 1.2rem;">Select Race:</label>
@@ -239,15 +221,11 @@
         {id: 3, name: "Team C", score: 5, lobby_id: "2", lobby_name: "Test Race 2"}
     ];
     
-    // Connection status tracking
-    let connectionAttempts = 0;
-    let usingFallback = false;
+    // Auto-update tracking
     let lastUpdateTime = 0;
-    let reconnecting = false;
-    let socket = null; // Store WebSocket reference globally
     
     // Debug logging that can be turned on/off
-    const DEBUG = true;
+    const DEBUG = false;
     function debug(message, data = null) {
         if (!DEBUG) return;
         if (data) {
@@ -255,132 +233,6 @@
         } else {
             console.log(`[Leaderboard Debug] ${message}`);
         }
-    }
-    
-    // Update connection status display
-    function updateStatus(status, color) {
-        const statusDot = document.getElementById('status-dot');
-        const statusText = document.getElementById('connection-status');
-        if (statusDot && statusText) {
-            statusDot.style.background = color;
-            statusText.textContent = status;
-        }
-        debug(`Connection status: ${status}`);
-    }
-    
-    // Initialize WebSocket connection
-    function initWebSocket() {
-        if (reconnecting) return;
-        
-        try {
-            const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const socketUrl = `${wsScheme}//${window.location.host}/ws/leaderboard/`;
-            debug(`Attempting WebSocket connection to ${socketUrl}`);
-            
-            updateStatus('Connecting to WebSocket...', '#ffcc00');
-            
-            socket = new WebSocket(socketUrl);
-            window.socket = socket; // Store globally for debugging
-            
-            socket.onopen = function() {
-                debug('WebSocket connected successfully');
-                updateStatus('WebSocket Connected', '#90C83C');
-                connectionAttempts = 0;
-                usingFallback = false;
-                reconnecting = false;
-                
-                // Request initial data
-                socket.send(JSON.stringify({
-                    action: 'get_data'
-                }));
-            };
-            
-            socket.onmessage = function(event) {
-                debug('WebSocket message received', event.data);
-                try {
-                    const data = JSON.parse(event.data);
-                    lastUpdateTime = Date.now();
-                    
-                    if (data.type === 'leaderboard_update') {
-                        // Handle different message formats
-                        if (data.teams) {
-                            // Format 1: Full teams array
-                            debug(`Received complete teams list: ${data.teams.length} teams`);
-                            updateLeaderboard(data.teams);
-                        } else if (data.action === 'full_refresh' && data.data) {
-                            // Format 2: Full refresh with data array
-                            debug(`Received full_refresh data: ${data.data.length} teams`);
-                            updateLeaderboard(data.data);
-                        } else if (data.action === 'update' && data.team_id) {
-                            // Format 3: Single team update - refresh all data
-                            debug(`Received single team update for team ${data.team_id} - requesting full refresh`);
-                            fetchLeaderboardData(); // Get fresh data for all teams
-                        } else if (data.action === 'refresh') {
-                            // Format 4: Request to refresh data
-                            debug('Received refresh request - fetching new data');
-                            fetchLeaderboardData();
-                        }
-                    } else if (data.type === 'error') {
-                        debug(`Server reported error: ${data.message}`, true);
-                        updateStatus(`Error: ${data.message}`, '#ff6b6b');
-                    }
-                } catch (error) {
-                    console.error('Error processing WebSocket message:', error);
-                }
-            };
-            
-            socket.onclose = function(event) {
-                debug(`WebSocket closed with code: ${event.code}, reason: ${event.reason}`);
-                updateStatus('WebSocket Disconnected - Reconnecting...', '#ffcc00');
-                
-                // Attempt to reconnect
-                reconnecting = true;
-                setTimeout(() => {
-                    reconnecting = false;
-                    connectionAttempts++;
-                    
-                    if (connectionAttempts <= 5) {
-                        debug(`Reconnection attempt ${connectionAttempts}/5`);
-                        initWebSocket();
-                    } else {
-                        debug('Max reconnection attempts reached, falling back to API polling');
-                        fallbackToPolling();
-                    }
-                }, 3000);
-            };
-            
-            socket.onerror = function(error) {
-                debug('WebSocket error', error);
-                updateStatus('WebSocket Error', '#ff6b6b');
-            };
-        } catch (error) {
-            console.error('Error initializing WebSocket:', error);
-            updateStatus('WebSocket Failed - Using API', '#ff6b6b');
-            fallbackToPolling();
-        }
-    }
-    
-    // Initialize real-time updates with WebSocket or fallback
-    function initRealTimeUpdates() {
-        debug('Initializing real-time updates');
-        initWebSocket();
-    }
-    
-    // Fall back to polling API for updates
-    function fallbackToPolling() {
-        if (usingFallback) return; // Prevent multiple polling intervals
-        
-        usingFallback = true;
-        debug('Falling back to API polling every 3 seconds');
-        updateStatus('Using API Polling', '#ffcc00');
-        
-        // Start with an immediate data fetch
-        fetchLeaderboardData();
-        
-        // Then poll every 3 seconds
-        setInterval(function() {
-            fetchLeaderboardData();
-        }, 3000);
     }
     
     // Fetch leaderboard data via API
@@ -395,15 +247,12 @@
                 
                 if (data.success && data.teams) {
                     updateLeaderboard(data.teams);
-                    updateStatus('Updated via API', '#90C83C');
                 } else {
                     debug('API error', data.error || 'Unknown error');
-                    updateStatus('API Error', '#ff6b6b');
                 }
             })
             .catch(error => {
                 console.error('Error fetching leaderboard data:', error);
-                updateStatus('Network Error', '#ff6b6b');
             });
     }
     
@@ -423,32 +272,6 @@
                 row.style.display = 'none';
             }
         });
-    });
-    
-    // Handle manual refresh button
-    document.getElementById('refresh-button').addEventListener('click', function() {
-        debug('Manual refresh requested');
-        
-        this.disabled = true;
-        this.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Refreshing...';
-        
-        // Method 1: Try to send a message through the WebSocket
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            debug('Requesting refresh via WebSocket');
-            socket.send(JSON.stringify({
-                action: 'get_data'
-            }));
-        } else {
-            // Method 2: Use the API endpoint as fallback
-            debug('Requesting refresh via API');
-            fetchLeaderboardData();
-        }
-        
-        // Re-enable button after a delay
-        setTimeout(() => {
-            this.disabled = false;
-            this.innerHTML = '<i class="fa fa-refresh"></i> Refresh';
-        }, 1000);
     });
     
     // Update the leaderboard with team data
@@ -550,26 +373,6 @@
                 scoreCell.classList.add('score-increased');
                 row.classList.add('updated');
                 
-                // Play sound for score update
-                try {
-                    // Create a simple tone if browser supports AudioContext
-                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = audioCtx.createOscillator();
-                    oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-                    
-                    const gainNode = audioCtx.createGain();
-                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Low volume
-                    
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                    
-                    oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + 0.1); // Short beep
-                } catch (e) {
-                    // Ignore errors with audio - it's just a nice-to-have
-                }
-                
                 setTimeout(() => {
                     row.classList.remove('updated');
                     scoreCell.classList.remove('score-increased');
@@ -596,183 +399,13 @@
         // Start with test data to ensure something is displayed
         updateLeaderboard(testTeams);
         
-        // Initialize real-time updates
-        initRealTimeUpdates();
+        // Initialize periodic updates
+        fetchLeaderboardData();
         
-        // Set a backup timer to check for updates
+        // Set up periodic refresh every 5 seconds
         setInterval(function() {
-            // If no updates for 15 seconds, try force refresh
-            if (Date.now() - lastUpdateTime > 15000) {
-                debug('No updates for 15 seconds, forcing refresh');
-                fetchLeaderboardData();
-            }
-        }, 15000);
-        
-        // Set a stronger backup refresh timer that works even if WebSocket is disconnected
-        // This will force a full API refresh every 5 seconds if no updates received
-        // Regardless of WebSocket connection status
-        const forceRefreshInterval = setInterval(function() {
-            if (Date.now() - lastUpdateTime > 5000) {
-                console.log('No updates for 5 seconds, forcing API refresh');
-                fetchLeaderboardData();
-            }
+            fetchLeaderboardData();
         }, 5000);
-        
-        // Also add a manual reload timer as a last resort fallback
-        // This will reload the entire page every 60 seconds if no updates for 30 seconds
-        setInterval(function() {
-            if (Date.now() - lastUpdateTime > 30000) {
-                console.log('No updates for 30 seconds, reloading page');
-                // Add timestamp to URL to bypass cache
-                window.location.href = window.location.pathname + '?t=' + Date.now();
-            }
-        }, 60000);
-        
-        // Create a visual indicator to show sync status
-        const syncStatus = document.createElement('div');
-        syncStatus.id = 'sync-status';
-        syncStatus.style.position = 'fixed';
-        syncStatus.style.bottom = '10px';
-        syncStatus.style.right = '10px';
-        syncStatus.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        syncStatus.style.color = '#90C83C';
-        syncStatus.style.padding = '5px 10px';
-        syncStatus.style.borderRadius = '5px';
-        syncStatus.style.fontSize = '12px';
-        syncStatus.style.zIndex = '9999';
-        syncStatus.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-        syncStatus.innerHTML = 'Last update: <span id="last-update-time">just now</span>';
-        document.body.appendChild(syncStatus);
-        
-        // Update the last update time display
-        function updateSyncStatus() {
-            const timeDisplay = document.getElementById('last-update-time');
-            if (!timeDisplay) return;
-            
-            const secondsSinceUpdate = Math.floor((Date.now() - lastUpdateTime) / 1000);
-            if (secondsSinceUpdate < 5) {
-                timeDisplay.textContent = 'just now';
-                syncStatus.style.color = '#90C83C';
-            } else if (secondsSinceUpdate < 10) {
-                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
-                syncStatus.style.color = '#90C83C';
-            } else if (secondsSinceUpdate < 30) {
-                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
-                syncStatus.style.color = '#FFC107'; // Yellow warning
-            } else {
-                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
-                syncStatus.style.color = '#DC3545'; // Red warning
-            }
-        }
-        
-        // Update sync status every second
-        setInterval(updateSyncStatus, 1000);
-        
-        // Add auto-refresh button with countdown
-        const autoRefreshBtn = document.createElement('button');
-        autoRefreshBtn.id = 'auto-refresh-toggle';
-        autoRefreshBtn.className = 'btn btn-sm';
-        autoRefreshBtn.style.backgroundColor = 'rgba(144, 200, 60, 0.2)';
-        autoRefreshBtn.style.color = '#90C83C';
-        autoRefreshBtn.style.border = 'none';
-        autoRefreshBtn.style.borderRadius = '50px';
-        autoRefreshBtn.style.padding = '5px 10px';
-        autoRefreshBtn.style.fontSize = '0.9rem';
-        autoRefreshBtn.style.marginLeft = '10px';
-        autoRefreshBtn.innerHTML = '<i class="fa fa-clock-o"></i> Auto <span id="refresh-countdown">5</span>s';
-        
-        // Insert after the refresh button
-        const refreshBtn = document.getElementById('refresh-button');
-        if (refreshBtn && refreshBtn.parentNode) {
-            refreshBtn.parentNode.insertBefore(autoRefreshBtn, refreshBtn.nextSibling);
-            
-            // Set countdown timer that refreshes every 5 seconds
-            let countdown = 5;
-            const countdownInterval = setInterval(function() {
-                countdown--;
-                const countdownEl = document.getElementById('refresh-countdown');
-                if (countdownEl) {
-                    countdownEl.textContent = countdown;
-                }
-                
-                if (countdown <= 0) {
-                    // Reset countdown
-                    countdown = 5;
-                    
-                    // Force refresh
-                    fetchLeaderboardData();
-                }
-            }, 1000);
-        }
-        
-        // Add visual notification when scores update
-        function showScoreUpdateNotification() {
-            // Create a notification element
-            const notification = document.createElement('div');
-            notification.id = 'score-update-notification';
-            notification.style.position = 'fixed';
-            notification.style.top = '20px';
-            notification.style.left = '50%';
-            notification.style.transform = 'translateX(-50%)';
-            notification.style.backgroundColor = 'rgba(144, 200, 60, 0.9)';
-            notification.style.color = 'white';
-            notification.style.padding = '10px 20px';
-            notification.style.borderRadius = '5px';
-            notification.style.fontWeight = 'bold';
-            notification.style.boxShadow = '0 3px 10px rgba(0, 0, 0, 0.2)';
-            notification.style.zIndex = '10000';
-            notification.style.opacity = '0';
-            notification.style.transition = 'opacity 0.3s ease-in-out';
-            notification.textContent = 'Scores Updated!';
-            
-            // Add to the document
-            document.body.appendChild(notification);
-            
-            // Fade in
-            setTimeout(() => {
-                notification.style.opacity = '1';
-            }, 10);
-            
-            // Fade out and remove after 3 seconds
-            setTimeout(() => {
-                notification.style.opacity = '0';
-                setTimeout(() => {
-                    if (document.body.contains(notification)) {
-                        document.body.removeChild(notification);
-                    }
-                }, 300);
-            }, 3000);
-        }
-        
-        // Override updateLeaderboard to show notification when scores change
-        const originalUpdateLeaderboard = updateLeaderboard;
-        updateLeaderboard = function(teams) {
-            // Get current scores before update
-            const currentScores = {};
-            document.querySelectorAll('.team-row').forEach(row => {
-                const teamId = row.getAttribute('data-team-id');
-                const scoreEl = row.querySelector('.team-score');
-                if (teamId && scoreEl) {
-                    currentScores[teamId] = parseInt(scoreEl.textContent) || 0;
-                }
-            });
-            
-            // Call the original function
-            originalUpdateLeaderboard(teams);
-            
-            // Check if any scores changed
-            let scoresChanged = false;
-            teams.forEach(team => {
-                if (currentScores[team.id] !== undefined && team.score !== currentScores[team.id]) {
-                    scoresChanged = true;
-                }
-            });
-            
-            // Show notification if scores changed
-            if (scoresChanged) {
-                showScoreUpdateNotification();
-            }
-        };
     });
 </script>
 {% endblock %}
