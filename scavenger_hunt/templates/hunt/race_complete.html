@@ -37,7 +37,7 @@
                 </div>
                 <div class="stat-info">
                     <span class="stat-label">Total Score</span>
-                    <span class="stat-value">{{ total_score }}</span>
+                    <span class="stat-value" id="total-score">{{ total_score }}</span>
                 </div>
             </div>
         </div>
@@ -209,4 +209,21 @@
     margin-right: 0.5rem;
 }
 </style>
+
+<script>
+// Check if we have a score in session storage (from timer expiration)
+document.addEventListener('DOMContentLoaded', function() {
+    const storedScore = sessionStorage.getItem('final_score');
+    if (storedScore) {
+        // Update the score display
+        const scoreElement = document.getElementById('total-score');
+        if (scoreElement) {
+            scoreElement.textContent = storedScore;
+        }
+        
+        // Clear the stored score to prevent it from being used again
+        sessionStorage.removeItem('final_score');
+    }
+});
+</script>
 {% endblock %} 
