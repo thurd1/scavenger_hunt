@@ -570,10 +570,52 @@ window.moveToQuestion = function(direction) {
     window.scrollTo(0, 0);
 };
 
+// Initialize timer on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Collect question elements
+    window.questions = document.querySelectorAll('.question-card');
+    
+    // Initialize timer
+    if (window.startTime && window.timeLimit) {
+        startTimer();
+    }
+    
+    // Initialize the submit answer buttons
+    initAnswerButtons();
+    
+    // Setup next question button
+    setupNextQuestionButton();
+});
+
+// Function to start timer
+function startTimer() {
+    // Calculate initial time remaining
+    const now = new Date();
+    const startTimeMs = window.startTime * 1000; // Convert to milliseconds
+    const endTimeMs = startTimeMs + (window.timeLimit * 60 * 1000); // timeLimit is in minutes
+    const remainingMs = endTimeMs - now.getTime();
+    const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+    
+    // Update timer display immediately
+    updateTimerDisplay(remainingSeconds);
+    
+    // Set interval to update timer every second
+    window.timerInterval = setInterval(function() {
+        const currentTime = new Date();
+        const timeRemainingMs = endTimeMs - currentTime.getTime();
+        const timeRemainingSeconds = Math.max(0, Math.floor(timeRemainingMs / 1000));
+        
+        updateTimerDisplay(timeRemainingSeconds);
+    }, 1000);
+}
+
 // Function to update timer display
 window.updateTimerDisplay = function(timeRemainingSeconds) {
     const timerElement = document.getElementById('timer-display');
-    if (!timerElement) return;
+    if (!timerElement) {
+        console.error("Timer display element not found!");
+        return;
+    }
     
     // Convert seconds to minutes and seconds
     const minutes = Math.floor(timeRemainingSeconds / 60);
@@ -615,6 +657,168 @@ window.updateTimerDisplay = function(timeRemainingSeconds) {
     }
 };
 
+// Function to initialize answer submission buttons
+function initAnswerButtons() {
+    // Get all submit answer buttons
+    const submitButtons = document.querySelectorAll('.submit-answer');
+    
+    // Add click event listeners to each button
+    submitButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const questionId = this.getAttribute('data-db-question-id');
+            const questionIndex = this.getAttribute('data-question-id');
+            
+            // Get the answer input
+            const answerInput = document.getElementById(`answer-${questionIndex}`);
+            if (!answerInput) {
+                console.error("Answer input not found for question ID:", questionId);
+                return;
+            }
+            
+            const answer = answerInput.value.trim();
+            const feedbackElement = document.getElementById(`feedback-${questionIndex}`);
+            
+            // Clear previous feedback
+            if (feedbackElement) {
+                feedbackElement.style.display = 'none';
+                feedbackElement.textContent = '';
+                feedbackElement.className = 'answer-feedback';
+            }
+            
+            // Validate input
+            if (!answer) {
+                if (feedbackElement) {
+                    feedbackElement.className = 'answer-feedback feedback error';
+                    feedbackElement.style.display = 'block';
+                    feedbackElement.textContent = 'Please enter an answer.';
+                }
+                return;
+            }
+            
+            // Get token for API request
+            const csrfToken = getCookie('csrftoken');
+            
+            // Disable the submit button to prevent double submissions
+            this.disabled = true;
+            
+            // Make API request to check answer
+            fetch("/check-answer/", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    question_id: questionId,
+                    answer: answer,
+                    team_code: "{{ team.code }}"
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Re-enable submit button
+                this.disabled = false;
+                
+                // Update attempts count
+                const attemptsElement = document.getElementById(`attempts-${questionIndex}`);
+                if (attemptsElement) {
+                    let attempts = parseInt(attemptsElement.textContent || '0') + 1;
+                    attemptsElement.textContent = attempts;
+                    
+                    // Check if max attempts reached (assuming 3 max attempts)
+                    if (attempts >= 3 && !data.correct) {
+                        showPhotoUpload(questionIndex);
+                    }
+                }
+                
+                // Check if answer is correct
+                if (data.correct) {
+                    // Show feedback
+                    if (feedbackElement) {
+                        feedbackElement.className = 'answer-feedback feedback correct';
+                        feedbackElement.style.display = 'block';
+                        feedbackElement.textContent = `Correct! You earned ${data.points || 0} points.`;
+                    }
+                    
+                    // Disable submit button
+                    this.disabled = true;
+                    
+                    // Mark input as correct
+                    answerInput.classList.add('correct-answer');
+                    answerInput.disabled = true;
+                    
+                    // Update total score
+                    const scoreElement = document.getElementById('total-score');
+                    if (scoreElement) {
+                        const currentScore = parseInt(scoreElement.textContent || '0');
+                        scoreElement.textContent = currentScore + (data.points || 0);
+                    }
+                    
+                    // Show navigation buttons
+                    const navButtons = document.getElementById('navigation-buttons');
+                    if (navButtons) {
+                        navButtons.style.display = 'block';
+                    }
+                } else {
+                    // Show incorrect feedback
+                    if (feedbackElement) {
+                        feedbackElement.className = 'answer-feedback feedback incorrect';
+                        feedbackElement.style.display = 'block';
+                        feedbackElement.textContent = 'Incorrect. Please try again.';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error("Error checking answer:", error);
+                
+                // Re-enable submit button
+                this.disabled = false;
+                
+                // Show error feedback
+                if (feedbackElement) {
+                    feedbackElement.className = 'answer-feedback feedback error';
+                    feedbackElement.style.display = 'block';
+                    feedbackElement.textContent = 'Error checking answer. Please try again.';
+                }
+            });
+        });
+    });
+}
+
+// Function to setup next question button
+function setupNextQuestionButton() {
+    const nextButton = document.getElementById('next-question');
+    if (nextButton) {
+        nextButton.addEventListener('click', function() {
+            moveToQuestion(1); // Move to next question
+        });
+    }
+}
+
+// Function to show photo upload form when max attempts reached
+function showPhotoUpload(questionIndex) {
+    const photoUploadElement = document.getElementById(`photo-upload-${questionIndex}`);
+    if (!photoUploadElement) {
+        console.error(`Photo upload element not found for question ${questionIndex}`);
+        return;
+    }
+    
+    photoUploadElement.style.display = 'block';
+    
+    // Disable answer input and submit button
+    const answerInput = document.getElementById(`answer-${questionIndex}`);
+    if (answerInput) {
+        answerInput.disabled = true;
+        answerInput.classList.add('max-attempts-reached');
+    }
+    
+    // Disable submit button
+    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionIndex}"]`);
+    if (submitButton) {
+        submitButton.disabled = true;
+    }
+}
+
 // Helper function to get cookies for CSRF token
 function getCookie(name) {
     let cookieValue = null;
@@ -630,21 +834,6 @@ function getCookie(name) {
     }
     return cookieValue;
 }
-
-// Initialize timer on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // Collect question elements
-    window.questions = document.querySelectorAll('.question-container');
-    
-    // Initialize timer
-    if (window.startTime && window.timeLimit) {
-        updateTimerDisplay();
-        window.timerInterval = setInterval(updateTimerDisplay, 1000);
-    }
-    
-    // Show the initial question
-    moveToQuestion(window.currentQuestionIndex);
-});
 
 // Pre-process Django template variables to JavaScript variables
 const currentQuestionIndexFromServer = {% if current_question_index %}{{ current_question_index }}{% else %}0{% endif %};
@@ -1039,147 +1228,6 @@ function updateTimerWithLocalData() {
         updateTimerDisplay(remainingSeconds);
     } catch (error) {
         console.error("Error updating timer with local data:", error);
-    }
-}
-
-// Fix the submitAnswer function to handle validation correctly
-window.submitAnswer = function(questionId) {
-    const answerInput = document.getElementById(`answer-${questionId}`);
-    if (!answerInput) {
-        console.error("Answer input not found for question ID:", questionId);
-        return;
-    }
-    
-    const answer = answerInput.value.trim();
-    const feedbackElement = document.getElementById(`feedback-${questionId}`);
-    
-    // Clear previous feedback
-    if (feedbackElement) {
-        feedbackElement.style.display = 'none';
-        feedbackElement.textContent = '';
-        feedbackElement.className = 'feedback';
-    }
-    
-    // Validate input
-    if (!answer) {
-        if (feedbackElement) {
-            feedbackElement.className = 'feedback error';
-            feedbackElement.style.display = 'block';
-            feedbackElement.textContent = 'Please enter an answer.';
-        }
-        return;
-    }
-    
-    // Get token for API request
-    const csrfToken = getCookie('csrftoken');
-    
-    // Disable the submit button to prevent double submissions
-    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
-    if (submitButton) submitButton.disabled = true;
-    
-    // Make API request to check answer
-    fetch("/check-answer/", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: JSON.stringify({
-            question_id: questionId,
-            answer: answer,
-            team_code: "{{ team.code }}"
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        // Re-enable submit button
-        if (submitButton) submitButton.disabled = false;
-        
-        // Update question data
-        if (window.questionData[questionId]) {
-            // Update attempts count
-            window.questionData[questionId].attempts++;
-            
-            // Update attempts display
-            const attemptsElement = document.getElementById(`attempts-${questionId}`);
-            if (attemptsElement) {
-                attemptsElement.textContent = window.questionData[questionId].attempts;
-            }
-            
-            // Check if answer is correct
-            if (data.correct) {
-                window.questionData[questionId].answered = true;
-                window.questionData[questionId].points = data.points || 0;
-                
-                // Show feedback
-                if (feedbackElement) {
-                    feedbackElement.className = 'feedback correct';
-                    feedbackElement.style.display = 'block';
-                    feedbackElement.textContent = `Correct! You earned ${data.points} points.`;
-                }
-                
-                // Disable submit button
-                if (submitButton) submitButton.disabled = true;
-                
-                // Show navigation buttons
-                document.getElementById('navigation-buttons').style.display = 'block';
-            } else {
-                // Show incorrect feedback
-                if (feedbackElement) {
-                    feedbackElement.className = 'feedback incorrect';
-                    feedbackElement.style.display = 'block';
-                    feedbackElement.textContent = `Incorrect. You have ${window.questionData[questionId].maxAttempts - window.questionData[questionId].attempts} attempts remaining.`;
-                }
-                
-                // Check if max attempts reached
-                if (window.questionData[questionId].attempts >= window.questionData[questionId].maxAttempts) {
-                    showPhotoUpload(questionId);
-                }
-            }
-        }
-    })
-    .catch(error => {
-        console.error("Error checking answer:", error);
-        
-        // Re-enable submit button
-        if (submitButton) submitButton.disabled = false;
-        
-        // Show error feedback
-        if (feedbackElement) {
-            feedbackElement.className = 'feedback error';
-            feedbackElement.style.display = 'block';
-            feedbackElement.textContent = 'Error checking answer. Please try again.';
-        }
-    });
-};
-
-// Function to show photo upload form
-function showPhotoUpload(questionId) {
-    const photoUploadElement = document.getElementById(`photo-upload-${questionId}`);
-    if (!photoUploadElement) {
-        console.error(`Photo upload element not found for question ${questionId}`);
-        return;
-    }
-    
-    photoUploadElement.style.display = 'block';
-    
-    // Disable answer submission
-    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
-    if (submitButton) {
-        submitButton.disabled = true;
-    }
-    
-    // Hide navigation buttons since we have our own Next Question button
-    document.getElementById('navigation-buttons').style.display = 'none';
-}
-
-// Show navigation buttons only if we have any answered questions
-const hasAnsweredQuestions = document.querySelectorAll('.feedback.correct').length > 0;
-if (hasAnsweredQuestions && document.getElementById('question-container')) {
-    // Only show if current question is already answered or has photo uploaded
-    const currentQuestionId = window.questions[window.currentQuestionIndex].id.split('-')[1];
-    if (window.questionData[currentQuestionId] && (window.questionData[currentQuestionId].answered || window.questionData[currentQuestionId].photoUploaded)) {
-        document.getElementById('navigation-buttons').style.display = 'block';
     }
 }
 </script>
