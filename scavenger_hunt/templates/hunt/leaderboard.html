@@ -37,7 +37,7 @@
                         <tr class="team-row" data-team-id="{{ team.id }}" data-lobby-id="{{ team.lobby.id }}">
                             <td class="team-name">{{ team.name }}</td>
                             <td class="team-score">{{ team.score }}</td>
-                            <td class="team-lobby">{{ team.lobby_name }}</td>
+                            <td class="team-lobby">{{ team.lobby.race.name }} (Code: {{ team.lobby.code }})</td>
                         </tr>
                         {% empty %}
                         <tr class="no-teams-message">
@@ -209,6 +209,12 @@
         // Add each team
         for (let i = 0; i < teams.length; i++) {
             const team = teams[i];
+            
+            // Make sure we have a valid lobby_id
+            if (!team.lobby_id && team.lobby && team.lobby.id) {
+                team.lobby_id = team.lobby.id;
+            }
+            
             console.log(`Team ${i}: id=${team.id}, name=${team.name}, lobby_id=${team.lobby_id}`);
             
             const row = document.createElement('tr');
@@ -228,10 +234,19 @@
             scoreCell.textContent = team.score;
             row.appendChild(scoreCell);
             
-            // Create lobby cell
+            // Create lobby cell with code
             const lobbyCell = document.createElement('td');
             lobbyCell.className = 'team-lobby';
-            lobbyCell.textContent = team.lobby_name;
+            
+            // Use lobby_name if available, otherwise construct from lobby info
+            if (team.lobby_name) {
+                lobbyCell.textContent = team.lobby_name;
+            } else if (team.lobby && team.lobby.race && team.lobby.race.name) {
+                lobbyCell.textContent = `${team.lobby.race.name} (Code: ${team.lobby.code})`;
+            } else {
+                lobbyCell.textContent = 'Unknown Race';
+            }
+            
             row.appendChild(lobbyCell);
             
             tbody.appendChild(row);
@@ -261,12 +276,13 @@
         // Loop through rows and show/hide based on lobby
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            const rowLobbyId = row.getAttribute('data-lobby-id');
+            const rowLobbyId = String(row.getAttribute('data-lobby-id') || '');
             const teamName = row.querySelector('.team-name')?.textContent || 'Unknown';
             
             console.log(`Row ${i}: team=${teamName}, lobbyId=${rowLobbyId}, selected=${selectedLobby}, match=${selectedLobby === 'all' || rowLobbyId === selectedLobby}`);
             
-            if (selectedLobby === 'all' || rowLobbyId === selectedLobby) {
+            // Make the comparison consistent by converting both to strings
+            if (selectedLobby === 'all' || rowLobbyId === String(selectedLobby)) {
                 row.style.display = '';
                 row.classList.remove('filtered-out');
                 visibleCount++;
@@ -320,7 +336,8 @@
         const initialRows = document.querySelectorAll('#leaderboard-body .team-row');
         console.log(`Page loaded with ${initialRows.length} team rows`);
         initialRows.forEach((row, i) => {
-            console.log(`Initial Row ${i}: team=${row.querySelector('.team-name')?.textContent}, lobbyId=${row.getAttribute('data-lobby-id')}`);
+            const lobbyId = row.getAttribute('data-lobby-id');
+            console.log(`Initial Row ${i}: team=${row.querySelector('.team-name')?.textContent}, lobbyId=${lobbyId}`);
         });
         
         // Check dropdown options
