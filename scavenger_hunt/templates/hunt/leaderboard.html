@@ -258,25 +258,9 @@
     
     // Handle lobby selection filtering
     document.getElementById('lobby-select').addEventListener('change', function() {
-        filterTeamsByLobby(this.value);
+        // When changing the lobby, just refetch and update
+        fetchLeaderboardData();
     });
-    
-    // Filter teams by selected lobby
-    function filterTeamsByLobby(selectedLobbyId) {
-        debug(`Filtering by lobby: ${selectedLobbyId}`);
-        
-        const teamRows = document.querySelectorAll('.team-row');
-        
-        teamRows.forEach(row => {
-            const lobbyId = row.dataset.lobbyId;
-            
-            if (selectedLobbyId === 'all' || lobbyId === selectedLobbyId) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
-    }
     
     // Update the leaderboard with team data
     function updateLeaderboard(teams) {
@@ -325,6 +309,11 @@
         // Get currently selected lobby
         const selectedLobbyId = document.getElementById('lobby-select')?.value || 'all';
         
+        // Filter teams by selected lobby before rendering
+        if (selectedLobbyId !== 'all') {
+            teams = teams.filter(team => team.lobby_id === selectedLobbyId);
+        }
+        
         // Get current teams for highlighting changes
         const currentTeams = {};
         document.querySelectorAll('.team-row').forEach(row => {
@@ -367,11 +356,6 @@
             row.appendChild(scoreCell);
             row.appendChild(lobbyCell);
             
-            // Apply filter based on selected lobby
-            if (selectedLobbyId !== 'all' && team.lobby_id !== selectedLobbyId) {
-                row.style.display = 'none';
-            }
-            
             // Highlight changed scores
             if (currentTeams[team.id] && team.score > currentTeams[team.id].score) {
                 scoreCell.classList.add('score-increased');
@@ -403,20 +387,12 @@
         // Start with test data to ensure something is displayed
         updateLeaderboard(testTeams);
         
-        // Apply initial filter based on selected lobby
-        const initialLobby = document.getElementById('lobby-select').value;
-        filterTeamsByLobby(initialLobby);
-        
         // Initialize periodic updates
         fetchLeaderboardData();
         
         // Set up periodic refresh every 5 seconds
         setInterval(function() {
             fetchLeaderboardData();
-            
-            // Re-apply filter after each data refresh
-            const selectedLobby = document.getElementById('lobby-select').value;
-            filterTeamsByLobby(selectedLobby);
         }, 5000);
     });
 </script>
