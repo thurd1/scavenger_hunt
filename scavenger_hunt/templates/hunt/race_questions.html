@@ -78,11 +78,6 @@
                                                             <div class="mt-2">
                                                                 <span class="attempts-info">Attempts: <span id="attempts-{{ forloop.counter0 }}">0</span></span>
                                                             </div>
-                                                            <div class="photo-upload mt-4" id="photo-upload-{{ forloop.counter0 }}" style="display: none;">
-                                                                <h4>Maximum attempts reached. Upload a photo instead:</h4>
-                                                                <input type="file" id="photo-{{ forloop.counter0 }}" class="form-control mt-3">
-                                                                <button type="button" class="btn btn-primary mt-3 upload-photo" data-question-id="{{ forloop.counter0 }}" data-db-question-id="{{ question.id }}">Upload Photo</button>
-                                                            </div>
                                                         </form>
                                                     </div>
                                                 {% endfor %}
@@ -714,32 +709,31 @@ function updateQuestionState(questionData) {
             document.getElementById('navigation-buttons').style.display = 'block';
         }
         
-        // Handle photo upload state
-        if (data.photo_uploaded) {
-            const photoUploadEl = document.getElementById(`photo-upload-${questionIndex}`);
-            if (photoUploadEl) {
-                const uploadButton = photoUploadEl.querySelector('.upload-photo');
-                if (uploadButton) {
-                    uploadButton.disabled = true;
-                    uploadButton.textContent = "Photo Uploaded ✓";
-                }
-                
-                // Show success feedback
-                const feedbackEl = document.getElementById(`feedback-${questionIndex}`);
-                if (feedbackEl) {
-                    feedbackEl.className = 'feedback correct';
-                    feedbackEl.style.display = 'block';
-                    feedbackEl.textContent = 'Photo uploaded successfully!';
-                }
-                
-                // Show navigation buttons
-                document.getElementById('navigation-buttons').style.display = 'block';
-            }
-        }
-        
         // Handle max attempts case
-        if (data.attempts >= 3 && !data.answered_correctly && !data.photo_uploaded) {
-            showPhotoUpload(questionIndex);
+        if (data.attempts >= 3 && !data.answered_correctly) {
+            // Show feedback and next button instead of photo upload
+            const feedbackEl = document.getElementById(`feedback-${questionIndex}`);
+            if (feedbackEl) {
+                feedbackEl.className = 'feedback max-attempts';
+                feedbackEl.style.display = 'block';
+                feedbackEl.textContent = 'You\'ve reached the maximum number of attempts. Please proceed to the next question.';
+            }
+            
+            // Disable input and submit
+            const answerInput = document.getElementById(`answer-${questionIndex}`);
+            if (answerInput) {
+                answerInput.readOnly = true;
+                answerInput.classList.add('max-attempts-reached');
+                answerInput.placeholder = 'Maximum attempts reached';
+            }
+            
+            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionIndex}"]`);
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            
+            // Show navigation buttons
+            document.getElementById('navigation-buttons').style.display = 'block';
         }
     }
 }
@@ -877,7 +871,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (serverData.photo_uploaded) {
                     questionData[questionId].photoUploaded = true;
                     
-                    const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
+                    const uploadButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
                     if (uploadButton) {
                         uploadButton.disabled = true;
                         uploadButton.textContent = "Photo Uploaded ✓";
@@ -1062,8 +1056,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     submitButton.textContent = "Submit Answer";
                 }
                 
-                // Hide navigation buttons until photo is uploaded
-                document.getElementById('navigation-buttons').style.display = 'none';
                 return;
             }
             
@@ -1167,20 +1159,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('Correct answer, showing navigation buttons');
                 } else {
                     feedbackElement.className = 'feedback incorrect';
-                    feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
                     
-                    // Re-enable the submit button for next attempt
-                    if (submitButton) {
-                        submitButton.disabled = false;
-                    }
-                    
-                    // IMPORTANT: Ensure navigation buttons are hidden for incorrect answers
-                    document.getElementById('navigation-buttons').style.display = 'none';
-                    console.log('Incorrect answer, hiding navigation buttons');
-                    
-                    // If max attempts reached, show photo upload
+                    // Check if this is the last attempt
                     if (questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
+                        feedbackElement.textContent = `Incorrect. You have reached the maximum number of attempts.`;
+                        
+                        // Show max attempts message and next button
                         showPhotoUpload(questionId);
+                    } else {
+                        feedbackElement.textContent = `Incorrect. You have ${questionData[questionId].maxAttempts - questionData[questionId].attempts} attempts remaining.`;
+                        
+                        // Re-enable the submit button for next attempt
+                        if (submitButton) {
+                            submitButton.disabled = false;
+                        }
+                        
+                        // IMPORTANT: Ensure navigation buttons are hidden for incorrect answers
+                        document.getElementById('navigation-buttons').style.display = 'none';
+                        console.log('Incorrect answer, hiding navigation buttons');
                     }
                 }
             })
@@ -1233,14 +1229,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Show photo upload form
         const showPhotoUpload = function(questionId) {
-            const photoUploadElement = document.getElementById(`photo-upload-${questionId}`);
-            if (!photoUploadElement) {
-                console.error(`Photo upload element not found for question ${questionId}`);
-                return;
-            }
-            
-            photoUploadElement.style.display = 'block';
-            
             // Disable answer submission
             const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
             if (submitButton) {
@@ -1248,7 +1236,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Set the question's input field as read-only to prevent further attempts
-                const answerInput = document.getElementById(`answer-${questionId}`);
+            const answerInput = document.getElementById(`answer-${questionId}`);
             if (answerInput) {
                 answerInput.readOnly = true;
                 answerInput.classList.add('max-attempts-reached');
@@ -1257,295 +1245,18 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Add a clear notice about max attempts being reached
             const feedbackElement = document.getElementById(`feedback-${questionId}`);
-            if (feedbackElement && !questionData[questionId].photoUploaded) {
+            if (feedbackElement) {
                 feedbackElement.className = 'feedback max-attempts';
                 feedbackElement.style.display = 'block';
-                feedbackElement.textContent = 'Maximum attempts reached. Please upload a photo to continue.';
+                feedbackElement.textContent = 'You\'ve reached the maximum number of attempts. Please proceed to the next question.';
             }
             
-            // IMPORTANT: Explicitly hide navigation buttons until photo is uploaded
-            document.getElementById('navigation-buttons').style.display = 'none';
-            console.log('Max attempts reached, showing photo upload and hiding navigation buttons');
+            // Show navigation buttons so user can move to next question
+            document.getElementById('navigation-buttons').style.display = 'block';
+            console.log('Max attempts reached, showing navigation buttons');
         };
-        
-        // Add event listeners to upload photo buttons
-        document.querySelectorAll('.upload-photo').forEach(button => {
-            button.addEventListener('click', function() {
-                const questionId = this.getAttribute('data-question-id');
-                uploadPhoto(questionId);
-            });
-        });
     }
     
-    // Photo upload function
-    function uploadPhoto(questionId) {
-        const photoInput = document.getElementById(`photo-${questionId}`);
-        if (!photoInput.files || !photoInput.files[0]) {
-            alert('Please select a photo to upload.');
-            return;
-        }
-        
-        // Get the actual database question ID
-        const uploadButton = document.querySelector(`.upload-photo[data-question-id="${questionId}"]`);
-        if (!uploadButton) {
-            alert('Error: Cannot find upload button');
-            return;
-        }
-        
-        const dbQuestionId = uploadButton.getAttribute('data-db-question-id');
-        if (!dbQuestionId) {
-            alert('Error: Missing question ID');
-            return;
-        }
-        
-        // Show loading indicator
-        if (uploadButton) {
-            uploadButton.disabled = true;
-            uploadButton.textContent = "Uploading...";
-        }
-        
-        const formData = new FormData();
-        formData.append('photo', photoInput.files[0]);
-        formData.append('question_id', dbQuestionId); // Use the database ID
-        formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
-        
-        // Get the team code
-        const teamCode = '{{ team.code }}';
-        formData.append('team_code', teamCode);
-        
-        fetch('/api/upload-photo/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const feedbackElement = document.getElementById(`feedback-${questionId}`);
-                feedbackElement.className = 'feedback correct';
-                feedbackElement.style.display = 'block';
-                feedbackElement.textContent = 'Photo uploaded successfully!';
-                
-                // Mark photo as uploaded
-                questionData[questionId].photoUploaded = true;
-                
-                // Always show the next button after a successful photo upload
-                // regardless of what the server returns
-                const navButtons = document.getElementById('navigation-buttons');
-                
-                // CRITICAL FIX: Force visibility of navigation buttons with multiple methods
-                navButtons.style.display = 'block';
-                navButtons.style.visibility = 'visible';
-                navButtons.style.opacity = '1';
-                navButtons.style.zIndex = '10000'; // Above the overlay
-                
-                // Create an attention-grabbing overlay to highlight the next button
-                const overlayDiv = document.createElement('div');
-                overlayDiv.style.position = 'fixed';
-                overlayDiv.style.top = '0';
-                overlayDiv.style.left = '0';
-                overlayDiv.style.width = '100%';
-                overlayDiv.style.height = '100%';
-                overlayDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-                overlayDiv.style.zIndex = '9999';
-                overlayDiv.style.display = 'flex';
-                overlayDiv.style.flexDirection = 'column';
-                overlayDiv.style.justifyContent = 'center';
-                overlayDiv.style.alignItems = 'center';
-                overlayDiv.style.transition = 'opacity 0.5s';
-                
-                // Create success message
-                const messageDiv = document.createElement('div');
-                messageDiv.innerHTML = `
-                    <div style="background-color: rgba(40, 167, 69, 0.9); border-radius: 10px; padding: 20px; max-width: 90%; text-align: center; margin-bottom: 30px;">
-                        <h3 style="color: white; margin-bottom: 15px;"><i class="fas fa-check-circle"></i> Photo Successfully Uploaded!</h3>
-                        <p style="color: white; font-size: 1.2rem;">Click the 'Next Question' button below to continue</p>
-                        <div style="margin-top: 20px;">
-                            <button id="overlay-next-btn" class="btn btn-light btn-lg">Next Question <i class="fas fa-arrow-right"></i></button>
-                        </div>
-                    </div>
-                `;
-                
-                // Add to body
-                overlayDiv.appendChild(messageDiv);
-                document.body.appendChild(overlayDiv);
-                
-                // Clone the navigation buttons and append to the message for easy access
-                const navButtonsClone = navButtons.cloneNode(true);
-                navButtonsClone.style.display = 'block';
-                navButtonsClone.style.marginTop = '20px';
-                messageDiv.appendChild(navButtonsClone);
-                
-                // Set up click events
-                document.getElementById('overlay-next-btn').addEventListener('click', function() {
-                    // Trigger click on the actual next button
-                    document.getElementById('next-question').click();
-                    // Remove overlay
-                    document.body.removeChild(overlayDiv);
-                });
-                
-                // Allow clicking anywhere to dismiss the overlay after a delay
-                setTimeout(() => {
-                    overlayDiv.addEventListener('click', function(e) {
-                        if (e.target === overlayDiv) {
-                            document.body.removeChild(overlayDiv);
-                        }
-                    });
-                }, 1000);
-                
-                // Auto-dismiss after 7 seconds
-                setTimeout(() => {
-                    if (document.body.contains(overlayDiv)) {
-                        document.body.removeChild(overlayDiv);
-                    }
-                }, 7000);
-                
-                // ENHANCED AUTO-NAVIGATION: Improve the auto-redirect mechanism for photo uploads
-                // Determine the URL to navigate to, prioritizing different sources
-                const redirectUrl = data.next_url || data.legacy_next_url;
-                
-                // RACE COMPLETION CHECK:
-                // If server indicates this is the last question, redirect to race completion page
-                if (data.is_last_question || data.is_race_complete) {
-                    console.log("SERVER INDICATED RACE COMPLETION AFTER PHOTO UPLOAD - REDIRECTING NOW");
-                    
-                    // Show message to user before redirecting
-                    const completeMessage = document.createElement('div');
-                    completeMessage.style.position = 'fixed';
-                    completeMessage.style.top = '50%';
-                    completeMessage.style.left = '50%';
-                    completeMessage.style.transform = 'translate(-50%, -50%)';
-                    completeMessage.style.background = 'rgba(40, 167, 69, 0.9)';
-                    completeMessage.style.color = 'white';
-                    completeMessage.style.padding = '20px';
-                    completeMessage.style.borderRadius = '10px';
-                    completeMessage.style.zIndex = '20000'; // Higher than other overlays
-                    completeMessage.innerHTML = '<h3>Congratulations!</h3><p>You\'ve completed all questions!</p><p>Redirecting to results page...</p>';
-                    document.body.appendChild(completeMessage);
-                    
-                    // Redirect after a short delay (2 seconds)
-                    setTimeout(() => {
-                        window.location.href = redirectUrl;
-                    }, 2000);
-                    
-                    // Don't do any more processing
-                    return;
-                }
-                
-                // Automatic navigation after 5 seconds if user doesn't click the Next button
-                if (redirectUrl) {
-                    // Show auto-navigation countdown message
-                    const autoNavMessage = document.createElement('div');
-                    autoNavMessage.id = 'auto-nav-message';
-                    autoNavMessage.style.position = 'fixed';
-                    autoNavMessage.style.bottom = '20px';
-                    autoNavMessage.style.left = '50%';
-                    autoNavMessage.style.transform = 'translateX(-50%)';
-                    autoNavMessage.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-                    autoNavMessage.style.color = 'white';
-                    autoNavMessage.style.padding = '10px 20px';
-                    autoNavMessage.style.borderRadius = '5px';
-                    autoNavMessage.style.zIndex = '10001';
-                    autoNavMessage.style.fontWeight = 'bold';
-                    autoNavMessage.innerHTML = 'Auto-navigating to next question in <span id="auto-nav-countdown">5</span> seconds...';
-                    document.body.appendChild(autoNavMessage);
-                    
-                    // Countdown timer for auto-navigation
-                    let autoNavCountdown = 5; // 5 seconds
-                    const autoNavCountdownEl = document.getElementById('auto-nav-countdown');
-                    const autoNavInterval = setInterval(() => {
-                        autoNavCountdown--;
-                        if (autoNavCountdownEl) {
-                            autoNavCountdownEl.textContent = autoNavCountdown;
-                        }
-                        
-                        if (autoNavCountdown <= 0) {
-                            clearInterval(autoNavInterval);
-                            if (document.body.contains(autoNavMessage)) {
-                                document.body.removeChild(autoNavMessage);
-                            }
-                            
-                            // Navigate to the next question
-                            console.log("Auto-navigating to next question:", redirectUrl);
-                            window.location.href = redirectUrl;
-                        }
-                    }, 1000);
-                    
-                    // If user clicks the Next button, cancel auto-navigation
-                    const nextButton = document.getElementById('next-question');
-                    if (nextButton) {
-                        nextButton.addEventListener('click', function() {
-                            // Cancel auto-navigation
-                            clearInterval(autoNavInterval);
-                            if (document.body.contains(autoNavMessage)) {
-                                document.body.removeChild(autoNavMessage);
-                            }
-                        });
-                    }
-                    
-                    // Store the redirect URL on the Next button so clicking it works even if event listener fails
-                    if (nextButton && !nextButton.hasAttribute('data-next-url')) {
-                        nextButton.setAttribute('data-next-url', redirectUrl);
-                        nextButton.addEventListener('click', function() {
-                            window.location.href = this.getAttribute('data-next-url');
-                        });
-                    }
-                } else {
-                    console.warn("No redirect URL provided by server after photo upload");
-                    
-                    // Create a fallback mechanism: if no URL provided, try to use the "next" button's normal mechanism
-                    setTimeout(() => {
-                        const nextButton = document.getElementById('next-question');
-                        if (nextButton) {
-                            console.log("Auto-clicking next button as fallback");
-                            nextButton.click();
-                        }
-                    }, 5000);
-                }
-                
-                // Also update the existing display
-                const nextButton = document.getElementById('next-question');
-                if (nextButton) {
-                    // Make it stand out
-                    nextButton.classList.add('ready');
-                    nextButton.style.backgroundColor = '#90C83C';
-                    nextButton.style.color = 'white';
-                    nextButton.style.fontSize = '1.3rem';
-                    nextButton.style.boxShadow = '0 0 20px rgba(144, 200, 60, 0.8)';
-                    
-                    // Ensure it's enabled
-                    nextButton.disabled = false;
-                }
-            } else {
-                alert('Error uploading photo: ' + (data.error || 'Unknown error'));
-                
-                // Re-enable upload button on error
-                if (uploadButton) {
-                    uploadButton.disabled = false;
-                    uploadButton.textContent = "Upload Photo";
-                }
-                
-                // Make sure navigation buttons remain hidden on error
-                document.getElementById('navigation-buttons').style.display = 'none';
-            }
-        })
-        .catch(error => {
-            console.error('Error uploading photo:', error);
-            alert('Error uploading photo. Please try again.');
-            
-            // Re-enable upload button on error
-            if (uploadButton) {
-                uploadButton.disabled = false;
-                uploadButton.textContent = "Upload Photo";
-            }
-            
-            // Make sure navigation buttons remain hidden on error
-            document.getElementById('navigation-buttons').style.display = 'none';
-        });
-    }
-
     // Add a new function to periodically update the score from the server
     function periodicScoreUpdate() {
         // Only run every 3 seconds to avoid overloading the server
