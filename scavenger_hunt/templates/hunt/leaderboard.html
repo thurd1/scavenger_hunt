@@ -14,7 +14,7 @@
             <!-- Lobby Selector -->
             <div class="lobby-selector mb-5">
                 <label for="lobby-select" class="mb-3" style="color: #90C83C; display: block; font-size: 1.2rem;">Select Race:</label>
-                <select id="lobby-select" class="form-control custom-select">
+                <select id="lobby-select" class="form-control custom-select" onchange="filterByLobby(this.value)">
                     <option value="all" selected>All Races</option>
                     {% for lobby in lobbies %}
                         <option value="{{ lobby.id }}">{{ lobby.race.name }} (Code: {{ lobby.code }})</option>
@@ -164,25 +164,8 @@
         100% { opacity: 1; }
     }
     
-    .websocket-status {
-        margin-bottom: 15px;
-        font-size: 14px;
-        padding: 5px 10px;
-        border-radius: 4px;
-        display: inline-block;
-        color: white;
-    }
-    
-    .websocket-status.connected {
-        color: #90C83C;
-    }
-    
-    .websocket-status.disconnected, .websocket-status.error {
-        color: #dc3545;
-    }
-    
-    .websocket-status.reconnecting {
-        color: #ffc107;
+    .hidden {
+        display: none !important;
     }
     
     /* Override any button styles to ensure they're all green */
@@ -197,227 +180,154 @@
         color: white !important;
         border-color: #618825 !important;
     }
-    
-    .pulse-dot {
-        display: inline-block;
-        animation: pulse 2s infinite;
-        margin-right: 3px;
-    }
-    
-    @keyframes pulse {
-        0% { opacity: 0.3; }
-        50% { opacity: 1; }
-        100% { opacity: 0.3; }
-    }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Global variable to store all teams data
-    let allTeams = [];
-    
-    // Create some test data to ensure the leaderboard isn't empty at startup
-    const testTeams = [
-        {id: 1, name: "Team A", score: 10, lobby_id: "1", lobby_name: "Test Race 1"},
-        {id: 2, name: "Team B", score: 8, lobby_id: "1", lobby_name: "Test Race 1"},
-        {id: 3, name: "Team C", score: 5, lobby_id: "2", lobby_name: "Test Race 2"}
-    ];
-    
-    // Debug flag - set to true for console output
-    const DEBUG = true;
-    
-    // Debug helper function
-    function debug(message, data = null) {
-        if (!DEBUG) return;
-        if (data) {
-            console.log(`[Leaderboard Debug] ${message}`, data);
-        } else {
-            console.log(`[Leaderboard Debug] ${message}`);
+    // Direct DOM filtering function
+    function filterByLobby(lobbyId) {
+        console.log("🔍 filterByLobby called with:", lobbyId);
+        
+        // Get all team rows
+        const rows = document.querySelectorAll('#leaderboard-body tr.team-row');
+        console.log(`Found ${rows.length} team rows`);
+        
+        let visibleCount = 0;
+        
+        // Loop through each row
+        rows.forEach(row => {
+            // Get the lobby ID for this row
+            const rowLobbyId = row.getAttribute('data-lobby-id');
+            console.log(`Row: ${row.querySelector('.team-name')?.textContent} | Row lobby ID: '${rowLobbyId}', Selected lobby ID: '${lobbyId}'`);
+            
+            // Show or hide based on filter
+            if (lobbyId === 'all' || rowLobbyId === lobbyId) {
+                row.classList.remove('hidden');
+                visibleCount++;
+                console.log(`✅ Showing row`);
+            } else {
+                row.classList.add('hidden');
+                console.log(`❌ Hiding row`);
+            }
+        });
+        
+        console.log(`After filtering: ${visibleCount} rows visible`);
+        
+        // Show "no teams" message if needed
+        const noTeamsMessage = document.querySelector('#leaderboard-body .no-teams-message');
+        if (visibleCount === 0) {
+            if (!noTeamsMessage) {
+                const tbody = document.getElementById('leaderboard-body');
+                const row = document.createElement('tr');
+                row.className = 'no-teams-message';
+                const cell = document.createElement('td');
+                cell.colSpan = 3;
+                cell.className = 'text-center';
+                cell.textContent = 'No teams available for this race';
+                row.appendChild(cell);
+                tbody.appendChild(row);
+                console.log('Added "no teams" message');
+            } else {
+                noTeamsMessage.classList.remove('hidden');
+                console.log('Showing existing "no teams" message');
+            }
+        } else if (noTeamsMessage) {
+            noTeamsMessage.classList.add('hidden');
+            console.log('Hiding "no teams" message');
         }
     }
     
-    // Fetch data from API
-    function fetchLeaderboardData() {
-        debug('Fetching leaderboard data from API');
+    // Initialize and set up data fetching
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('📋 Leaderboard page loaded');
         
-        fetch('/api/leaderboard-data/')
-            .then(response => response.json())
-            .then(data => {
-                debug('API response received', data);
-                
-                if (data.success && data.teams) {
-                    // Store all teams
-                    allTeams = cleanTeamData(data.teams);
+        // Check data-lobby-id attributes on load
+        const rows = document.querySelectorAll('#leaderboard-body tr.team-row');
+        rows.forEach(row => {
+            console.log(`Team: ${row.querySelector('.team-name')?.textContent}, Lobby ID: '${row.getAttribute('data-lobby-id')}'`);
+        });
+        
+        // Apply initial filter
+        setTimeout(() => {
+            const initialValue = document.getElementById('lobby-select').value;
+            console.log(`Initial lobby select value: ${initialValue}`);
+            filterByLobby(initialValue);
+        }, 500);
+        
+        // Set up data refresh - replace with a simpler version
+        setInterval(function() {
+            console.log('Fetching updated data...');
+            
+            fetch('/api/leaderboard-data/')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('API response received:', data);
                     
-                    // Apply current filter
-                    applyLobbyFilter();
-                } else {
-                    debug('API error', data.error || 'Unknown error');
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching leaderboard data:', error);
-            });
-    }
+                    if (data.success && data.teams && data.teams.length > 0) {
+                        updateLeaderboard(data.teams);
+                        
+                        // Re-apply current filter after update
+                        const currentLobby = document.getElementById('lobby-select').value;
+                        console.log(`Re-applying filter for lobby: ${currentLobby}`);
+                        filterByLobby(currentLobby);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                });
+        }, 5000);
+    });
     
-    // Clean team data to ensure valid values
-    function cleanTeamData(teams) {
-        return teams.map(team => {
-            // Ensure team has a valid name
-            if (!team.name || typeof team.name !== 'string') {
-                team.name = team.team_name || `Team ${team.id}`;
-            }
-            
-            // Check for "Team: ID" format issues and clean up
-            if (team.name.includes(':')) {
-                team.name = team.name.split(':')[0].trim();
-                if (team.name === 'Team') {
-                    team.name = `Team ${team.id}`;
-                }
-            }
-            
-            // Ensure score is a number
-            team.score = parseInt(team.score) || 0;
-            
-            // Ensure lobby data is present and consistent type
-            team.lobby_id = String(team.lobby_id || '');
-            team.lobby_name = team.lobby_name || 'Unknown Race';
-            
-            return team;
-        });
-    }
-    
-    // Apply the current lobby filter and update display
-    function applyLobbyFilter() {
-        const selectedLobbyId = String(document.getElementById('lobby-select').value);
-        debug(`Applying filter for lobby ID: ${selectedLobbyId}`);
+    // Simple function to update the leaderboard with new data
+    function updateLeaderboard(teams) {
+        if (!teams || !teams.length) return;
         
-        // Make a copy of all teams to work with
-        let teamsToDisplay = [...allTeams];
+        console.log(`Updating leaderboard with ${teams.length} teams`);
         
-        // Use test data if no teams available yet
-        if (!teamsToDisplay.length) {
-            debug('No real teams available, using test data');
-            teamsToDisplay = [...testTeams];
-        }
+        // Sort teams by score
+        teams.sort((a, b) => b.score - a.score);
         
-        // Filter teams if a specific lobby is selected
-        if (selectedLobbyId !== 'all') {
-            const before = teamsToDisplay.length;
-            teamsToDisplay = teamsToDisplay.filter(team => {
-                const teamLobbyId = String(team.lobby_id);
-                const match = teamLobbyId === selectedLobbyId;
-                debug(`Team ${team.name}: lobby=${teamLobbyId}, selected=${selectedLobbyId}, match=${match}`);
-                return match;
-            });
-            debug(`Filtered from ${before} to ${teamsToDisplay.length} teams`);
-        }
+        const tbody = document.getElementById('leaderboard-body');
+        tbody.innerHTML = '';
         
-        // Sort teams by score (highest first)
-        teamsToDisplay.sort((a, b) => b.score - a.score);
-        
-        // Now update the display with the filtered teams
-        updateLeaderboardDisplay(teamsToDisplay);
-    }
-    
-    // Update the leaderboard display with the provided teams
-    function updateLeaderboardDisplay(teams) {
-        const leaderboardBody = document.getElementById('leaderboard-body');
-        if (!leaderboardBody) return;
-        
-        debug(`Updating display with ${teams.length} teams`);
-        
-        // Get current teams for highlighting changes
-        const currentTeams = {};
-        document.querySelectorAll('.team-row').forEach(row => {
-            const teamId = row.getAttribute('data-team-id');
-            const scoreElement = row.querySelector('.team-score');
-            if (teamId && scoreElement) {
-                currentTeams[teamId] = {
-                    score: parseInt(scoreElement.textContent) || 0,
-                    element: row
-                };
-            }
-        });
-        
-        // Clear the table
-        leaderboardBody.innerHTML = '';
-        
-        // If no teams to display, show a message
-        if (teams.length === 0) {
-            const row = document.createElement('tr');
-            const cell = document.createElement('td');
-            cell.colSpan = 3;
-            cell.className = 'text-center';
-            cell.textContent = 'No teams available for this race';
-            row.appendChild(cell);
-            leaderboardBody.appendChild(row);
-            return;
-        }
-        
-        // Add each team to the table
+        // Add all teams to the table
         teams.forEach(team => {
+            // Create the row
             const row = document.createElement('tr');
             row.className = 'team-row';
-            row.dataset.teamId = team.id;
-            row.dataset.lobbyId = team.lobby_id;
+            row.setAttribute('data-team-id', team.id);
+            row.setAttribute('data-lobby-id', team.lobby_id || '');
+            
+            // Log the team data
+            console.log(`Adding team: ${team.name}, Lobby ID: '${team.lobby_id}'`);
             
             // Team name cell
             const nameCell = document.createElement('td');
             nameCell.className = 'team-name';
-            nameCell.textContent = team.name;
+            nameCell.textContent = team.name || `Team ${team.id}`;
             
             // Score cell
             const scoreCell = document.createElement('td');
             scoreCell.className = 'team-score';
-            scoreCell.textContent = team.score;
+            scoreCell.textContent = team.score || 0;
             
             // Lobby name cell
             const lobbyCell = document.createElement('td');
             lobbyCell.className = 'team-lobby';
-            lobbyCell.textContent = team.lobby_name;
+            lobbyCell.textContent = team.lobby_name || 'Unknown Race';
             
             row.appendChild(nameCell);
             row.appendChild(scoreCell);
             row.appendChild(lobbyCell);
             
-            // Highlight changed scores
-            if (currentTeams[team.id] && team.score > currentTeams[team.id].score) {
-                scoreCell.classList.add('score-increased');
-                row.classList.add('updated');
-                
-                setTimeout(() => {
-                    row.classList.remove('updated');
-                    scoreCell.classList.remove('score-increased');
-                }, 3000);
-            } else if (!currentTeams[team.id]) {
-                row.classList.add('new-team');
-                
-                setTimeout(() => {
-                    row.classList.remove('new-team');
-                }, 3000);
-            }
-            
-            leaderboardBody.appendChild(row);
+            tbody.appendChild(row);
         });
+        
+        // Re-apply current filter
+        const currentLobby = document.getElementById('lobby-select').value;
+        console.log(`After update: applying filter for lobby ${currentLobby}`);
+        filterByLobby(currentLobby);
     }
-    
-    // Initialize the page
-    document.addEventListener('DOMContentLoaded', function() {
-        debug('Leaderboard page loaded');
-        
-        // Set up the lobby select change handler
-        document.getElementById('lobby-select').addEventListener('change', function() {
-            debug(`Lobby selection changed to: ${this.value}`);
-            applyLobbyFilter();
-        });
-        
-        // Fetch initial data
-        fetchLeaderboardData();
-        
-        // Set up periodic refresh
-        setInterval(fetchLeaderboardData, 5000);
-    });
 </script>
 {% endblock %}
