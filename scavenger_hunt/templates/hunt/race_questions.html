@@ -827,35 +827,54 @@ document.addEventListener('DOMContentLoaded', function() {
     const questionContainer = document.getElementById('question-container');
     const joinForm = document.querySelector('.join-race-form');
     
+    // Global constants for this page
+    const teamCode = '{{ team.code }}';
+    const raceId = '{{ race.id }}';
+    const localStorageKey = `race_state_${raceId}_${teamCode}`;
+    const timerStorageKey = `race_timer_${raceId}_${teamCode}`;
+    
     if (questionContainer) {
-        // We're in questions display mode
-        // Get team information for storage keys
-        const teamCode = '{{ team.code }}';
-        const raceId = '{{ race.id }}';
-        const localStorageKey = `race_state_${raceId}_${teamCode}`;
+        console.log('---------- RACE QUESTIONS PAGE INITIALIZING ----------');
+        console.log('Server data - Current question index:', currentQuestionIndexFromServer);
+        console.log('Server data - Total points:', totalPointsFromServer);
         
         // Keep track of current question index - first try from server, then localStorage, then default to 0
         let currentQuestionIndex = currentQuestionIndexFromServer;
         
-        // Try to restore from localStorage if server data is 0 (likely a refresh)
-        if (currentQuestionIndex === 0 && localStorage.getItem(localStorageKey)) {
-            try {
-                const savedState = JSON.parse(localStorage.getItem(localStorageKey));
-                if (savedState && savedState.currentQuestionIndex !== undefined) {
+        // --- STATE RESTORATION FROM LOCAL STORAGE ---
+        let savedState = null;
+        try {
+            if (localStorage.getItem(localStorageKey)) {
+                savedState = JSON.parse(localStorage.getItem(localStorageKey));
+                console.log('Found saved state in localStorage:', savedState);
+                
+                // Only use localStorage index if server index is 0 (empty) AND localStorage has a valid index
+                if (currentQuestionIndex === 0 && savedState && savedState.currentQuestionIndex > 0) {
                     console.log('Restoring question index from localStorage:', savedState.currentQuestionIndex);
                     currentQuestionIndex = savedState.currentQuestionIndex;
                     
                     // Save to server to ensure consistency
                     saveCurrentQuestionIndex(currentQuestionIndex);
+                } else {
+                    console.log('Using server question index:', currentQuestionIndex);
                 }
-            } catch (error) {
-                console.error('Error parsing saved state:', error);
+            } else {
+                console.log('No saved state found in localStorage, using server data only');
             }
+        } catch (error) {
+            console.error('Error parsing saved state:', error);
         }
         
         // Collect all questions
         const questions = document.querySelectorAll('.question-card');
         const totalQuestions = questions.length;
+        console.log(`Found ${totalQuestions} questions`);
+        
+        // Make sure currentQuestionIndex is within bounds
+        if (currentQuestionIndex >= totalQuestions) {
+            console.log(`Current index ${currentQuestionIndex} is out of bounds, resetting to 0`);
+            currentQuestionIndex = 0;
+        }
         
         // Initialize total score
         const totalScoreElement = document.getElementById('total-score');
@@ -863,6 +882,7 @@ document.addEventListener('DOMContentLoaded', function() {
             totalScoreElement.textContent = totalPointsFromServer;
         }
         
+        // --- QUESTION DATA INITIALIZATION ---
         // Track attempts and points for each question
         const questionData = {};
         
@@ -909,7 +929,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return totalPoints;
         }
         
-        // Initialize question data
+        // --- INITIALIZE QUESTIONS STATE ---
         document.querySelectorAll('.question-card').forEach(question => {
             const questionId = question.id.split('-')[1];
             questionData[questionId] = {
@@ -922,6 +942,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Apply data from server if available
             if (answersFromServer[questionId]) {
+                console.log(`Restoring question ${questionId} data from server:`, answersFromServer[questionId]);
                 const serverData = answersFromServer[questionId];
                 questionData[questionId].attempts = serverData.attempts || 0;
                 questionData[questionId].points = serverData.points || 0;
@@ -969,60 +990,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (serverData.attempts >= 3 && !serverData.answered && !serverData.photo_uploaded) {
                     showPhotoUpload(questionId);
                 }
-            } else {
+            } else if (savedState && savedState.questionData && savedState.questionData[questionId]) {
                 // Try to restore from localStorage if there's no server data
-                const savedState = localStorage.getItem(localStorageKey);
-                if (savedState) {
-                    try {
-                        const parsedState = JSON.parse(savedState);
-                        if (parsedState.questionData && parsedState.questionData[questionId]) {
-                            const localData = parsedState.questionData[questionId];
-                            // Only use localStorage data if it's not default values
-                            if (localData.attempts > 0 || localData.points > 0 || localData.answered || localData.photoUploaded) {
-                                console.log(`Restoring question ${questionId} data from localStorage:`, localData);
-                                questionData[questionId] = localData;
-                                updateAttemptsDisplay(questionId);
-                                
-                                // Update UI based on restored state
-                                if (localData.answered) {
-                                    const feedbackElement = document.getElementById(`feedback-${questionId}`);
-                                    if (feedbackElement) {
-                                        feedbackElement.className = 'feedback correct';
-                                        feedbackElement.style.display = 'block';
-                                        feedbackElement.textContent = `Correct! You earned ${localData.points} points.`;
-                                    }
-                                    
-                                    // Disable answer submission
-                                    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
-                                    if (submitButton) {
-                                        submitButton.disabled = true;
-                                    }
-                                }
-                                
-                                if (localData.attempts >= 3 && !localData.answered && !localData.photoUploaded) {
-                                    showPhotoUpload(questionId);
-                                }
+                try {
+                    const localData = savedState.questionData[questionId];
+                    // Only use localStorage data if it's not default values
+                    if (localData.attempts > 0 || localData.points > 0 || localData.answered || localData.photoUploaded) {
+                        console.log(`Restoring question ${questionId} data from localStorage:`, localData);
+                        questionData[questionId] = localData;
+                        updateAttemptsDisplay(questionId);
+                        
+                        // Update UI based on restored state
+                        if (localData.answered) {
+                            const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                            if (feedbackElement) {
+                                feedbackElement.className = 'feedback correct';
+                                feedbackElement.style.display = 'block';
+                                feedbackElement.textContent = `Correct! You earned ${localData.points} points.`;
+                            }
+                            
+                            // Disable answer submission
+                            const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+                            if (submitButton) {
+                                submitButton.disabled = true;
                             }
                         }
-                    } catch (error) {
-                        console.error('Error restoring question data from localStorage:', error);
+                        
+                        if (localData.attempts >= 3 && !localData.answered && !localData.photoUploaded) {
+                            showPhotoUpload(questionId);
+                        }
                     }
+                } catch (error) {
+                    console.error('Error restoring question data from localStorage:', error);
                 }
             }
         });
         
-        // Save initial state to localStorage
+        // Save initial state to localStorage to ensure we have something
         saveGameState();
         
+        // --- DISPLAY CORRECT QUESTION ---
         // Hide all questions initially except the current one
+        console.log(`Setting active question to index ${currentQuestionIndex}`);
         for (let i = 0; i < questions.length; i++) {
             if (i === currentQuestionIndex) {
                 questions[i].style.display = 'block';
+                console.log(`Showing question ${i}`);
             } else {
                 questions[i].style.display = 'none';
             }
         }
         
+        // --- UPDATE NAVIGATION CONTROLS ---
         // Update the question counter
         const updateQuestionCounter = function() {
             const nextButton = document.getElementById('next-question');
@@ -1046,11 +1065,14 @@ document.addEventListener('DOMContentLoaded', function() {
              questionData[currentQuestionId].photoUploaded || 
              questionData[currentQuestionId].attempts >= questionData[currentQuestionId].maxAttempts)) {
             document.getElementById('navigation-buttons').style.display = 'block';
+            console.log('Showing navigation buttons based on question state');
         } else {
-            // Initially hide navigation buttons - they'll only show after correct answer or photo uploaded
+            // Initially hide navigation buttons - they'll only show after correct answer or photo upload
             document.getElementById('navigation-buttons').style.display = 'none';
+            console.log('Hiding navigation buttons');
         }
         
+        // --- NAVIGATION EVENT LISTENERS ---
         // Next button event listener
         document.getElementById('next-question').addEventListener('click', function() {
             // Check if this button has a redirect URL (set by photo upload response)
@@ -1090,16 +1112,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // Show navigation buttons only if we have any answered questions
-        const hasAnsweredQuestions = document.querySelectorAll('.feedback.correct').length > 0;
-        if (hasAnsweredQuestions) {
-            // Only show if current question is already answered or has photo uploaded
-            const currentQuestionId = questions[currentQuestionIndex].id.split('-')[1];
-            if (questionData[currentQuestionId] && (questionData[currentQuestionId].answered || questionData[currentQuestionId].photoUploaded)) {
-                document.getElementById('navigation-buttons').style.display = 'block';
-            }
-        }
-
+        // --- FORM SUBMISSION SETUP ---
         // Add event listeners for form submissions
         document.querySelectorAll('.answer-form').forEach(form => {
             form.addEventListener('submit', function(e) {
@@ -1136,6 +1149,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
         
+        // --- ANSWER SUBMISSION HANDLING ---
         // Function to handle answer submission
         function submitAnswer(questionId, answer) {
             // Get the team code from the page
@@ -1343,9 +1357,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Save current question index to server
-        const saveCurrentQuestionIndex = function(index) {
-            const teamCode = '{{ team.code }}';
-            const raceId = '{{ race.id }}';
+        function saveCurrentQuestionIndex(index) {
+            console.log('Saving question index to server:', index);
             
             fetch('/api/save-question-index/', {
                 method: 'POST',
@@ -1367,19 +1380,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error saving question index:', error);
                 // Even if server save fails, we still have localStorage as backup
             });
-        };
+        }
         
         // Update total score
-        const updateTotalScore = function() {
+        function updateTotalScore() {
             let totalScore = 0;
             for (const questionId in questionData) {
                 totalScore += questionData[questionId].points;
             }
             document.getElementById('total-score').textContent = totalScore;
-        };
+        }
         
         // Show photo upload form
-        const showPhotoUpload = function(questionId) {
+        function showPhotoUpload(questionId) {
             // Disable answer submission
             const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
             if (submitButton) {
@@ -1408,141 +1421,139 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Save state to localStorage
             saveGameState();
-        };
-        
-        // Handle beforeunload event to ensure final state is saved
-        window.addEventListener('beforeunload', function() {
-            saveGameState();
-        });
-    }
-    
-    // Add a new function to periodically update the score from the server
-    function periodicScoreUpdate() {
-        // Only run every 3 seconds to avoid overloading the server
-        setInterval(() => {
-            // Get the team code
-            const teamCode = '{{ team.code }}';
-            const raceId = '{{ race.id }}';
-            
-            if (!teamCode || !raceId) return;
-            
-            // Make API call to get current team score
-            fetch(`/api/leaderboard-data/?team_code=${teamCode}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.teams) {
-                        // Find our team in the response
-                        const ourTeam = data.teams.find(team => team.code === teamCode);
-                        if (ourTeam && ourTeam.score !== undefined) {
-                            // Update the score display
-                            const totalScoreEl = document.getElementById('total-score');
-                            if (totalScoreEl && parseInt(totalScoreEl.textContent) !== ourTeam.score) {
-                                // If score is different, update with animation
-                                totalScoreEl.textContent = ourTeam.score;
-                                totalScoreEl.style.transition = 'color 0.5s';
-                                totalScoreEl.style.color = '#90C83C';
-                                setTimeout(() => {
-                                    totalScoreEl.style.color = '';
-                                }, 1000);
-                            }
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching score update:', error);
-                });
-        }, 3000);
-    }
-    
-    // Update to avoid API calls that are failing
-    function initializePeriodicUpdates() {
-        // Only initialize WebSocket if we're not on the join form
-        if (!document.querySelector('.join-race-form')) {
-            try {
-                setupRaceWebSocket();
-            } catch (error) {
-                console.error("Error setting up WebSocket:", error);
-                // Fall back to periodic score updates without API
-                setInterval(() => {
-                    // Update timer display without server connection
-                    updateTimerWithLocalData();
-                }, 1000);
-            }
         }
-    }
-
-    // Function to update timer with local data if server connection fails
-    function updateTimerWithLocalData() {
-        try {
-            const startTimeStr = "{{ start_time|safe }}";
-            let startTime;
+        
+        // --- TIMER SETUP ---
+        // Initialize timer immediately
+        initializeTimer();
+        
+        // Initialize timer with proper persistence
+        function initializeTimer() {
+            console.log('Initializing timer...');
             
-            // Try to get the start time from localStorage first
-            const storedStartTime = localStorage.getItem(`race_starttime_${raceId}_${teamCode}`);
-            if (storedStartTime) {
-                try {
+            // Get the timer display element
+            const timerDisplay = document.getElementById('race-timer');
+            if (!timerDisplay) {
+                console.error('Timer display element not found!');
+                return;
+            }
+            
+            // Try to get stored start time first
+            let startTime;
+            try {
+                const storedStartTime = localStorage.getItem(timerStorageKey);
+                
+                if (storedStartTime) {
                     startTime = new Date(storedStartTime);
+                    console.log('Using stored start time from localStorage:', startTime);
+                    
+                    // Verify it's a valid date
                     if (isNaN(startTime.getTime())) {
+                        console.warn('Stored start time is invalid, falling back to server time');
                         startTime = null;
                     }
-                } catch (e) {
-                    startTime = null;
                 }
-            }
-            
-            // If no valid localStorage time, use server time or current time
-            if (!startTime) {
-                try {
-                    startTime = startTimeStr && startTimeStr !== "None" ? new Date(startTimeStr) : new Date();
-                    if (isNaN(startTime.getTime())) {
+                
+                // If no stored time or invalid, get from server
+                if (!startTime) {
+                    const startTimeStr = "{{ start_time|safe }}";
+                    if (startTimeStr && startTimeStr !== "None") {
+                        startTime = new Date(startTimeStr);
+                        console.log('Using start time from server:', startTime);
+                        
+                        if (isNaN(startTime.getTime())) {
+                            console.warn('Server start time is invalid, using current time');
+                            startTime = new Date();
+                        }
+                    } else {
+                        console.log('No start time from server, using current time');
                         startTime = new Date();
                     }
-                    // Store for future use
-                    localStorage.setItem(`race_starttime_${raceId}_${teamCode}`, startTime.toISOString());
-                } catch (e) {
-                    console.log("Using current time as fallback:", e);
-                    startTime = new Date();
-                    localStorage.setItem(`race_starttime_${raceId}_${teamCode}`, startTime.toISOString());
+                    
+                    // Save to localStorage for future refreshes
+                    localStorage.setItem(timerStorageKey, startTime.toISOString());
                 }
+            } catch (e) {
+                console.error('Error setting up timer, using current time as fallback:', e);
+                startTime = new Date();
+                // Store this fallback time
+                localStorage.setItem(timerStorageKey, startTime.toISOString());
             }
             
             // Get time limit from race object or fall back to default
             const timeLimitMinutes = {% if race.time_limit_minutes %}{{ race.time_limit_minutes }}{% else %}{{ time_limit_minutes|default:20 }}{% endif %};
+            console.log('Time limit (minutes):', timeLimitMinutes);
             
             // Calculate end time
             const endTime = new Date(startTime.getTime() + (timeLimitMinutes * 60 * 1000));
+            console.log('Race ends at:', endTime);
             
-            // Calculate remaining time
-            const now = new Date();
-            const remainingMs = endTime - now;
-            const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+            // Flag to ensure 5-minute warning only shows once
+            let fiveMinuteWarningShown = false;
             
-            // Update the timer display
-            updateTimerDisplay(remainingSeconds);
-        } catch (error) {
-            console.error("Error updating timer with local data:", error);
+            // Run timer update immediately
+            updateTimer();
+            
+            // Setup interval to update timer every second
+            const timerInterval = setInterval(updateTimer, 1000);
+            
+            function updateTimer() {
+                const now = new Date();
+                const remainingMs = endTime - now;
+                const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+                const minutes = Math.floor(remainingSeconds / 60);
+                const seconds = remainingSeconds % 60;
+                
+                // Update timer on page
+                timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                // Set timer color to red when time is running low
+                if (remainingSeconds <= 300) { // 5 minutes or less
+                    timerDisplay.style.color = "red";
+                    timerDisplay.style.fontWeight = "bold";
+                }
+                
+                // Popup warning at 5 minutes
+                if (!fiveMinuteWarningShown && remainingSeconds <= 300 && remainingSeconds > 290) {
+                    fiveMinuteWarningShown = true;
+                    showCustomPopup(
+                        "⏳ Time Warning", 
+                        "Only 5 minutes left!<br><br>Finish strong and complete all your questions!",
+                        "warning"
+                    );
+                }
+                
+                // Redirect when time runs out
+                if (remainingSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    showCustomPopup(
+                        "⏰ Time's Up!", 
+                        "Your race time has ended.<br><br>Redirecting to the race completion page...",
+                        "danger",
+                        function() {
+                            window.location.href = "{% url 'race_complete' %}";
+                        }
+                    );
+                }
+            }
         }
-    }
-    
-    // Initialize all periodic updates
-    initializePeriodicUpdates();
-    
-    // Initialize timer functionality
-    const timerDisplay = document.getElementById('race-timer');
-    if (timerDisplay) {
-        // Calculate end time
-        const endTime = new Date(startTime.getTime() + (timeLimitMinutes * 60 * 1000));
-        console.log("Race end time:", endTime);
-        
-        // Flag to ensure 5-minute warning only shows once
-        let fiveMinuteWarningShown = false;
         
         // Function to show custom popup
         function showCustomPopup(title, message, type, callback) {
             const popup = document.getElementById('custom-popup');
+            if (!popup) {
+                console.error('Custom popup element not found!');
+                return;
+            }
+            
             const popupTitle = document.getElementById('popup-title');
             const popupMessage = document.getElementById('popup-message');
             const popupButton = document.getElementById('popup-button');
+            
+            if (!popupTitle || !popupMessage || !popupButton) {
+                console.error('Popup elements not found!');
+                return;
+            }
             
             // Set content
             popupTitle.textContent = title;
@@ -1574,51 +1585,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 10);
         }
         
-        // Update timer immediately once
-        updateTimer();
+        // Handle beforeunload event to ensure final state is saved
+        window.addEventListener('beforeunload', function() {
+            saveGameState();
+        });
         
-        // Update timer every second
-        const timerInterval = setInterval(updateTimer, 1000);
+        // --- INITIALIZE WEBSOCKET UPDATES ---
+        initializePeriodicUpdates();
         
-        function updateTimer() {
-            const now = new Date();
-            const remainingMs = endTime - now;
-            const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
-            const minutes = Math.floor(remainingSeconds / 60);
-            const seconds = remainingSeconds % 60;
-
-            // 🕒 Update timer on page
-            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            
-            // Set timer color to red when time is running low
-            if (remainingSeconds <= 300) { // 5 minutes or less
-                timerDisplay.style.color = "red";
-                timerDisplay.style.fontWeight = "bold";
-            }
-
-            // ⚠️ Popup warning at 5 minutes
-            if (!fiveMinuteWarningShown && remainingSeconds <= 300 && remainingSeconds > 0) {
-                showCustomPopup(
-                    "⏳ Time Warning", 
-                    "Only 5 minutes left!<br><br>Finish strong and complete all your questions!",
-                    "warning"
-                );
-                fiveMinuteWarningShown = true;
-            }
-
-            // ⏰ Redirect when time runs out
-            if (remainingSeconds <= 0) {
-                clearInterval(timerInterval);
-                showCustomPopup(
-                    "⏰ Time's Up!", 
-                    "Your race time has ended.<br><br>Redirecting to the race completion page...",
-                    "danger",
-                    function() {
-                        window.location.href = "{% url 'race_complete' %}";
-                    }
-                );
-            }
-        }
+        console.log('---------- RACE QUESTIONS PAGE INITIALIZATION COMPLETE ----------');
     }
 });
 
@@ -1674,6 +1649,20 @@ function updateTimerDisplay(remainingSeconds) {
                 window.location.href = "{% url 'race_complete' %}";
             }
         );
+    }
+}
+
+// Update to avoid API calls that are failing
+function initializePeriodicUpdates() {
+    // Only initialize WebSocket if we're not on the join form
+    if (!document.querySelector('.join-race-form')) {
+        try {
+            setupRaceWebSocket();
+        } catch (error) {
+            console.error("Error setting up WebSocket:", error);
+            // Fall back to periodic timer updates without WebSocket
+            console.log("Using local timer updates (no WebSocket)");
+        }
     }
 }
 </script>
