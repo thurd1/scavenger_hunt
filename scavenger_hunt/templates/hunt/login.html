@@ -12,8 +12,9 @@
         {% if messages %}
         <div class="messages">
             {% for message in messages %}
-            <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">
-                {{ message }}
+            <div class="mega-alert {% if message.tags %}mega-alert-{{ message.tags }}{% endif %}">
+                <div class="alert-icon">⚠️</div>
+                <div class="alert-text">{{ message }}</div>
             </div>
             {% endfor %}
         </div>
@@ -30,8 +31,9 @@
                 <input type="password" name="password" id="id_password" value="{{ form.password.value }}" class="form-control">
             </div>
             {% if form.errors %}
-                <div class="alert alert-danger">
-                    <strong>Error:</strong> Incorrect Credentials
+                <div class="mega-alert mega-alert-danger">
+                    <div class="alert-icon">⚠️</div>
+                    <div class="alert-text"><strong>Error:</strong> Incorrect Credentials</div>
                 </div>
             {% endif %}
             <button type="submit" class="login-btn">Login</button>
@@ -108,31 +110,45 @@ h2 {
     transform: translateY(-2px);
 }
 
-.alert-danger {
-    background-color: rgba(220, 53, 69, 0.8);
-    border: 2px solid rgba(220, 53, 69, 0.8);
-    color: white;
+.mega-alert {
+    display: flex;
+    align-items: center;
     padding: 15px;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
     font-weight: bold;
     font-size: 1.1rem;
-    text-align: center;
-    box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
-    animation: pulse-error 2s 1;
+    text-align: left;
 }
 
-@keyframes pulse-error {
-    0% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
-    }
-    50% {
-        transform: scale(1.03);
-        box-shadow: 0 0 15px 0 rgba(220, 53, 69, 0.5);
-    }
-    100% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
-    }
+.mega-alert-danger {
+    background: linear-gradient(135deg, #ff0000, #9e0000);
+    border: 3px solid #ff0000;
+    color: white;
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both, glow 1.5s infinite alternate;
+}
+
+.alert-icon {
+    font-size: 1.8rem;
+    margin-right: 15px;
+}
+
+.alert-text {
+    font-size: 1.2rem;
+    flex: 1;
+}
+
+@keyframes shake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+@keyframes glow {
+    from { box-shadow: 0 0 10px 5px rgba(255, 0, 0, 0.5); }
+    to { box-shadow: 0 0 20px 10px rgba(255, 0, 0, 0.7); }
 }
 </style>
 {% endblock %}
