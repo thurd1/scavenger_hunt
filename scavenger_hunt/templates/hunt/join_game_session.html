@@ -11,7 +11,7 @@
         {% if messages %}
         <div class="messages">
             {% for message in messages %}
-            <div class="mega-alert {% if message.tags %}mega-alert-{{ message.tags }}{% endif %}">
+            <div class="alert alert-danger">
                 {{ message }}
             </div>
             {% endfor %}
@@ -93,23 +93,13 @@
         background: #a1df3e;
     }
     
-    .mega-alert {
-        padding: 15px;
-        margin-bottom: 1.5rem;
-        border-radius: 5px;
-        font-weight: 400;
-        font-size: 1.1rem;
-        text-align: center;
-        color: white;
-    }
-    
-    .mega-alert-danger {
+    .alert-danger {
         background-color: #52181c;
-        border: 1px solid #6e1c22;
+        color: white;
         text-align: center;
-        font-size: 1.1rem;
-        padding: 20px;
-        color: #ff6b6b;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
     }
     
     .admin-login-link {
