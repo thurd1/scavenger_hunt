@@ -21,6 +21,7 @@
                     {% endfor %}
                 </select>
                 <div id="filter-status" style="margin-top: 10px; padding: 5px; color: #90C83C; text-align: center;"></div>
+                <div id="debug-output" style="margin-top: 10px; padding: 5px; color: #90C83C; font-size: 0.8rem; display: none;"></div>
             </div>
             
             <div id="leaderboard-container" class="table-responsive mb-5">
@@ -37,7 +38,16 @@
                         <tr class="team-row" data-team-id="{{ team.id }}" data-lobby-id="{{ team.lobby.id }}">
                             <td class="team-name">{{ team.name }}</td>
                             <td class="team-score">{{ team.score }}</td>
-                            <td class="team-lobby">{{ team.lobby.race.name }} (Code: {{ team.lobby.code }})</td>
+                            <td class="team-lobby">
+                                {% if team.lobby.race %}
+                                    {{ team.lobby.race.name }} 
+                                    {% if team.lobby.code %}
+                                        (Code: {{ team.lobby.code }})
+                                    {% endif %}
+                                {% else %}
+                                    {{ team.lobby_name|default:"Unknown Race" }}
+                                {% endif %}
+                            </td>
                         </tr>
                         {% empty %}
                         <tr class="no-teams-message">
@@ -159,18 +169,59 @@
     .team-row.filtered-out {
         display: none;
     }
+
+    .debug-info {
+        background: rgba(0, 0, 0, 0.6);
+        padding: 5px 8px;
+        border-radius: 4px;
+        font-family: monospace;
+        white-space: pre-wrap;
+        font-size: 11px;
+        margin-top: 5px;
+    }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    // Debug function to show data in UI
+    function showDebug(message, data) {
+        console.log(message, data);
+        
+        const debugEl = document.getElementById('debug-output');
+        if (debugEl) {
+            // Only show in development
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                debugEl.style.display = 'block';
+                
+                const debugInfo = document.createElement('div');
+                debugInfo.className = 'debug-info';
+                
+                if (typeof data === 'object') {
+                    debugInfo.textContent = message + ': ' + JSON.stringify(data, null, 2);
+                } else {
+                    debugInfo.textContent = message + ': ' + data;
+                }
+                
+                debugEl.appendChild(debugInfo);
+                
+                // Limit to 5 messages
+                if (debugEl.children.length > 5) {
+                    debugEl.removeChild(debugEl.children[0]);
+                }
+            }
+        }
+    }
+    
     // Simple data refresh function
     function refreshLeaderboard() {
-        console.log('Refreshing leaderboard data...');
+        showDebug('Refreshing leaderboard data', new Date().toLocaleTimeString());
+        
         fetch('/api/leaderboard-data/')
             .then(response => response.json())
             .then(data => {
-                console.log('API response:', data);
+                showDebug('API response teams count', data.teams ? data.teams.length : 0);
+                
                 if (data.success && data.teams) {
                     renderTeams(data.teams);
                 }
@@ -182,7 +233,8 @@
     
     // Render teams to the leaderboard
     function renderTeams(teams) {
-        console.log('Rendering teams:', teams);
+        showDebug('Rendering teams count', teams.length);
+        
         const tbody = document.getElementById('leaderboard-body');
         
         // Sort teams by score
@@ -210,17 +262,36 @@
         for (let i = 0; i < teams.length; i++) {
             const team = teams[i];
             
-            // Make sure we have a valid lobby_id
-            if (!team.lobby_id && team.lobby && team.lobby.id) {
-                team.lobby_id = team.lobby.id;
+            // Handle different data structures
+            let lobbyId = '';
+            let lobbyName = 'Unknown Race';
+            
+            if (team.lobby && team.lobby.id) {
+                // Direct lobby object
+                lobbyId = team.lobby.id;
+                
+                if (team.lobby.race && team.lobby.race.name) {
+                    lobbyName = team.lobby.race.name;
+                    if (team.lobby.code) {
+                        lobbyName += ` (Code: ${team.lobby.code})`;
+                    }
+                }
+            } else if (team.lobby_id) {
+                // Just lobby ID reference
+                lobbyId = team.lobby_id;
+                lobbyName = team.lobby_name || 'Unknown Race';
             }
             
-            console.log(`Team ${i}: id=${team.id}, name=${team.name}, lobby_id=${team.lobby_id}`);
+            showDebug(`Team ${team.name}`, {
+                id: team.id,
+                score: team.score,
+                lobbyId: lobbyId
+            });
             
             const row = document.createElement('tr');
             row.className = 'team-row';
             row.setAttribute('data-team-id', team.id);
-            row.setAttribute('data-lobby-id', team.lobby_id);
+            row.setAttribute('data-lobby-id', lobbyId);
             
             // Create name cell
             const nameCell = document.createElement('td');
@@ -234,19 +305,10 @@
             scoreCell.textContent = team.score;
             row.appendChild(scoreCell);
             
-            // Create lobby cell with code
+            // Create lobby cell
             const lobbyCell = document.createElement('td');
             lobbyCell.className = 'team-lobby';
-            
-            // Use lobby_name if available, otherwise construct from lobby info
-            if (team.lobby_name) {
-                lobbyCell.textContent = team.lobby_name;
-            } else if (team.lobby && team.lobby.race && team.lobby.race.name) {
-                lobbyCell.textContent = `${team.lobby.race.name} (Code: ${team.lobby.code})`;
-            } else {
-                lobbyCell.textContent = 'Unknown Race';
-            }
-            
+            lobbyCell.textContent = lobbyName;
             row.appendChild(lobbyCell);
             
             tbody.appendChild(row);
@@ -259,7 +321,7 @@
     // Filter teams by lobby
     function filterTeams() {
         const selectedLobby = document.getElementById('lobby-select').value;
-        console.log('Filtering for lobbyId:', selectedLobby);
+        showDebug('Filtering for lobbyId', selectedLobby);
         
         // Update status indicator
         const statusElement = document.getElementById('filter-status');
@@ -269,9 +331,13 @@
         }
         
         const rows = document.querySelectorAll('#leaderboard-body .team-row');
-        console.log(`Found ${rows.length} team rows to filter`);
+        showDebug('Rows found for filtering', rows.length);
         
         let visibleCount = 0;
+        
+        // Static filter test for specific IDs (uncomment to test)
+        // console.log("Testing static filter for lobby ID 5:");
+        // rows.forEach(row => console.log(`Row lobby ID: '${row.getAttribute('data-lobby-id')}', matches test ID 5: ${row.getAttribute('data-lobby-id') === '5'}`));
         
         // Loop through rows and show/hide based on lobby
         for (let i = 0; i < rows.length; i++) {
@@ -279,47 +345,52 @@
             const rowLobbyId = String(row.getAttribute('data-lobby-id') || '');
             const teamName = row.querySelector('.team-name')?.textContent || 'Unknown';
             
-            console.log(`Row ${i}: team=${teamName}, lobbyId=${rowLobbyId}, selected=${selectedLobby}, match=${selectedLobby === 'all' || rowLobbyId === selectedLobby}`);
+            // Make the comparison
+            const isAllSelected = selectedLobby === 'all';
+            const isLobbyMatch = String(rowLobbyId) === String(selectedLobby);
+            const shouldShow = isAllSelected || isLobbyMatch;
             
-            // Make the comparison consistent by converting both to strings
-            if (selectedLobby === 'all' || rowLobbyId === String(selectedLobby)) {
+            showDebug(`Filtering row ${teamName}`, {
+                rowLobbyId,
+                selectedLobby,
+                match: shouldShow
+            });
+            
+            if (shouldShow) {
                 row.style.display = '';
                 row.classList.remove('filtered-out');
                 visibleCount++;
-                console.log(`✓ Showing row: ${teamName}`);
             } else {
                 row.style.display = 'none';
                 row.classList.add('filtered-out');
-                console.log(`✗ Hiding row: ${teamName}`);
             }
         }
         
-        console.log(`After filtering: ${visibleCount} rows visible`);
+        showDebug('Visible rows after filtering', visibleCount);
         
         // Show or hide "no teams" message
         const noTeamsMessage = document.querySelector('.no-teams-message');
         
-        if (visibleCount === 0 && !noTeamsMessage) {
-            console.log('Creating "no teams" message');
-            const tbody = document.getElementById('leaderboard-body');
-            const row = document.createElement('tr');
-            row.className = 'no-teams-message';
-            
-            const cell = document.createElement('td');
-            cell.colSpan = 3;
-            cell.className = 'text-center';
-            cell.textContent = 'No teams available for this race';
-            
-            row.appendChild(cell);
-            tbody.appendChild(row);
-        } else if (noTeamsMessage) {
-            if (visibleCount === 0) {
-                noTeamsMessage.style.display = '';
-                console.log('Showing "no teams" message');
+        if (visibleCount === 0) {
+            // No visible teams, show message
+            if (!noTeamsMessage) {
+                const tbody = document.getElementById('leaderboard-body');
+                const row = document.createElement('tr');
+                row.className = 'no-teams-message';
+                
+                const cell = document.createElement('td');
+                cell.colSpan = 3;
+                cell.className = 'text-center';
+                cell.textContent = 'No teams available for this race';
+                
+                row.appendChild(cell);
+                tbody.appendChild(row);
             } else {
-                noTeamsMessage.style.display = 'none';
-                console.log('Hiding "no teams" message');
+                noTeamsMessage.style.display = '';
             }
+        } else if (noTeamsMessage) {
+            // Teams are visible, hide message
+            noTeamsMessage.style.display = 'none';
         }
         
         // Update status with count
@@ -330,35 +401,62 @@
     
     // Initialize
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM loaded - initializing leaderboard');
+        showDebug('DOM loaded - initializing leaderboard', new Date().toLocaleTimeString());
         
         // Check team rows on page load
         const initialRows = document.querySelectorAll('#leaderboard-body .team-row');
-        console.log(`Page loaded with ${initialRows.length} team rows`);
+        showDebug('Initial rows count', initialRows.length);
+        
         initialRows.forEach((row, i) => {
             const lobbyId = row.getAttribute('data-lobby-id');
-            console.log(`Initial Row ${i}: team=${row.querySelector('.team-name')?.textContent}, lobbyId=${lobbyId}`);
+            const teamName = row.querySelector('.team-name')?.textContent;
+            
+            showDebug(`Initial Row ${i}`, {
+                team: teamName,
+                lobbyId: lobbyId
+            });
         });
         
         // Check dropdown options
         const options = document.querySelectorAll('#lobby-select option');
-        console.log(`Dropdown has ${options.length} options`);
+        showDebug('Dropdown options count', options.length);
+        
         options.forEach((option, i) => {
-            console.log(`Option ${i}: value=${option.value}, text=${option.textContent}`);
+            showDebug(`Option ${i}`, {
+                value: option.value,
+                text: option.textContent
+            });
         });
         
-        // Set up lobby select change event
+        // Explicitly set change listener
         const select = document.getElementById('lobby-select');
         if (select) {
-            console.log('Setting up change event listener for dropdown');
+            // Remove any existing event listeners
+            select.removeEventListener('change', filterTeams);
+            
+            // Add new event listener
             select.addEventListener('change', function() {
-                console.log(`Dropdown changed to: value=${this.value}, text=${this.options[this.selectedIndex].text}`);
+                showDebug('Dropdown changed', {
+                    value: this.value,
+                    text: this.options[this.selectedIndex].text
+                });
+                
+                // Hard-coded test filter to verify logic (uncomment to test)
+                // console.log("Testing hard-coded filter:");
+                // const testId = '5'; // Use an ID you know exists
+                // console.log(`Filtering for test lobby ID: ${testId}`);
+                // this.value = testId;
+                
                 filterTeams();
             });
+            
+            showDebug('Change event listener set up for dropdown', true);
         }
         
         // Apply initial filter
-        filterTeams();
+        setTimeout(function() {
+            filterTeams();
+        }, 100);
         
         // Fetch initial data
         refreshLeaderboard();
