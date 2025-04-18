@@ -795,6 +795,11 @@ function setupNextQuestionButton() {
     }
 }
 
+// Helper function to move to next question (used in onclick)
+window.moveToNextQuestion = function() {
+    moveToQuestion(1);
+};
+
 // Function to show photo upload form when max attempts reached
 function showPhotoUpload(questionIndex) {
     const photoUploadElement = document.getElementById(`photo-upload-${questionIndex}`);
