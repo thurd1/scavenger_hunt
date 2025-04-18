@@ -211,9 +211,9 @@
 }
 
 .feedback.max-attempts {
-    background-color: rgba(255, 193, 7, 0.2);
-    border: 1px solid rgba(255, 193, 7, 0.4);
-    color: #ffc107;
+    background-color: rgba(220, 53, 69, 0.2);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    color: #dc3545;
 }
 
 input.max-attempts-reached {
@@ -826,6 +826,23 @@ document.addEventListener('DOMContentLoaded', function() {
         // Track attempts and points for each question
         const questionData = {};
         
+        // Update all the places where attempts are displayed or updated
+        function updateAttemptsDisplay(questionId) {
+            const attemptsElement = document.getElementById(`attempts-${questionId}`);
+            if (!attemptsElement || !questionData[questionId]) return;
+            
+            const currentAttempts = questionData[questionId].attempts;
+            const maxAttempts = questionData[questionId].maxAttempts || 3;
+            
+            attemptsElement.textContent = `${currentAttempts}/${maxAttempts}`;
+            
+            // Show in red if max attempts reached
+            if (currentAttempts >= maxAttempts) {
+                attemptsElement.style.color = '#dc3545';
+                attemptsElement.style.fontWeight = 'bold';
+            }
+        }
+        
         // Initialize question data
         document.querySelectorAll('.question-card').forEach(question => {
             const questionId = question.id.split('-')[1];
@@ -846,10 +863,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 questionData[questionId].photoUploaded = serverData.photo_uploaded || false;
                 
                 // Update UI to match the state
-                const attemptsElement = document.getElementById(`attempts-${questionId}`);
-                if (attemptsElement) {
-                    attemptsElement.textContent = serverData.attempts || 0;
-                }
+                updateAttemptsDisplay(questionId);
                 
                 // If question was already answered correctly, show feedback and disable submission
                 if (serverData.answered) {
@@ -1061,10 +1075,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Increment attempts
             questionData[questionId].attempts++;
-            const attemptsElement = document.getElementById(`attempts-${questionId}`);
-            if (attemptsElement) {
-                attemptsElement.textContent = questionData[questionId].attempts;
-            }
+            updateAttemptsDisplay(questionId);
             
             // Make API call to check answer
             fetch('/check-answer/', {
