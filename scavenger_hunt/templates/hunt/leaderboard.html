@@ -1,252 +1,191 @@
-{% extends "base.html" %}
-
-{% load static %}
+{% extends "hunt/base.html" %}
 
 {% block title %}Leaderboard{% endblock %}
 
-{% block welcome_text %}Leaderboard{% endblock %}
-
 {% block content %}
-    <div class="container py-4">
-        <div class="dashboard-box p-4">
-            <h2 style="color: #90C83C; text-align: center; margin-bottom: 3rem;">Leaderboard</h2>
-            
-            <!-- Real-time indicator and refresh button -->
-            <div class="text-center mb-3">
-                <span id="realtime-indicator" class="badge bg-success" style="background-color: rgba(144, 200, 60, 0.2) !important; color: #90C83C !important; font-size: 0.9rem; padding: 6px 12px; border-radius: 50px;">
-                    <span class="pulse-dot">●</span> Live Updates
-                </span>
-                <button id="refresh-button" class="btn btn-sm" style="margin-left: 10px; background-color: rgba(144, 200, 60, 0.8); color: white; border: none; padding: 6px 12px; border-radius: 50px; cursor: pointer;">
-                    <i class="fa fa-refresh"></i> Refresh
-                </button>
-            </div>
-            
-            <!-- Connection status display -->
-            <div class="text-center mb-3">
-                <div id="connection-status" style="display: inline-block; padding: 5px 10px; font-size: 0.85rem; color: #f8f9fa;">
-                    <span id="status-dot" style="display:inline-block; width:8px; height:8px; background:#ffcc00; border-radius:50%; margin-right:5px;"></span>
-                    Connecting...
-                </div>
-            </div>
-            
-            <!-- Lobby Selector -->
-            <div class="lobby-selector mb-5">
-                <label for="lobby-select" class="mb-3" style="color: #90C83C; display: block; font-size: 1.2rem;">Select Race:</label>
-                <select id="lobby-select" class="form-control custom-select">
-                    <option value="all" selected>All Races</option>
-                    {% for lobby in lobbies %}
-                        <option value="{{ lobby.id }}">{{ lobby.race.name }} (Code: {{ lobby.code }})</option>
+<div class="title-block">
+    <h1>Leaderboard</h1>
+</div>
+
+<div class="welcome-text">
+    <p>Follow the teams' progress as they solve challenges!</p>
+</div>
+
+<div class="leaderboard-container">
+    <div class="dashboard-box">
+        <div class="dashboard-header">
+            <h2>Team Rankings</h2>
+            <!-- Removed: Live updates indicator and refresh button -->
+            <div class="race-select-container">
+                <select id="lobby-select" class="lobby-selector">
+                    <option value="all">All Races</option>
+                    {% for race in races %}
+                        <option value="{{ race.id }}">{{ race.title }}</option>
                     {% endfor %}
                 </select>
             </div>
-            
-            <div id="leaderboard-container" class="table-responsive mb-5">
-                <table class="w-100">
-                    <thead>
-                        <tr>
-                            <th>Team Name</th>
-                            <th>Score</th>
-                            <th>Race</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leaderboard-body">
-                        {% for team in teams %}
-                        <tr class="team-row" data-team-id="{{ team.id }}" data-lobby-id="{{ team.lobby_id }}">
-                            <td class="team-name">{{ team.name }}</td>
-                            <td class="team-score">{{ team.score }}</td>
-                            <td class="team-lobby">{{ team.lobby_name }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="3" class="text-center">No teams available</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="text-center mt-5">
-                <a href="{% url 'leader_dashboard' %}" class="btn btn-success btn-lg">Back to Dashboard</a>
-            </div>
+        </div>
+        
+        <div class="scoreboard">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Team Name</th>
+                        <th>Score</th>
+                        <th>Race</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                    <!-- Teams will be added here dynamically -->
+                    <tr>
+                        <td colspan="3" class="no-teams">Loading teams...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
 
 <style>
     .dashboard-box {
-        background-color: rgba(33, 37, 41, 0.9);
-        border-radius: 15px;
-        border: 1px solid rgba(144, 200, 60, 0.2);
-        padding: 2.5rem !important;
+        background-color: #fff;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+    
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .dashboard-header h2 {
+        margin: 0;
+        color: #333;
+        font-size: 1.8rem;
+    }
+    
+    .race-select-container {
+        margin: 10px 0;
     }
     
     .lobby-selector {
-        max-width: 500px;
-        margin: 0 auto 2.5rem auto;
-        padding: 1.5rem;
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 8px;
-    }
-    
-    .custom-select {
-        background-color: rgba(33, 37, 41, 0.8);
-        color: white;
-        border: 1px solid rgba(144, 200, 60, 0.3);
-        padding: 12px;
-        border-radius: 5px;
+        padding: 8px 16px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        background-color: #f8f8f8;
         cursor: pointer;
-        font-size: 1.1rem;
+        font-size: 14px;
     }
     
-    .custom-select:focus {
-        border-color: #90C83C;
-        outline: none;
-        box-shadow: 0 0 0 0.2rem rgba(144, 200, 60, 0.25);
-    }
-    
-    .table-responsive {
-        overflow-x: auto;
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 8px;
-        padding: 1.5rem;
-        margin-bottom: 2.5rem;
-    }
-    
-    table {
+    .leaderboard-table {
         width: 100%;
         border-collapse: collapse;
     }
     
-    th, td {
-        padding: 1.2rem;
+    .leaderboard-table th {
+        background-color: #f5f5f5;
+        padding: 12px;
         text-align: left;
-        border-bottom: 1px solid rgba(144, 200, 60, 0.2);
+        font-weight: 600;
+        color: #555;
+        border-bottom: 2px solid #eaeaea;
     }
     
-    th {
-        color: #90C83C;
-        font-weight: bold;
-        white-space: nowrap;
-        font-size: 1.2rem;
+    .leaderboard-table td {
+        padding: 12px;
+        border-bottom: 1px solid #eaeaea;
     }
     
-    td {
-        color: white;
-        font-size: 1.1rem;
+    .team-name {
+        font-weight: 500;
     }
     
-    tr:last-child td {
-        border-bottom: none;
-    }
-    
-    tr:hover {
-        background: rgba(144, 200, 60, 0.1);
-    }
-    
-    .text-center {
+    .team-score {
+        font-weight: 600;
         text-align: center;
     }
     
-    .btn-success {
-        background-color: #90C83C;
-        border-color: #90C83C;
-        padding: 0.8rem 2rem;
-        font-size: 1.1rem;
-        margin-top: 1.5rem;
+    .no-teams {
+        text-align: center;
+        padding: 30px;
+        color: #888;
+        font-style: italic;
     }
     
-    .btn-success:hover {
-        background-color: #7ab32f;
-        border-color: #7ab32f;
+    .updated {
+        animation: highlight 3s ease-out;
     }
     
-    .team-row.updated {
-        animation: highlight 2s ease-in-out;
-    }
-    
-    .team-row.new-team {
-        animation: fadeIn 2s;
+    .new-team {
+        animation: newTeamHighlight 3s ease-out;
     }
     
     .score-increased {
+        position: relative;
+    }
+    
+    .score-increased::after {
+        content: '↑';
         color: #90C83C;
         font-weight: bold;
+        margin-left: 4px;
     }
     
     @keyframes highlight {
-        0% { background-color: rgba(144, 200, 60, 0.4); }
+        0% { background-color: rgba(144, 200, 60, 0.3); }
         100% { background-color: transparent; }
     }
     
-    @keyframes fadeIn {
-        0% { opacity: 0; }
-        100% { opacity: 1; }
+    @keyframes newTeamHighlight {
+        0% { background-color: rgba(100, 149, 237, 0.3); }
+        100% { background-color: transparent; }
     }
     
-    .websocket-status {
-        margin-bottom: 15px;
-        font-size: 14px;
-        padding: 5px 10px;
-        border-radius: 4px;
-        display: inline-block;
-        color: white;
-    }
-    
-    .websocket-status.connected {
-        color: #90C83C;
-    }
-    
-    .websocket-status.disconnected, .websocket-status.error {
-        color: #dc3545;
-    }
-    
-    .websocket-status.reconnecting {
-        color: #ffc107;
-    }
-    
-    /* Override any button styles to ensure they're all green */
-    .btn, .btn-primary, button[type="submit"] {
-        background: linear-gradient(135deg, #90C83C, #7AAF2F) !important;
-        color: white !important;
-        border-color: #7AAF2F !important;
-    }
-
-    .btn:hover, .btn-primary:hover, button[type="submit"]:hover {
-        background: linear-gradient(135deg, #7AAF2F, #618825) !important;
-        color: white !important;
-        border-color: #618825 !important;
-    }
-    
-    .pulse-dot {
-        display: inline-block;
-        animation: pulse 2s infinite;
-        margin-right: 3px;
-    }
-    
-    @keyframes pulse {
-        0% { opacity: 0.3; }
-        50% { opacity: 1; }
-        100% { opacity: 0.3; }
+    /* Mobile responsive styles */
+    @media (max-width: 768px) {
+        .dashboard-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .race-select-container {
+            margin-top: 15px;
+            width: 100%;
+        }
+        
+        .lobby-selector {
+            width: 100%;
+        }
+        
+        .leaderboard-table th,
+        .leaderboard-table td {
+            padding: 8px;
+            font-size: 0.9rem;
+        }
     }
 </style>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-    // Create some test data to ensure the leaderboard isn't empty at startup only
+    // Test data to ensure the leaderboard is not empty at startup
     const testTeams = [
-        {id: 1, name: "Team A", score: 10, lobby_id: "1", lobby_name: "Test Race 1"},
-        {id: 2, name: "Team B", score: 8, lobby_id: "1", lobby_name: "Test Race 1"},
-        {id: 3, name: "Team C", score: 5, lobby_id: "2", lobby_name: "Test Race 2"}
+        { id: 1, name: "Team Alpha", score: 1500, lobby_id: "1", lobby_name: "Race A" },
+        { id: 2, name: "Team Beta", score: 1200, lobby_id: "1", lobby_name: "Race A" },
+        { id: 3, name: "Team Gamma", score: 900, lobby_id: "2", lobby_name: "Race B" }
     ];
     
-    // Connection status tracking
+    let socket;
+    let lastUpdateTime = Date.now();
     let connectionAttempts = 0;
     let usingFallback = false;
-    let lastUpdateTime = 0;
     let reconnecting = false;
-    let socket = null; // Store WebSocket reference globally
     
-    // Debug logging that can be turned on/off
     const DEBUG = true;
     function debug(message, data = null) {
         if (!DEBUG) return;
@@ -255,17 +194,6 @@
         } else {
             console.log(`[Leaderboard Debug] ${message}`);
         }
-    }
-    
-    // Update connection status display
-    function updateStatus(status, color) {
-        const statusDot = document.getElementById('status-dot');
-        const statusText = document.getElementById('connection-status');
-        if (statusDot && statusText) {
-            statusDot.style.background = color;
-            statusText.textContent = status;
-        }
-        debug(`Connection status: ${status}`);
     }
     
     // Initialize WebSocket connection
@@ -277,14 +205,11 @@
             const socketUrl = `${wsScheme}//${window.location.host}/ws/leaderboard/`;
             debug(`Attempting WebSocket connection to ${socketUrl}`);
             
-            updateStatus('Connecting to WebSocket...', '#ffcc00');
-            
             socket = new WebSocket(socketUrl);
             window.socket = socket; // Store globally for debugging
             
             socket.onopen = function() {
                 debug('WebSocket connected successfully');
-                updateStatus('WebSocket Connected', '#90C83C');
                 connectionAttempts = 0;
                 usingFallback = false;
                 reconnecting = false;
@@ -322,7 +247,6 @@
                         }
                     } else if (data.type === 'error') {
                         debug(`Server reported error: ${data.message}`, true);
-                        updateStatus(`Error: ${data.message}`, '#ff6b6b');
                     }
                 } catch (error) {
                     console.error('Error processing WebSocket message:', error);
@@ -331,7 +255,6 @@
             
             socket.onclose = function(event) {
                 debug(`WebSocket closed with code: ${event.code}, reason: ${event.reason}`);
-                updateStatus('WebSocket Disconnected - Reconnecting...', '#ffcc00');
                 
                 // Attempt to reconnect
                 reconnecting = true;
@@ -351,11 +274,9 @@
             
             socket.onerror = function(error) {
                 debug('WebSocket error', error);
-                updateStatus('WebSocket Error', '#ff6b6b');
             };
         } catch (error) {
             console.error('Error initializing WebSocket:', error);
-            updateStatus('WebSocket Failed - Using API', '#ff6b6b');
             fallbackToPolling();
         }
     }
@@ -372,7 +293,6 @@
         
         usingFallback = true;
         debug('Falling back to API polling every 3 seconds');
-        updateStatus('Using API Polling', '#ffcc00');
         
         // Start with an immediate data fetch
         fetchLeaderboardData();
@@ -395,15 +315,12 @@
                 
                 if (data.success && data.teams) {
                     updateLeaderboard(data.teams);
-                    updateStatus('Updated via API', '#90C83C');
                 } else {
                     debug('API error', data.error || 'Unknown error');
-                    updateStatus('API Error', '#ff6b6b');
                 }
             })
             .catch(error => {
                 console.error('Error fetching leaderboard data:', error);
-                updateStatus('Network Error', '#ff6b6b');
             });
     }
     
@@ -423,32 +340,6 @@
                 row.style.display = 'none';
             }
         });
-    });
-    
-    // Handle manual refresh button
-    document.getElementById('refresh-button').addEventListener('click', function() {
-        debug('Manual refresh requested');
-        
-        this.disabled = true;
-        this.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Refreshing...';
-        
-        // Method 1: Try to send a message through the WebSocket
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            debug('Requesting refresh via WebSocket');
-            socket.send(JSON.stringify({
-                action: 'get_data'
-            }));
-        } else {
-            // Method 2: Use the API endpoint as fallback
-            debug('Requesting refresh via API');
-            fetchLeaderboardData();
-        }
-        
-        // Re-enable button after a delay
-        setTimeout(() => {
-            this.disabled = false;
-            this.innerHTML = '<i class="fa fa-refresh"></i> Refresh';
-        }, 1000);
     });
     
     // Update the leaderboard with team data
@@ -550,26 +441,6 @@
                 scoreCell.classList.add('score-increased');
                 row.classList.add('updated');
                 
-                // Play sound for score update
-                try {
-                    // Create a simple tone if browser supports AudioContext
-                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = audioCtx.createOscillator();
-                    oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-                    
-                    const gainNode = audioCtx.createGain();
-                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Low volume
-                    
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                    
-                    oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + 0.1); // Short beep
-                } catch (e) {
-                    // Ignore errors with audio - it's just a nice-to-have
-                }
-                
                 setTimeout(() => {
                     row.classList.remove('updated');
                     scoreCell.classList.remove('score-increased');
@@ -608,171 +479,18 @@
             }
         }, 15000);
         
-        // Set a stronger backup refresh timer that works even if WebSocket is disconnected
-        // This will force a full API refresh every 5 seconds if no updates received
-        // Regardless of WebSocket connection status
-        const forceRefreshInterval = setInterval(function() {
-            if (Date.now() - lastUpdateTime > 5000) {
-                console.log('No updates for 5 seconds, forcing API refresh');
-                fetchLeaderboardData();
-            }
-        }, 5000);
-        
-        // Also add a manual reload timer as a last resort fallback
-        // This will reload the entire page every 60 seconds if no updates for 30 seconds
-        setInterval(function() {
-            if (Date.now() - lastUpdateTime > 30000) {
-                console.log('No updates for 30 seconds, reloading page');
-                // Add timestamp to URL to bypass cache
-                window.location.href = window.location.pathname + '?t=' + Date.now();
-            }
-        }, 60000);
-        
-        // Create a visual indicator to show sync status
-        const syncStatus = document.createElement('div');
-        syncStatus.id = 'sync-status';
-        syncStatus.style.position = 'fixed';
-        syncStatus.style.bottom = '10px';
-        syncStatus.style.right = '10px';
-        syncStatus.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        syncStatus.style.color = '#90C83C';
-        syncStatus.style.padding = '5px 10px';
-        syncStatus.style.borderRadius = '5px';
-        syncStatus.style.fontSize = '12px';
-        syncStatus.style.zIndex = '9999';
-        syncStatus.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-        syncStatus.innerHTML = 'Last update: <span id="last-update-time">just now</span>';
-        document.body.appendChild(syncStatus);
-        
-        // Update the last update time display
-        function updateSyncStatus() {
-            const timeDisplay = document.getElementById('last-update-time');
-            if (!timeDisplay) return;
-            
-            const secondsSinceUpdate = Math.floor((Date.now() - lastUpdateTime) / 1000);
-            if (secondsSinceUpdate < 5) {
-                timeDisplay.textContent = 'just now';
-                syncStatus.style.color = '#90C83C';
-            } else if (secondsSinceUpdate < 10) {
-                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
-                syncStatus.style.color = '#90C83C';
-            } else if (secondsSinceUpdate < 30) {
-                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
-                syncStatus.style.color = '#FFC107'; // Yellow warning
-            } else {
-                timeDisplay.textContent = secondsSinceUpdate + ' seconds ago';
-                syncStatus.style.color = '#DC3545'; // Red warning
+        // Check if there's a race ID in the URL and select it
+        const urlParams = new URLSearchParams(window.location.search);
+        const raceId = urlParams.get('race');
+        if (raceId) {
+            const lobbySelect = document.getElementById('lobby-select');
+            if (lobbySelect) {
+                lobbySelect.value = raceId;
+                // Trigger the change event to filter teams
+                const event = new Event('change');
+                lobbySelect.dispatchEvent(event);
             }
         }
-        
-        // Update sync status every second
-        setInterval(updateSyncStatus, 1000);
-        
-        // Add auto-refresh button with countdown
-        const autoRefreshBtn = document.createElement('button');
-        autoRefreshBtn.id = 'auto-refresh-toggle';
-        autoRefreshBtn.className = 'btn btn-sm';
-        autoRefreshBtn.style.backgroundColor = 'rgba(144, 200, 60, 0.2)';
-        autoRefreshBtn.style.color = '#90C83C';
-        autoRefreshBtn.style.border = 'none';
-        autoRefreshBtn.style.borderRadius = '50px';
-        autoRefreshBtn.style.padding = '5px 10px';
-        autoRefreshBtn.style.fontSize = '0.9rem';
-        autoRefreshBtn.style.marginLeft = '10px';
-        autoRefreshBtn.innerHTML = '<i class="fa fa-clock-o"></i> Auto <span id="refresh-countdown">5</span>s';
-        
-        // Insert after the refresh button
-        const refreshBtn = document.getElementById('refresh-button');
-        if (refreshBtn && refreshBtn.parentNode) {
-            refreshBtn.parentNode.insertBefore(autoRefreshBtn, refreshBtn.nextSibling);
-            
-            // Set countdown timer that refreshes every 5 seconds
-            let countdown = 5;
-            const countdownInterval = setInterval(function() {
-                countdown--;
-                const countdownEl = document.getElementById('refresh-countdown');
-                if (countdownEl) {
-                    countdownEl.textContent = countdown;
-                }
-                
-                if (countdown <= 0) {
-                    // Reset countdown
-                    countdown = 5;
-                    
-                    // Force refresh
-                    fetchLeaderboardData();
-                }
-            }, 1000);
-        }
-        
-        // Add visual notification when scores update
-        function showScoreUpdateNotification() {
-            // Create a notification element
-            const notification = document.createElement('div');
-            notification.id = 'score-update-notification';
-            notification.style.position = 'fixed';
-            notification.style.top = '20px';
-            notification.style.left = '50%';
-            notification.style.transform = 'translateX(-50%)';
-            notification.style.backgroundColor = 'rgba(144, 200, 60, 0.9)';
-            notification.style.color = 'white';
-            notification.style.padding = '10px 20px';
-            notification.style.borderRadius = '5px';
-            notification.style.fontWeight = 'bold';
-            notification.style.boxShadow = '0 3px 10px rgba(0, 0, 0, 0.2)';
-            notification.style.zIndex = '10000';
-            notification.style.opacity = '0';
-            notification.style.transition = 'opacity 0.3s ease-in-out';
-            notification.textContent = 'Scores Updated!';
-            
-            // Add to the document
-            document.body.appendChild(notification);
-            
-            // Fade in
-            setTimeout(() => {
-                notification.style.opacity = '1';
-            }, 10);
-            
-            // Fade out and remove after 3 seconds
-            setTimeout(() => {
-                notification.style.opacity = '0';
-                setTimeout(() => {
-                    if (document.body.contains(notification)) {
-                        document.body.removeChild(notification);
-                    }
-                }, 300);
-            }, 3000);
-        }
-        
-        // Override updateLeaderboard to show notification when scores change
-        const originalUpdateLeaderboard = updateLeaderboard;
-        updateLeaderboard = function(teams) {
-            // Get current scores before update
-            const currentScores = {};
-            document.querySelectorAll('.team-row').forEach(row => {
-                const teamId = row.getAttribute('data-team-id');
-                const scoreEl = row.querySelector('.team-score');
-                if (teamId && scoreEl) {
-                    currentScores[teamId] = parseInt(scoreEl.textContent) || 0;
-                }
-            });
-            
-            // Call the original function
-            originalUpdateLeaderboard(teams);
-            
-            // Check if any scores changed
-            let scoresChanged = false;
-            teams.forEach(team => {
-                if (currentScores[team.id] !== undefined && team.score !== currentScores[team.id]) {
-                    scoresChanged = true;
-                }
-            });
-            
-            // Show notification if scores changed
-            if (scoresChanged) {
-                showScoreUpdateNotification();
-            }
-        };
     });
 </script>
 {% endblock %}
