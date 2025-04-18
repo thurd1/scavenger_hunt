@@ -258,10 +258,14 @@
     
     // Handle lobby selection filtering
     document.getElementById('lobby-select').addEventListener('change', function() {
-        const selectedLobbyId = this.value;
-        const teamRows = document.querySelectorAll('.team-row');
-        
+        filterTeamsByLobby(this.value);
+    });
+    
+    // Filter teams by selected lobby
+    function filterTeamsByLobby(selectedLobbyId) {
         debug(`Filtering by lobby: ${selectedLobbyId}`);
+        
+        const teamRows = document.querySelectorAll('.team-row');
         
         teamRows.forEach(row => {
             const lobbyId = row.dataset.lobbyId;
@@ -272,7 +276,7 @@
                 row.style.display = 'none';
             }
         });
-    });
+    }
     
     // Update the leaderboard with team data
     function updateLeaderboard(teams) {
@@ -399,12 +403,20 @@
         // Start with test data to ensure something is displayed
         updateLeaderboard(testTeams);
         
+        // Apply initial filter based on selected lobby
+        const initialLobby = document.getElementById('lobby-select').value;
+        filterTeamsByLobby(initialLobby);
+        
         // Initialize periodic updates
         fetchLeaderboardData();
         
         // Set up periodic refresh every 5 seconds
         setInterval(function() {
             fetchLeaderboardData();
+            
+            // Re-apply filter after each data refresh
+            const selectedLobby = document.getElementById('lobby-select').value;
+            filterTeamsByLobby(selectedLobby);
         }, 5000);
     });
 </script>
