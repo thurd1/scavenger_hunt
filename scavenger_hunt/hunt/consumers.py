@@ -594,6 +594,21 @@ class RaceConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error in RaceConsumer.race_started: {str(e)}")
 
+    async def race_update(self, event):
+        """Handle race update message"""
+        # Forward the update to the WebSocket
+        await self.send(text_data=json.dumps(event))
+    
+    async def team_score_update(self, event):
+        """Handle team score update message"""
+        # Forward the team score update to the WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'team_score_update',
+            'team_id': event.get('team_id'),
+            'team_name': event.get('team_name'),
+            'score': event.get('score')
+        }))
+
 class LeaderboardConsumer(AsyncWebsocketConsumer):
     """
     Consumer for the leaderboard page.
