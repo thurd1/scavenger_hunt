@@ -449,6 +449,12 @@ input.max-attempts-reached {
     background-color: rgba(220, 53, 69, 0.3);
     color: #ff6b6b;
 }
+
+.correct-answer {
+    background-color: rgba(40, 167, 69, 0.1) !important;
+    border-color: rgba(40, 167, 69, 0.3) !important;
+    color: rgba(255, 255, 255, 0.7) !important;
+}
 </style>
 
 <script>
@@ -926,38 +932,29 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initially hide navigation buttons - they'll only show after correct answer or photo upload
         document.getElementById('navigation-buttons').style.display = 'none';
         
+        // Track if we're on the last question
+        let isLastQuestion = false;
+        
+        // Check if we're on the last question
+        isLastQuestion = currentQuestionIndex + 1 >= totalQuestions;
+        
+        // Check if we're returning to a page with max attempts already reached
+        checkMaxAttemptsOnLoad();
+        
         // Next button event listener
         document.getElementById('next-question').addEventListener('click', function() {
-            // Check if this button has a redirect URL (set by photo upload response)
-            const redirectUrl = this.getAttribute('data-next-url');
-            if (redirectUrl) {
-                console.log("Redirecting to:", redirectUrl);
-                window.location.href = redirectUrl;
-                return;
-            }
-            
-            if (currentQuestionIndex < totalQuestions - 1) {
-                questions[currentQuestionIndex].style.display = 'none';
-                currentQuestionIndex++;
-                questions[currentQuestionIndex].style.display = 'block';
-                updateQuestionCounter();
+            // If this is the last question, redirect to race completion
+            if (isLastQuestion) {
+                // Get the current total score
+                const currentScore = document.getElementById('total-score').textContent;
                 
-                // Save current question index to server
-                saveCurrentQuestionIndex(currentQuestionIndex);
+                // Store the total score in session storage before redirecting
+                sessionStorage.setItem('final_score', currentScore);
                 
-                // IMPORTANT: Hide navigation buttons for new question until it's answered correctly or photo uploaded
-                const questionId = questions[currentQuestionIndex].id.split('-')[1];
-                if (questionData[questionId] && !questionData[questionId].answered && !questionData[questionId].photoUploaded) {
-                    document.getElementById('navigation-buttons').style.display = 'none';
-                    console.log('Moving to next question, hiding navigation buttons');
-                } else {
-                    console.log('Moving to next question that is already answered or has photo, showing navigation buttons');
-                }
-            } else {
-                // This is the last question and we're trying to go beyond it
                 // Redirect to race completion page
-                console.log("Last question completed, redirecting to race completion page");
-                window.location.href = "/race-complete/";
+                window.location.href = "{% url 'race_complete' %}?score=" + currentScore;
+            } else {
+                moveToQuestion(currentQuestionIndex + 1);
             }
         });
         
@@ -1247,8 +1244,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitButton.disabled = true;
             }
             
-            // Show navigation buttons to move to next question
-            document.getElementById('navigation-buttons').style.display = 'block';
+            // Hide navigation buttons since we have our own Next Question button
+            document.getElementById('navigation-buttons').style.display = 'none';
         };
         
         // Add event listeners to upload photo buttons
@@ -1258,12 +1255,84 @@ document.addEventListener('DOMContentLoaded', function() {
                 moveToNextQuestion();
             });
         });
+
+        // Store information about which questions have already been attempted
+        function checkQuestionStatus() {
+            for (const questionId in questionData) {
+                // If max attempts reached
+                if (questionData[questionId] && questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
+                    // Disable the input and submit button
+                    const answerInput = document.getElementById(`answer-${questionId}`);
+                    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+                    
+                    if (answerInput) {
+                        answerInput.disabled = true;
+                        answerInput.placeholder = 'Maximum attempts reached';
+                    }
+                    
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
+                    
+                    // Show the max attempts reached message
+                    showPhotoUpload(questionId);
+                }
+                // If already answered correctly
+                else if (questionData[questionId] && questionData[questionId].answered) {
+                    // Disable the input and submit button
+                    const answerInput = document.getElementById(`answer-${questionId}`);
+                    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+                    
+                    if (answerInput) {
+                        answerInput.disabled = true;
+                        answerInput.value = 'Correct answer submitted';
+                        answerInput.classList.add('correct-answer');
+                    }
+                    
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
+                    
+                    // Show feedback
+                    const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                    if (feedbackElement) {
+                        feedbackElement.className = 'feedback correct';
+                        feedbackElement.style.display = 'block';
+                        feedbackElement.textContent = `Correct! You earned ${questionData[questionId].points} points.`;
+                    }
+                    
+                    // Show navigation buttons
+                    document.getElementById('navigation-buttons').style.display = 'block';
+                }
+                
+                // Update the attempts display
+                const attemptsElement = document.getElementById(`attempts-${questionId}`);
+                if (attemptsElement && questionData[questionId]) {
+                    attemptsElement.textContent = questionData[questionId].attempts;
+                }
+            }
+        }
+
+        // Add to the document.addEventListener('DOMContentLoaded', function() { ... });
+        checkQuestionStatus();
     }
     
     // Remove the photo upload processing code
     // Add function to move to next question
     function moveToNextQuestion() {
-        moveToQuestion(currentQuestionIndex + 1);
+        // If this is the last question, redirect to race completion
+        if (isLastQuestion) {
+            // Get the current total score
+            const currentScore = document.getElementById('total-score').textContent;
+            
+            // Store the total score in session storage before redirecting
+            sessionStorage.setItem('final_score', currentScore);
+            
+            // Redirect to race completion page
+            window.location.href = "{% url 'race_complete' %}?score=" + currentScore;
+        } else {
+            moveToQuestion(currentQuestionIndex + 1);
+        }
     }
 
     // Add a new function to periodically update the score from the server
@@ -1477,6 +1546,23 @@ document.addEventListener('DOMContentLoaded', function() {
                         window.location.href = "{% url 'race_complete' %}?score=" + currentScore;
                     }
                 );
+            }
+        }
+    }
+
+    // Add a function to check max attempts on page load
+    function checkMaxAttemptsOnLoad() {
+        const questionId = currentQuestionIndex;
+        
+        // Check if max attempts reached for current question
+        if (questionData[questionId] && questionData[questionId].attempts >= questionData[questionId].maxAttempts) {
+            // Hide navigation buttons
+            document.getElementById('navigation-buttons').style.display = 'none';
+            
+            // Show the max attempts message
+            const photoUploadElement = document.getElementById(`photo-upload-${questionId}`);
+            if (photoUploadElement) {
+                photoUploadElement.style.display = 'block';
             }
         }
     }
