@@ -14,7 +14,7 @@
             <!-- Lobby Selector -->
             <div class="lobby-selector mb-5">
                 <label for="lobby-select" class="mb-3" style="color: #90C83C; display: block; font-size: 1.2rem;">Select Race:</label>
-                <select id="lobby-select" class="form-control custom-select" onchange="filterByLobby(this.value)">
+                <select id="lobby-select" class="form-control custom-select">
                     <option value="all" selected>All Races</option>
                     {% for lobby in lobbies %}
                         <option value="{{ lobby.id }}">{{ lobby.race.name }} (Code: {{ lobby.code }})</option>
@@ -241,6 +241,13 @@
     // Initialize and set up data fetching
     document.addEventListener('DOMContentLoaded', function() {
         console.log('📋 Leaderboard page loaded');
+        
+        // Set up the lobby select change handler
+        document.getElementById('lobby-select').addEventListener('change', function() {
+            const selectedLobbyId = this.value;
+            console.log(`Lobby selection changed to: ${selectedLobbyId}`);
+            filterByLobby(selectedLobbyId);
+        });
         
         // Check data-lobby-id attributes on load
         const rows = document.querySelectorAll('#leaderboard-body tr.team-row');
