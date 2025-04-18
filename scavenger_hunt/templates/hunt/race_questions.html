@@ -610,7 +610,7 @@ window.updateTimerDisplay = function(timeRemainingSeconds) {
         
         // Redirect to results page after a short delay
         setTimeout(() => {
-            window.location.href = "{% url 'race_complete' race.id %}";
+            window.location.href = "{% url 'race_complete' %}";
         }, 3000);
     }
 };
