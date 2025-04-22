@@ -667,20 +667,6 @@ class LeaderboardConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logging.error(f"Error processing message in LeaderboardConsumer: {str(e)}")
     
-    async def team_score_update(self, event):
-        """Handle team score update message"""
-        try:
-            # Forward the team score update to the WebSocket
-            await self.send(text_data=json.dumps({
-                'type': 'team_score_update',
-                'team_id': event.get('team_id'),
-                'team_name': event.get('team_name'),
-                'score': event.get('score')
-            }))
-            logging.info(f"Sent team score update for team {event.get('team_id')} to leaderboard client")
-        except Exception as e:
-            logging.error(f"Error in team_score_update handler: {str(e)}")
-    
     async def leaderboard_update(self, event):
         """Handle leaderboard update message"""
         try:
