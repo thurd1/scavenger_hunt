@@ -1,4 +1,3 @@
-
 # Scavenger Hunt Application Hierarchy
 
 ## Player Flow (Student/Participant)
@@ -85,3 +84,47 @@ https://docs.djangoproject.com/en/stable/ref/contrib/admin/
 
 Web Socket:
 https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
+
+# Migration Fix Instructions
+
+If you encounter migration errors related to duplicate columns, you can use the included management commands to fix them.
+
+## For duplicated `updated_at` column in Lobby table
+If you see an error like: `duplicate column name: updated_at`, run:
+
+```bash
+python manage.py fake_migration
+```
+
+## For duplicated `photo_questions_completed` column in TeamRaceProgress table
+If you see an error like: `duplicate column name: photo_questions_completed`, run:
+
+```bash
+python manage.py fake_photo_migration
+```
+
+These commands will mark the problematic migrations as applied in the database without actually running them, allowing you to continue using the application.
+
+## Checking migration status
+To check the status of migrations:
+
+```bash
+python manage.py showmigrations hunt
+```
+
+## Database structure
+To verify the columns in a specific table:
+
+```bash
+# For sqlite3 databases
+python -c "import sqlite3; conn = sqlite3.connect('db.sqlite3'); cursor = conn.cursor(); cursor.execute('PRAGMA table_info(hunt_teamraceprogress)'); columns = cursor.fetchall(); [print(column) for column in columns]; conn.close()"
+```
+
+## After fixing migrations
+Once you've successfully fixed the migrations, you should be able to run:
+
+```bash
+python manage.py migrate
+```
+
+Without encountering any duplicate column errors.
