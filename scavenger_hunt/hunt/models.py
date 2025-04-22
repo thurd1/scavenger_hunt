@@ -18,6 +18,7 @@ class Lobby(models.Model):
     is_active = models.BooleanField(default=True)
     hunt_started = models.BooleanField(default=False)
     start_time = models.DateTimeField(null=True, blank=True)
+    hunt_start_time = models.DateTimeField(null=True, blank=True)
     race = models.ForeignKey('Race', on_delete=models.SET_NULL, null=True, blank=True)
 
     def save(self, *args, **kwargs):
@@ -29,6 +30,7 @@ class Lobby(models.Model):
                     break
         if self.hunt_started and not self.start_time:
             self.start_time = timezone.now()
+            self.hunt_start_time = self.start_time
         super().save(*args, **kwargs)
 
     def __str__(self):
