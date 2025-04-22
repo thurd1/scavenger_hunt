@@ -1104,9 +1104,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // --- NAVIGATION EVENT LISTENERS ---
         // Next button event listener
-        document.getElementById('next-question').addEventListener('click', function(e) {
-            e.preventDefault(); // Prevent the default button behavior
-            
+        document.getElementById('next-question').addEventListener('click', function() {
             // Check if this button has a redirect URL (set by photo upload response)
             const redirectUrl = this.getAttribute('data-next-url');
             if (redirectUrl) {
@@ -1116,19 +1114,20 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             if (currentQuestionIndex < totalQuestions - 1) {
-                // COMPLETELY NEW APPROACH: Force a full server round-trip with new URL parameters
-                // This bypasses client-side navigation entirely and ensures clean question state
+                // Move to next question 
                 const nextIndex = currentQuestionIndex + 1;
                 
-                // Create a URL with force_index parameter
-                const url = new URL(window.location.href);
-                url.searchParams.set('force_index', nextIndex);
-                url.searchParams.set('fresh_load', Date.now()); // Cache-busting parameter
+                // Save current question index to server
+                saveCurrentQuestionIndex(nextIndex);
                 
-                console.log(`Navigating to question ${nextIndex} via server redirect`);
+                // CRITICAL FIX: Force page reload to ensure clean question state
+                // This is the most reliable way to ensure no state leakage between questions
+                console.log(`Moving to question index ${nextIndex}, reloading page...`);
                 
-                // Redirect to the new URL, forcing a complete page reload
-                window.location.href = url.toString();
+                // Wait for the server save to complete before reloading
+                setTimeout(() => {
+                    window.location.reload();
+                }, 100);
             } else {
                 // This is the last question and we're trying to go beyond it
                 // Redirect to race completion page

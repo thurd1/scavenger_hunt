@@ -1983,7 +1983,6 @@ def race_questions(request, race_id):
     # Process query parameters first
     team_code = request.GET.get('team_code')
     player_name_param = request.GET.get('player_name')
-    force_index = request.GET.get('force_index')  # New parameter for direct question navigation
     
     # Get player name from session or query parameter
     player_name = request.session.get('player_name') or player_name_param
@@ -2078,44 +2077,8 @@ def race_questions(request, race_id):
     total_points = 0
     
     if team_race_progress:
-        # If force_index is provided in URL, use it instead
-        if force_index is not None:
-            try:
-                force_index_int = int(force_index)
-                # Verify it's within valid range
-                if 0 <= force_index_int < questions.count():
-                    # Update the TeamRaceProgress with the forced index
-                    team_race_progress.current_question_index = force_index_int
-                    team_race_progress.save()
-                    current_question_index = force_index_int
-                    print(f"FORCED question index to {force_index_int} for team {team.id} in race {race.id}")
-                else:
-                    current_question_index = team_race_progress.current_question_index
-            except ValueError:
-                current_question_index = team_race_progress.current_question_index
-        else:
-            current_question_index = team_race_progress.current_question_index
-        
+        current_question_index = team_race_progress.current_question_index
         total_points = team_race_progress.total_points
-    elif force_index is not None:
-        # If we don't have progress but force_index is provided, create new progress
-        try:
-            force_index_int = int(force_index)
-            if 0 <= force_index_int < questions.count():
-                team_race_progress = TeamRaceProgress.objects.create(
-                    team=team,
-                    race=race,
-                    current_question_index=force_index_int,
-                    total_points=0
-                )
-                current_question_index = force_index_int
-                print(f"Created new progress with index {force_index_int} for team {team.id} in race {race.id}")
-        except ValueError:
-            pass
-    
-    # Add a timestamp to indicate when the page was rendered
-    # This helps avoid caching issues
-    timestamp = int(time.time())
     
     context = {
         'race': race,
@@ -2125,17 +2088,10 @@ def race_questions(request, race_id):
         'questions_by_zone': questions_by_zone,
         'answers_by_question': answers_by_question,
         'current_question_index': current_question_index,
-        'total_points': total_points,
-        'timestamp': timestamp  # Add timestamp to context
+        'total_points': total_points
     }
     
-    # Set a special header to indicate this is a fresh page load
-    response = render(request, 'hunt/race_questions.html', context)
-    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    response['Pragma'] = 'no-cache'
-    response['Expires'] = '0'
-    
-    return response
+    return render(request, 'hunt/race_questions.html', context)
 
 def check_race_status(request, race_id):
     """Check if the race has started - called by client-side polling"""
