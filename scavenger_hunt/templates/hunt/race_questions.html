@@ -1104,7 +1104,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // --- NAVIGATION EVENT LISTENERS ---
         // Next button event listener
-        document.getElementById('next-question').addEventListener('click', function() {
+        document.getElementById('next-question').addEventListener('click', function(e) {
+            e.preventDefault(); // Prevent the default button behavior
+            
             // Check if this button has a redirect URL (set by photo upload response)
             const redirectUrl = this.getAttribute('data-next-url');
             if (redirectUrl) {
@@ -1114,20 +1116,19 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             if (currentQuestionIndex < totalQuestions - 1) {
-                // Move to next question 
+                // COMPLETELY NEW APPROACH: Force a full server round-trip with new URL parameters
+                // This bypasses client-side navigation entirely and ensures clean question state
                 const nextIndex = currentQuestionIndex + 1;
                 
-                // Save current question index to server
-                saveCurrentQuestionIndex(nextIndex);
+                // Create a URL with force_index parameter
+                const url = new URL(window.location.href);
+                url.searchParams.set('force_index', nextIndex);
+                url.searchParams.set('fresh_load', Date.now()); // Cache-busting parameter
                 
-                // CRITICAL FIX: Force page reload to ensure clean question state
-                // This is the most reliable way to ensure no state leakage between questions
-                console.log(`Moving to question index ${nextIndex}, reloading page...`);
+                console.log(`Navigating to question ${nextIndex} via server redirect`);
                 
-                // Wait for the server save to complete before reloading
-                setTimeout(() => {
-                    window.location.reload();
-                }, 100);
+                // Redirect to the new URL, forcing a complete page reload
+                window.location.href = url.toString();
             } else {
                 // This is the last question and we're trying to go beyond it
                 // Redirect to race completion page
@@ -1428,7 +1429,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Set the question's input field as read-only to prevent further attempts
-            const answerInput = document.getElementById(`answer-${questionId}`);
+                const answerInput = document.getElementById(`answer-${questionId}`);
             if (answerInput) {
                 answerInput.readOnly = true;
                 answerInput.classList.add('max-attempts-reached');
@@ -1474,9 +1475,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const timerDisplay = document.getElementById('race-timer');
             if (!timerDisplay) {
                 console.error('Timer display element not found!');
-            return;
-        }
-        
+                    return;
+                }
+                
             // Try to get stored start time first
             let startTime;
             try {
