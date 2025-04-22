@@ -651,7 +651,7 @@ def create_team(request, lobby_id):
             
             # Store team info in session
             request.session['team_id'] = team.id
-            messages.success(request, f'Team created! Your team code is: {team.code}')
+            request.session['team_code'] = team.code  # Store code in session instead of showing as message
             return redirect('view_team', team_id=team.id)
     else:
         form = TeamForm()

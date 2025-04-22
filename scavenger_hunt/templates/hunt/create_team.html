@@ -13,9 +13,9 @@
             </div>
         </div>
 
-        {% if messages %}
+        {% if filtered_messages %}
         <div class="messages">
-            {% for message in messages %}
+            {% for message in filtered_messages %}
             <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">
                 {{ message }}
             </div>

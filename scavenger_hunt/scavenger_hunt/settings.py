@@ -49,6 +49,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'hunt.context_processors.player_name',
+                'hunt.context_processors.filter_team_creation_messages',
             ],
         },
     },

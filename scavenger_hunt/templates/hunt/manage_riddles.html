@@ -13,9 +13,9 @@
         <h1>Manage Races</h1>
     </div>
 
-    {% if messages %}
+    {% if filtered_messages %}
     <div class="messages-container">
-        {% for message in messages %}
+        {% for message in filtered_messages %}
         <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %}">
             {{ message }}
         </div>

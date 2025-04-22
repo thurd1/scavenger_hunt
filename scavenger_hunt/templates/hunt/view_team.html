@@ -281,6 +281,32 @@
         box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
         transform: translateY(-2px);
 }
+
+.team-code-container {
+    background: rgba(25, 25, 40, 0.7);
+    border-radius: 15px;
+    padding: 15px;
+    margin-bottom: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.team-code-display {
+    padding: 10px;
+}
+
+.code-highlight {
+    font-weight: bold;
+    color: var(--accent);
+    letter-spacing: 2px;
+    font-size: 1.2em;
+}
+
+.team-code-info {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9em;
+    margin-top: 5px;
+}
 </style>
 {% endblock %}
 
@@ -293,6 +319,16 @@
 {% block content %}
 <div class="team-dashboard">
     <h2 class="team-name">{{ team.name }}</h2>
+
+    <!-- Add team code display -->
+    {% if request.session.team_code %}
+    <div class="team-code-container">
+        <div class="team-code-display">
+            <h3>Team Code: <span class="code-highlight">{{ request.session.team_code }}</span></h3>
+            <p class="team-code-info">Share this code with others to let them join your team</p>
+        </div>
+    </div>
+    {% endif %}
 
     <div class="race-status">
         <h3 class="race-status-title">Race Status</h3>
