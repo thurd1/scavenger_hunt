@@ -112,9 +112,10 @@
             {% csrf_token %}
             <input type="hidden" id="questionId" name="question_id" value="">
             
-            <div id="noZonesWarning" style="display:none; background-color: #52341c; color: #ffc107; border: 1px solid #6e5c22; margin-bottom: 15px; padding: 10px; border-radius: 5px;">
+            <!-- Hidden loading indicator, only shown programmatically when needed -->
+            <div id="zoneCreationIndicator" style="display:none; background-color: #52341c; color: #ffc107; border: 1px solid #6e5c22; margin-bottom: 15px; padding: 10px; border-radius: 5px; text-align: center;">
                 <strong>Creating default zone...</strong> 
-                <div class="loading-spinner" style="margin-top: 8px; text-align: center;">
+                <div class="loading-spinner" style="margin-top: 8px;">
                     <i class="fas fa-spinner fa-spin" style="color: #ffc107; font-size: 1.5rem;"></i>
                 </div>
             </div>
@@ -707,21 +708,47 @@ function showAddQuestionModal() {
     
     // Check if zones exist and automatically create one if not
     {% if not zones %}
-    // Show loading state in the modal before creating zone
     document.getElementById('questionModal').style.display = 'block';
     document.getElementById('questionSubmitBtn').disabled = true;
-    document.getElementById('questionSubmitBtn').innerHTML = 'Creating zone...';
+    document.getElementById('zoneCreationIndicator').style.display = 'block';
     
     // Automatically create a default zone
-    createDefaultZone().then(() => {
-        // Once zone is created, hide warning and enable submit button
-        document.getElementById('noZonesWarning').style.display = 'none';
-        document.getElementById('questionSubmitBtn').disabled = false;
-        document.getElementById('questionSubmitBtn').innerHTML = 'Add Question';
-    });
+    createDefaultZone();
     {% else %}
     document.getElementById('questionModal').style.display = 'block';
     {% endif %}
+}
+
+// Function to create a default zone
+function createDefaultZone() {
+    // Create form data
+    const formData = new FormData();
+    formData.append('name', 'Default Zone');
+    formData.append('location', 'Default Location');
+    
+    fetch(`/race/{{ race.id }}/add-zone/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the zone select value with the new zone ID
+            document.getElementById('zoneSelect').value = data.zone.id;
+            // Hide the loading indicator and enable the submit button
+            document.getElementById('zoneCreationIndicator').style.display = 'none';
+            document.getElementById('questionSubmitBtn').disabled = false;
+        } else {
+            alert('Error creating zone: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to create zone. Please try again.');
+    });
 }
 
 function editQuestion(questionId, questionText, questionAnswer, zoneId) {
@@ -891,41 +918,6 @@ function toggleRaceStatus() {
     .catch(error => {
         console.error('Error:', error);
         alert('Failed to toggle race status. Please try again.');
-    });
-}
-
-// Function to create a default zone
-function createDefaultZone() {
-    // Create form data
-    const formData = new FormData();
-    formData.append('name', 'Default Zone');
-    formData.append('location', 'Default Location');
-    
-    return fetch(`/race/{{ race.id }}/add-zone/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Update the zone select value with the new zone ID
-            document.getElementById('zoneSelect').value = data.zone.id;
-            // Console log for debugging
-            console.log('Default zone created with ID:', data.zone.id);
-            return data;
-        } else {
-            console.error('Error creating zone:', data.error);
-            alert('Error creating zone: ' + data.error);
-            throw new Error(data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to create zone. Please try again.');
-        throw error;
     });
 }
 </script>
