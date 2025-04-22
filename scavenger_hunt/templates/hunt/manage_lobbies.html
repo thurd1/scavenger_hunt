@@ -7,6 +7,16 @@
         <h1>Game Lobby Management</h1>
     </div>
 
+    {% if messages %}
+    <div class="messages-container">
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="lobbies-section">
         <h2 class="section-title">Active Lobbies</h2>
         <div class="lobbies-grid">
@@ -89,6 +99,40 @@
 .page-header h1 {
     color: #90C83C;
     margin: 0;
+}
+
+.messages-container {
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.alert {
+    padding: 12px;
+    margin-bottom: 15px;
+    border-radius: 5px;
+    text-align: center;
+    box-sizing: border-box;
+    width: 100%;
+    font-size: 1rem;
+    line-height: 1.4;
+}
+
+.alert-danger, .alert-error {
+    background-color: #52181c;
+    color: #ff6b6b;
+    border: 1px solid #6e1c22;
+}
+
+.alert-success {
+    background-color: #1c4d23;
+    color: #90C83C;
+    border: 1px solid #2a632f;
+}
+
+.alert-info {
+    background-color: #1d3c4d;
+    color: #5bc0de;
+    border: 1px solid #2a546f;
 }
 
 .section-title {
