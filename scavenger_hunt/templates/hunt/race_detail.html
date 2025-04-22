@@ -111,6 +111,14 @@
         <form id="questionForm" method="POST" action="{% url 'add_question' race.id %}">
             {% csrf_token %}
             <input type="hidden" id="questionId" name="question_id" value="">
+            
+            <div id="noZonesWarning" style="{% if zones %}display:none;{% endif %} background-color: #52341c; color: #ffc107; border: 1px solid #6e5c22; margin-bottom: 15px; padding: 10px; border-radius: 5px;">
+                <strong>Warning:</strong> You need to create at least one zone before adding questions. 
+                <button type="button" onclick="createDefaultZone()" class="btn" style="background: #ffc107; color: #000; margin-top: 8px; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer;">
+                    Create Default Zone
+                </button>
+            </div>
+
             <div class="form-group">
                 <label for="questionText">Question</label>
                 <textarea id="questionText" name="text" required class="form-control"></textarea>
@@ -121,7 +129,7 @@
             </div>
             <input type="hidden" id="zoneSelect" name="zone" value="{% if zones %}{{ zones.0.id }}{% endif %}">
             <div class="modal-buttons">
-                <button type="submit" class="submit-btn" id="questionSubmitBtn">Add Question</button>
+                <button type="submit" class="submit-btn" id="questionSubmitBtn" {% if not zones %}disabled{% endif %}>Add Question</button>
                 <button type="button" class="cancel-btn" onclick="closeQuestionModal()">Cancel</button>
             </div>
         </form>
@@ -866,6 +874,41 @@ function toggleRaceStatus() {
     .catch(error => {
         console.error('Error:', error);
         alert('Failed to toggle race status. Please try again.');
+    });
+}
+
+// Function to create a default zone
+function createDefaultZone() {
+    // Create form data
+    const formData = new FormData();
+    formData.append('name', 'Default Zone');
+    formData.append('location', 'Default Location');
+    
+    fetch(`/race/{{ race.id }}/add-zone/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the zone select value with the new zone ID
+            document.getElementById('zoneSelect').value = data.zone.id;
+            // Enable the submit button
+            document.getElementById('questionSubmitBtn').disabled = false;
+            // Hide the warning
+            document.getElementById('noZonesWarning').style.display = 'none';
+            // Show success message
+            alert('Default zone created! You can now add questions.');
+        } else {
+            alert('Error creating zone: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to create zone. Please try again.');
     });
 }
 </script>
