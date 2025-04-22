@@ -773,6 +773,7 @@ function showRaceConnectionStatus(status, message) {
         statusElement.style.borderRadius = '5px';
         statusElement.style.fontSize = '12px';
         statusElement.style.zIndex = '1000';
+        statusElement.style.display = 'none'; // Hide by default
         document.body.appendChild(statusElement);
     }
     
@@ -782,21 +783,19 @@ function showRaceConnectionStatus(status, message) {
         case 'connected':
             statusElement.style.backgroundColor = 'rgba(40, 167, 69, 0.8)';
             statusElement.style.color = 'white';
-            setTimeout(() => {
-                statusElement.style.display = 'none';
-            }, 3000);
+            statusElement.style.display = 'none'; // Always hide connected status
             break;
         case 'reconnecting':
             statusElement.style.backgroundColor = 'rgba(255, 193, 7, 0.8)';
             statusElement.style.color = 'black';
-            statusElement.style.display = 'block';
+            statusElement.style.display = 'none'; // Hide reconnecting status
             break;
         case 'error':
         case 'closed':
         case 'failed':
             statusElement.style.backgroundColor = 'rgba(220, 53, 69, 0.8)';
             statusElement.style.color = 'white';
-            statusElement.style.display = 'block';
+            statusElement.style.display = 'none'; // Hide error status
             break;
     }
 }
