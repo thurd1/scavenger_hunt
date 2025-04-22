@@ -1072,7 +1072,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('navigation-buttons').style.display = 'block';
             console.log('Showing navigation buttons based on question state');
         } else {
-        // Initially hide navigation buttons - they'll only show after correct answer or photo upload
+        // Initially hide navigation buttons - they'll only show after correct answer or photo uploaded
         document.getElementById('navigation-buttons').style.display = 'none';
             console.log('Hiding navigation buttons');
         }
@@ -1100,14 +1100,64 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Also save to localStorage
                 saveGameState();
                 
-                // IMPORTANT: Hide navigation buttons for new question until it's answered correctly or photo uploaded
+                // IMPORTANT: Verify the next question state with server data
                 const questionId = questions[currentQuestionIndex].id.split('-')[1];
-                if (questionData[questionId] && !questionData[questionId].answered && !questionData[questionId].photoUploaded && 
-                    questionData[questionId].attempts < questionData[questionId].maxAttempts) {
+                const dbQuestionId = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`)?.getAttribute('data-db-question-id');
+                
+                // Reset question state to match the server data only
+                if (dbQuestionId && answersFromServer[dbQuestionId]) {
+                    // Use server data to set state (not localStorage)
+                    const serverData = answersFromServer[dbQuestionId];
+                    questionData[questionId].answered = serverData.answered || false;
+                    questionData[questionId].points = serverData.points || 0;
+                    questionData[questionId].attempts = serverData.attempts || 0;
+                    questionData[questionId].photoUploaded = serverData.photo_uploaded || false;
+                    
+                    // Update UI to match the verified state
+                    updateAttemptsDisplay(questionId);
+                    
+                    const feedbackElement = document.getElementById(`feedback-${questionId}`);
+                    const submitButton = document.querySelector(`.submit-answer[data-question-id="${questionId}"]`);
+                    
+                    // Clear any previous feedback
+                    if (feedbackElement) {
+                        feedbackElement.style.display = 'none';
+                        feedbackElement.className = '';
+                        feedbackElement.textContent = '';
+                    }
+                    
+                    // Reset the submit button
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = "Submit Answer";
+                    }
+                    
+                    // Only if server confirms it's answered, show as answered
+                    if (serverData.answered) {
+                        if (feedbackElement) {
+                            feedbackElement.className = 'feedback correct';
+                            feedbackElement.style.display = 'block';
+                            feedbackElement.textContent = `Correct! You earned ${serverData.points} points.`;
+                        }
+                        
+                        if (submitButton) {
+                            submitButton.disabled = true;
+                        }
+                        
+                        document.getElementById('navigation-buttons').style.display = 'block';
+                    } 
+                    else if (serverData.attempts >= 3) {
+                        // Max attempts reached
+                        showPhotoUpload(questionId);
+                    }
+                    else {
+                        // Not answered yet - hide navigation buttons
+                        document.getElementById('navigation-buttons').style.display = 'none';
+                    }
+                } else {
+                    // No server data available, treat as new question
                     document.getElementById('navigation-buttons').style.display = 'none';
                     console.log('Moving to next question, hiding navigation buttons');
-                } else {
-                    console.log('Moving to next question that is already answered or has photo, showing navigation buttons');
                 }
             } else {
                 // This is the last question and we're trying to go beyond it
