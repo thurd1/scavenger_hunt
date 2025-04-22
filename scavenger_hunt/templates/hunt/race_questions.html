@@ -1053,11 +1053,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const nextButton = document.getElementById('next-question');
             const navigationButtons = document.getElementById('navigation-buttons');
             
-            // Disable/enable next button
+            // Update button text if it's the last question
             if (currentQuestionIndex >= totalQuestions - 1) {
-                nextButton.disabled = true;
+                nextButton.textContent = 'Complete Race';
             } else {
-                nextButton.disabled = false;
+                nextButton.textContent = 'Next Question';
             }
         };
         
@@ -1114,7 +1114,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // This is the last question and we're trying to go beyond it
                 // Redirect to race completion page
                 console.log("Last question completed, redirecting to race completion page");
-                window.location.href = "/race-complete/";
+                window.location.href = "{% url 'race_complete' %}";
             }
         });
         
@@ -1410,7 +1410,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Set the question's input field as read-only to prevent further attempts
-                const answerInput = document.getElementById(`answer-${questionId}`);
+            const answerInput = document.getElementById(`answer-${questionId}`);
             if (answerInput) {
                 answerInput.readOnly = true;
                 answerInput.classList.add('max-attempts-reached');
@@ -1422,7 +1422,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if (feedbackElement) {
                 feedbackElement.className = 'feedback max-attempts';
                 feedbackElement.style.display = 'block';
-                feedbackElement.textContent = 'You\'ve reached the maximum number of attempts. Please proceed to the next question.';
+                
+                // Check if this is the last question
+                if (currentQuestionIndex >= totalQuestions - 1) {
+                    feedbackElement.textContent = 'You\'ve reached the maximum number of attempts. Please click Next Question to complete the race.';
+                    // Update the Next Question button text
+                    const nextButton = document.getElementById('next-question');
+                    if (nextButton) {
+                        nextButton.textContent = 'Complete Race';
+                    }
+                } else {
+                    feedbackElement.textContent = 'You\'ve reached the maximum number of attempts. Please proceed to the next question.';
+                }
             }
             
             // Show navigation buttons so user can move to next question
