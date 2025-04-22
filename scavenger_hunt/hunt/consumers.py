@@ -1010,4 +1010,11 @@ class RaceUpdatesConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'race_complete',
             'redirect_url': event.get('redirect_url', '/race-complete/')
+        }))
+        
+    async def team_score_update(self, event):
+        """Handle team score update events"""
+        await self.send(text_data=json.dumps({
+            'type': 'score_update',
+            'score': event.get('score', 0)
         })) 
