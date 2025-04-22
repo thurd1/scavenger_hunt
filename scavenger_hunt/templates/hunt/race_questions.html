@@ -803,23 +803,29 @@ function showRaceConnectionStatus(status, message) {
 
 // Show race completion notification
 function showRaceCompleteNotification(redirectUrl) {
-    const completeMessage = document.createElement('div');
-    completeMessage.style.position = 'fixed';
-    completeMessage.style.top = '50%';
-    completeMessage.style.left = '50%';
-    completeMessage.style.transform = 'translate(-50%, -50%)';
-    completeMessage.style.background = 'rgba(40, 167, 69, 0.9)';
-    completeMessage.style.color = 'white';
-    completeMessage.style.padding = '20px';
-    completeMessage.style.borderRadius = '10px';
-    completeMessage.style.zIndex = '20000';
-    completeMessage.innerHTML = '<h3>Congratulations!</h3><p>You\'ve completed all questions!</p><p>Redirecting to results page...</p>';
-    document.body.appendChild(completeMessage);
+    // Create the congratulations popup
+    const redirectMessage = document.createElement('div');
+    redirectMessage.style.position = 'fixed';
+    redirectMessage.style.top = '50%';
+    redirectMessage.style.left = '50%';
+    redirectMessage.style.transform = 'translate(-50%, -50%)';
+    redirectMessage.style.background = 'rgba(40, 167, 69, 0.9)';
+    redirectMessage.style.color = 'white';
+    redirectMessage.style.padding = '20px';
+    redirectMessage.style.borderRadius = '10px';
+    redirectMessage.style.zIndex = '10000';
+    redirectMessage.innerHTML = '<h3>Congratulations!</h3><p>You\'ve completed all questions!</p><p>Redirecting to results page...</p>';
+    document.body.appendChild(redirectMessage);
     
-    // Redirect after a short delay
+    // Hide all zone information and no questions message when showing completion
+    document.querySelectorAll('.zone').forEach(element => {
+        element.style.display = 'none';
+    });
+    
+    // Redirect after a short delay (1.5 seconds)
     setTimeout(() => {
         window.location.href = redirectUrl || '/race-complete/';
-    }, 2000);
+    }, 1500);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1289,11 +1295,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // RACE COMPLETION CHECK:
-                    // If server indicates this is the last question, redirect to race completion page
-                    if (data.is_last_question || data.is_race_complete) {
-                        console.log("SERVER INDICATED RACE COMPLETION - REDIRECTING NOW");
+                    if (data.is_last_question) {
+                        console.log('Last question answered correctly, showing completion message');
                         
-                        // Show message to user before redirecting
+                        // Create and display the completion message
                         const redirectMessage = document.createElement('div');
                         redirectMessage.style.position = 'fixed';
                         redirectMessage.style.top = '50%';
@@ -1306,6 +1311,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         redirectMessage.style.zIndex = '10000';
                         redirectMessage.innerHTML = '<h3>Congratulations!</h3><p>You\'ve completed all questions!</p><p>Redirecting to results page...</p>';
                         document.body.appendChild(redirectMessage);
+                        
+                        // Hide all zone information
+                        document.querySelectorAll('.zone').forEach(element => {
+                            element.style.display = 'none';
+                        });
                         
                         // Redirect after a short delay (1.5 seconds)
                         setTimeout(() => {
