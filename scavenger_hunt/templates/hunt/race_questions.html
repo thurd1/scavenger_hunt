@@ -1089,20 +1089,146 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             if (currentQuestionIndex < totalQuestions - 1) {
-                // Move to next question 
-                const nextIndex = currentQuestionIndex + 1;
+                // Hide current question
+                questions[currentQuestionIndex].style.display = 'none';
+                
+                // Move to next question
+                currentQuestionIndex++;
+                
+                // Clear the previous question's UI state before showing the next question
+                const nextQuestionElement = questions[currentQuestionIndex];
+                const nextQuestionId = nextQuestionElement.id.split('-')[1];
+                const nextDbQuestionId = nextQuestionElement.getAttribute('data-question-id');
+                
+                // Find elements that need to be reset
+                const feedbackElement = document.getElementById(`feedback-${nextQuestionId}`);
+                const attemptsElement = document.getElementById(`attempts-${nextQuestionId}`);
+                const submitButton = document.querySelector(`.submit-answer[data-question-id="${nextQuestionId}"]`);
+                const answerInput = document.getElementById(`answer-${nextQuestionId}`);
+                
+                console.log(`Moving to question ${nextQuestionId} (DB ID: ${nextDbQuestionId})`);
+                
+                // Reset feedback area
+                if (feedbackElement) {
+                    feedbackElement.style.display = 'none';
+                    feedbackElement.className = '';
+                    feedbackElement.textContent = '';
+                }
+                
+                // Reset the input field
+                if (answerInput) {
+                    answerInput.value = '';
+                    answerInput.readOnly = false;
+                    answerInput.classList.remove('max-attempts-reached');
+                    answerInput.placeholder = 'Your answer';
+                }
+                
+                // Reset the submit button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Answer";
+                }
+                
+                // Show the next question
+                nextQuestionElement.style.display = 'block';
+                
+                // Update navigation button text
+                updateQuestionCounter();
                 
                 // Save current question index to server
-                saveCurrentQuestionIndex(nextIndex);
+                saveCurrentQuestionIndex(currentQuestionIndex);
                 
-                // CRITICAL FIX: Force page reload to ensure clean question state
-                // This is the most reliable way to ensure no state leakage between questions
-                console.log(`Moving to question index ${nextIndex}, reloading page...`);
+                // Get the correct state from server data
+                if (nextDbQuestionId && answersFromServer[nextDbQuestionId]) {
+                    const serverData = answersFromServer[nextDbQuestionId];
+                    console.log(`Server data for question ${nextDbQuestionId}:`, serverData);
+                    
+                    // Reset and update the questionData with server values
+                    questionData[nextQuestionId] = {
+                        attempts: serverData.attempts || 0,
+                        points: serverData.points || 0,
+                        maxAttempts: 3,
+                        photoUploaded: serverData.photo_uploaded || false,
+                        answered: serverData.answered || false
+                    };
+                    
+                    // Update attempts display
+                    if (attemptsElement) {
+                        attemptsElement.textContent = `${serverData.attempts || 0}/3`;
+                        if ((serverData.attempts || 0) >= 3) {
+                            attemptsElement.style.color = '#dc3545';
+                            attemptsElement.style.fontWeight = 'bold';
+                        } else {
+                            attemptsElement.style.color = '';
+                            attemptsElement.style.fontWeight = '';
+                        }
+                    }
+                    
+                    // Apply server state to UI
+                    if (serverData.answered) {
+                        // Question was correctly answered
+                        if (feedbackElement) {
+                            feedbackElement.className = 'feedback correct';
+                            feedbackElement.style.display = 'block';
+                            feedbackElement.textContent = `Correct! You earned ${serverData.points} points.`;
+                        }
+                        
+                        if (submitButton) {
+                            submitButton.disabled = true;
+                        }
+                        
+                        if (answerInput) {
+                            answerInput.readOnly = true;
+                        }
+                        
+                        document.getElementById('navigation-buttons').style.display = 'block';
+                    } 
+                    else if (serverData.photo_uploaded) {
+                        // Photo was uploaded
+                        if (feedbackElement) {
+                            feedbackElement.className = 'feedback correct';
+                            feedbackElement.style.display = 'block';
+                            feedbackElement.textContent = 'Photo uploaded successfully!';
+                        }
+                        
+                        if (submitButton) {
+                            submitButton.disabled = true;
+                            submitButton.textContent = "Photo Uploaded ✓";
+                        }
+                        
+                        document.getElementById('navigation-buttons').style.display = 'block';
+                    }
+                    else if ((serverData.attempts || 0) >= 3) {
+                        // Max attempts reached
+                        showPhotoUpload(nextQuestionId);
+                    }
+                    else {
+                        // Not answered correctly yet and attempts still available
+                    document.getElementById('navigation-buttons').style.display = 'none';
+                    }
+                } else {
+                    // No server data available, treat as new question
+                    questionData[nextQuestionId] = {
+                        attempts: 0,
+                        points: 0,
+                        maxAttempts: 3,
+                        photoUploaded: false,
+                        answered: false
+                    };
+                    
+                    // Update attempts display
+                    if (attemptsElement) {
+                        attemptsElement.textContent = "0/3";
+                        attemptsElement.style.color = '';
+                        attemptsElement.style.fontWeight = '';
+                    }
+                    
+                    document.getElementById('navigation-buttons').style.display = 'none';
+                }
                 
-                // Wait for the server save to complete before reloading
-                setTimeout(() => {
-                    window.location.reload();
-                }, 100);
+                // Save updated state to localStorage
+                saveGameState();
+                
             } else {
                 // This is the last question and we're trying to go beyond it
                 // Redirect to race completion page
