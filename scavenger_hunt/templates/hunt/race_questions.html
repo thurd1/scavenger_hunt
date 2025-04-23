@@ -54,7 +54,7 @@
                             {% for zone_id, questions in questions_by_zone.items %}
                                 {% with zone=zones|filter_by:'id'|get:zone_id %}
                                     <div class="zone mb-5" id="zone-{{ zone.id }}">
-                                        <h2 class="zone-title mb-4">{{ zone.name }}</h2>
+                                        <h2 class="zone-title mb-4">{{ zone.name|default:"" }}</h2>
                                         
                                         <!-- Current question container -->
                                         <div id="questionContainer" class="question-container mb-4">
@@ -122,12 +122,6 @@
     border-radius: 15px;
     border: 1px solid rgba(144, 200, 60, 0.2);
     padding: 2rem !important;
-}
-
-/* Hide Default Zone */
-#zone-container .zone-title:contains("Default Zone"),
-.zone:has(.zone-title:contains("Default Zone")) {
-    display: none;
 }
 
 .join-form-container {
@@ -840,17 +834,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const raceId = '{{ race.id }}';
     const localStorageKey = `race_state_${raceId}_${teamCode}`;
     const timerStorageKey = `race_timer_${raceId}_${teamCode}`;
-    
-    // Hide any default zones
-    document.querySelectorAll('.zone-title').forEach(zoneTitle => {
-        if (zoneTitle.textContent.trim() === 'Default Zone') {
-            // Hide the entire zone
-            const zoneElement = zoneTitle.closest('.zone');
-            if (zoneElement) {
-                zoneElement.style.display = 'none';
-            }
-        }
-    });
     
     if (questionContainer) {
         console.log('---------- RACE QUESTIONS PAGE INITIALIZING ----------');
