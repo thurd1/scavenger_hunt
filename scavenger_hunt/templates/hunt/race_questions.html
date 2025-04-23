@@ -124,6 +124,12 @@
     padding: 2rem !important;
 }
 
+/* Hide Default Zone */
+#zone-container .zone-title:contains("Default Zone"),
+.zone:has(.zone-title:contains("Default Zone")) {
+    display: none;
+}
+
 .join-form-container {
     max-width: 500px;
     margin: 0 auto;
@@ -834,6 +840,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const raceId = '{{ race.id }}';
     const localStorageKey = `race_state_${raceId}_${teamCode}`;
     const timerStorageKey = `race_timer_${raceId}_${teamCode}`;
+    
+    // Hide any default zones
+    document.querySelectorAll('.zone-title').forEach(zoneTitle => {
+        if (zoneTitle.textContent.trim() === 'Default Zone') {
+            // Hide the entire zone
+            const zoneElement = zoneTitle.closest('.zone');
+            if (zoneElement) {
+                zoneElement.style.display = 'none';
+            }
+        }
+    });
     
     if (questionContainer) {
         console.log('---------- RACE QUESTIONS PAGE INITIALIZING ----------');
