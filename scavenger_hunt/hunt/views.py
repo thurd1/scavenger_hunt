@@ -2452,21 +2452,13 @@ def save_question_index(request):
             defaults={'current_question_index': question_index}
         )
         
-        # IMPORTANT: Clear any client-side session data to fix the question display issue
-        # This ensures a fresh state when navigating to a question after refreshing
-        response = JsonResponse({
+        return JsonResponse({
             'success': True,
             'message': 'Question index saved successfully',
             'team_id': team.id,
             'race_id': race.id,
             'question_index': question_index
         })
-        
-        # Set a special cookie flag to indicate navigation
-        # This will be used by the frontend to ensure clean question state
-        response.set_cookie('fresh_navigation', 'true', max_age=10)
-        
-        return response
         
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)

@@ -53,7 +53,6 @@
                         <div id="question-container">
                             {% for zone_id, questions in questions_by_zone.items %}
                                 {% with zone=zones|filter_by:'id'|get:zone_id %}
-                                    {% if zone.name != "Default zone" and zone.name != "Default Zone" %}
                                     <div class="zone mb-5" id="zone-{{ zone.id }}">
                                         <h2 class="zone-title mb-4">Zone: {{ zone.name }}</h2>
                                         
@@ -83,13 +82,10 @@
                                                     </div>
                                                 {% endfor %}
                                             {% else %}
-                                                {% if zone.name != "Default zone" and zone.name != "Default Zone" %}
                                                 <div class="alert alert-warning">No questions available.</div>
-                                                {% endif %}
                                             {% endif %}
                                             </div>
                                     </div>
-                                    {% endif %}
                                 {% endwith %}
                             {% endfor %}
                             
@@ -842,31 +838,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const localStorageKey = `race_state_${raceId}_${teamCode}`;
     const timerStorageKey = `race_timer_${raceId}_${teamCode}`;
     
-    // CRITICAL FIX: Check if this is a navigation from another question
-    // by looking for the fresh_navigation cookie
-    function checkForNavigationReset() {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.indexOf('fresh_navigation=true') === 0) {
-                console.log('Detected navigation between questions - ensuring clean state');
-                
-                // Clear the navigation cookie immediately
-                document.cookie = 'fresh_navigation=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-                
-                // Force a clean reload from server by clearing localStorage
-                localStorage.removeItem(localStorageKey);
-                
-                // Return true to indicate we detected navigation
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    // Check for navigation reset at the start
-    const isNavigatingBetweenQuestions = checkForNavigationReset();
-    
     if (questionContainer) {
         console.log('---------- RACE QUESTIONS PAGE INITIALIZING ----------');
         console.log('Server data - Current question index:', currentQuestionIndexFromServer);
@@ -878,7 +849,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // --- STATE RESTORATION FROM LOCAL STORAGE ---
         let savedState = null;
         try {
-            if (localStorage.getItem(localStorageKey) && !isNavigatingBetweenQuestions) {
+            if (localStorage.getItem(localStorageKey)) {
                 savedState = JSON.parse(localStorage.getItem(localStorageKey));
                 console.log('Found saved state in localStorage:', savedState);
                 
@@ -893,7 +864,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('Using server question index:', currentQuestionIndex);
                 }
             } else {
-                console.log('No saved state found in localStorage or navigating between questions, using server data only');
+                console.log('No saved state found in localStorage, using server data only');
             }
         } catch (error) {
             console.error('Error parsing saved state:', error);
