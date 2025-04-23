@@ -53,8 +53,9 @@
                         <div id="question-container">
                             {% for zone_id, questions in questions_by_zone.items %}
                                 {% with zone=zones|filter_by:'id'|get:zone_id %}
+                                    {% if zone.name != "Default Zone" %}
                                     <div class="zone mb-5" id="zone-{{ zone.id }}">
-                                        <h2 class="zone-title mb-4">{{ zone.name|default:"" }}</h2>
+                                        <h2 class="zone-title mb-4">{{ zone.name }}</h2>
                                         
                                         <!-- Current question container -->
                                         <div id="questionContainer" class="question-container mb-4">
@@ -86,6 +87,7 @@
                                             {% endif %}
                                             </div>
                                     </div>
+                                    {% endif %}
                                 {% endwith %}
                             {% endfor %}
                             
