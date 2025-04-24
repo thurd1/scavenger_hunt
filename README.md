@@ -128,3 +128,10 @@ python manage.py migrate
 ```
 
 Without encountering any duplicate column errors.
+
+Required dependencies:
+pip install django
+pip install whitenoise
+pip install channels
+pip install channels-redis
+pip install daphne
